@@ -145,4 +145,4 @@ jobs:
         npm ci --no-audit --no-fund
         npm test
     secrets:
-      opencode_go_api_key: ${{ secrets.AI_PROVIDER_OPENCODE_GO_KEY }
+      opencode_go_api_key: ${{ secrets.AI_PROVIDER_OPENCODE_GO_KEY }}
