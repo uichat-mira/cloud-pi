@@ -35,7 +35,7 @@ Cloud Auth 不是每次工具请求的代理，也不是存放 Agent 研究任�
 | Scheduler | 优先成熟插件；宿主只提供任务触发和运行审计薄胶水 | 定时准确性、时区、重复触发、取消与重启 |
 | Research | Pi 工具 + 搜索/阅读能力，使用标准 MCP | 实际工具权限、来源引用和防提示词注入 |
 | Feishu | 优先适配现成插件；消息收发/群 @/多目标投递 | 用户/群身份核验、消息去重、断线恢复 |
-| MCP | Pi 原生 Extension 优先，std​​io / Streamable HTTP | SDK 真实装配、动态凭证、工具结果保真 |
+| MCP | Pi 原生 Extension 优先，stdio / Streamable HTTP | SDK 真实装配、动态凭证、工具结果保真 |
 | Persistence | SQLite（首选候选）+ Pi Session 持久化，避免重复保存整份模型上下文 | 持久化一致性、备份、重启后的任务归属 |
 | API/UI | Cloud Auth 服务入口 + Agent 业务 API 与控制台 | 路由、同源反代或独立子服务的实际代码 |
 | Deployment | 本地 DSH → 广州 Linux Docker（后续） | 2C2G 共存的内存、CPU、网络、数据卷与重启恢复 |
@@ -48,7 +48,7 @@ Cloud Auth 不是每次工具请求的代理，也不是存放 Agent 研究任�
 
 - 嵌入式 SDK **不自动装载** CLI 的内建 MCP/codemode/tool-search 扩展。候选路径为使用 DefaultResourceLoader 的 extensionFactories 显式注册并完成 Session 扩展绑定；具体导出、签名、生命周期必须以**实际锁定版本**验证。
 - 官方 MCP Client / Extension 负责协议、工具注册和结果，不自行重写 JSON-RPC 或复制观澜的工具 Schema。
-- 优先 **2026-07-28 + Stateless Streamable HTTP**；协商能力以实际 Pi SDK 与 Guanlan 测试为准。std​​io MCP 用于明确授权的本地工具，禁止不受控执行。
+- 优先 **2026-07-28 + Stateless Streamable HTTP**；协商能力以实际 Pi SDK 与 Guanlan 测试为准。stdio MCP 用于明确授权的本地工具，禁止不受控执行。
 - 优先**按任务暴露少量工具**。先验证 direct / deferred / codemode 的工具可见性、模型成本与权限覆盖，再决定默认。
 - 保留 MCP 的 content、structuredContent、isError、URL 与 nextCursor；空 items 且 nextCursor 非空时继续有界分页。
 - **A / B 二选一**：A = Pi 原生 MCP Extension，首选；只有拿到无法满足动态凭证/权限/取消的实证才评估 B = 官方 MCP Client 薄桥接。不能同时建两套。
