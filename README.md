@@ -33,4 +33,15 @@
 
 先按 [P0 MCP 方案](docs/engineering/p0-mcp-poc.md) 验证一条真实 Pi SDK ↔ 隔离观澜 workerd/D1 的只读协议链路。P0 **不需要**搭建完整控制台、飞书机器人、定时器、云账号委托或生产环境；通过后再按业务价值递进。
 
+## OpenCode 付费 Worker（工程施工）
+
+本仓库使用 [Organization 共享 Mira External Worker](https://github.com/uichat-mira/.github/blob/main/.github/workflows/mira-external-worker.yml)，由 `.github/workflows/mira-external-worker.yml` 作为**受信任的轻量派工入口**。运行时采用 OpenCode Go，默认模型 `deepseek-v4.1-flash`，**每次最多 90 分钟**（包含施工与可信验证）。这只是运行时间上限，不是固定消费额度。
+
+- 仅适用于**已有明确施工授权且仍 OPEN 的工程 Issue**；Issue 关闭、PR、空合同不能派工。必须由拥有当前仓库写权限的**真人维护者**在对应 Issue 留下**完整且未编辑的单行评论 `/worker run`**；也可从 Actions 手动输入 Issue 编号启动。
+- Worker 在独立 `feat/worker-*` 分支执行，以 `dev` 为唯一交付目标，使用仓库现有 `npm ci --no-audit --no-fund && npm test` 进行可信验证，交付 **Draft PR**。**不允许**自行合并、关闭 Issue、部署或变更生产权限。
+- 密钥通过 GitHub Actions Secret `AI_PROVIDER_OPENCODE_GO_KEY` 提供给共享工作流，**不写入仓库、PR、Issue、日志或用户对话**。新仓库能否使用组织密钥须由实际 Actions 运行或组织密钥访问策略确认；仅有 YAML 引用不构成可用性证据。
+- **GitHub 默认分支须为 `dev`**：评论事件和手动 Dispatch 只会从默认分支发现 Caller，实际 Workflow 和 Worker 交付目标均在 `dev`；保留的 `main` 不是生产分支。修改默认分支不会触发产品部署。
+
+该入口只负责工程施工，不是 Cloud Agent 产品自身的运行时。
+
 本仓库遵守 [Mira Organization AGENTS](https://github.com/uichat-mira/.github/blob/main/AGENTS.md) 和 [环境分支规范](https://github.com/uichat-mira/.github/blob/main/docs/engineering/environment-model.md)。当前 main 仅保留初始引导，开发集成以 dev 为目标；任何生产部署均应另行评审并走正式环境晋级。

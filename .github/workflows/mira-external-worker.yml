@@ -1,0 +1,149 @@
+# Cloud Pi paid OpenCode Worker caller.
+# Default GitHub branch must be dev for issue_comment / workflow_dispatch to load this caller.
+# The Organization reusable workflow owns OpenCode execution, verification and Draft PR delivery.
+name: Mira External Worker
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Open cloud-pi engineering Issue to implement
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize dispatch of the same Issue end-to-end, including verification and delivery.
+concurrency:
+  group: ${{ format('cloud-pi-worker-{0}-{1}', github.repository, github.event_name == 'issue_comment' && github.event.issue.number || inputs.issue_number || github.run_id) }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  enrollment:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.action == 'created' &&
+       github.event.comment.body == '/worker run')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      issue_number: ${{ steps.guard.outputs.issue_number }}
+    steps:
+      - name: Verify live maintainer authorization and Issue contract
+        id: guard
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DISPATCH_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = 'uichat-mira/cloud-pi'
+
+          # Both triggers must execute only the reviewed dev/default-branch caller.
+          # This also prevents manual workflow_dispatch from an unreviewed feature ref.
+          if test "$DEFAULT_BRANCH" != 'dev' || test "$GITHUB_REF_NAME" != 'dev'; then
+            echo '::error::Worker caller must execute from the default dev branch.' >&2
+            exit 1
+          fi
+          test -s "$GITHUB_EVENT_PATH"
+          gh api "repos/$GITHUB_REPOSITORY/branches/dev" --jq '.name' >/dev/null
+
+          # GitHub event actor must be a real human; recheck live collaborator permission.
+          jq -e --arg actor "$ACTOR" '
+            .sender.login == $actor and .sender.type == "User"
+          ' "$GITHUB_EVENT_PATH" >/dev/null || {
+            echo '::error::Dispatch must come from the actual human event actor.' >&2
+            exit 1
+          }
+          permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$ACTOR/permission" --jq '.permission')"
+          case "$permission" in
+            admin|maintain|write) ;;
+            *) echo '::error::Dispatcher lacks current repository write permission.' >&2; exit 1 ;;
+          esac
+
+          if test "$EVENT_NAME" = 'issue_comment'; then
+            jq -e --arg actor "$ACTOR" '
+              .action == "created" and
+              .issue.state == "open" and
+              (.issue | has("pull_request") | not) and
+              .comment.body == "/worker run" and
+              .comment.user.login == $actor and
+              .comment.user.type == "User" and
+              .comment.created_at == .comment.updated_at
+            ' "$GITHUB_EVENT_PATH" >/dev/null || {
+              echo '::error::Use an original unedited /worker run on an open Issue.' >&2
+              exit 1
+            }
+            issue_number="$(jq -er '.issue.number | numbers' "$GITHUB_EVENT_PATH")"
+            comment_id="$(jq -er '.comment.id | numbers' "$GITHUB_EVENT_PATH")"
+            case "$comment_id" in
+              ''|0|0*|*[!0-9]*) echo '::error::Invalid comment ID.' >&2; exit 1 ;;
+            esac
+            live_comment="$(gh api "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id")"
+            jq -e --slurpfile event "$GITHUB_EVENT_PATH" '
+              .id == $event[0].comment.id and
+              .user.id == $event[0].comment.user.id and
+              .user.login == $event[0].comment.user.login and
+              .user.type == "User" and
+              .issue_url == $event[0].issue.url and
+              .body == "/worker run" and
+              .created_at == $event[0].comment.created_at and
+              .updated_at == $event[0].comment.updated_at and
+              .created_at == .updated_at
+            ' <<< "$live_comment" >/dev/null || {
+              echo '::error::Original dispatch comment was edited, removed or replaced.' >&2
+              exit 1
+            }
+          else
+            issue_number="$DISPATCH_ISSUE_NUMBER"
+          fi
+
+          case "$issue_number" in
+            ''|0|0*|*[!0-9]*) echo '::error::Issue number must be a positive decimal integer.' >&2; exit 1 ;;
+          esac
+          live_issue="$(gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number")"
+          jq -e '
+            .state == "open" and
+            (has("pull_request") | not) and
+            (.body // "" | gsub("[[:space:]]"; "") | length > 0)
+          ' <<< "$live_issue" >/dev/null || {
+            echo '::error::Issue is closed, a PR, or has no work contract.' >&2
+            exit 1
+          }
+
+          echo "issue_number=$issue_number" >> "$GITHUB_OUTPUT"
+
+  worker:
+    needs: enrollment
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: write
+    # Immutable Organization main revision verified at enrollment time.
+    uses: uichat-mira/.github/.github/workflows/mira-external-worker.yml@d359b6e4d0792e8ab48eee6145ca49483f9b4456
+    with:
+      issue_number: ${{ fromJSON(needs.enrollment.outputs.issue_number) }}
+      base_branch: dev
+      timeout_minutes: 90
+      free_mode: false
+      provider: opencode-go
+      model: deepseek-v4.1-flash
+      verification_command: |
+        NODE_BIN="$(find /opt/hostedtoolcache/node -path '*/24.*/x64/bin/node' -type f -print | sort -V | tail -n 1)"
+        test -n "$NODE_BIN"
+        export PATH="$(dirname "$NODE_BIN"):$PATH"
+        node --version
+        npm ci --no-audit --no-fund
+        npm test
+    secrets:
+      opencode_go_api_key: ${{ secrets.AI_PROVIDER_OPENCODE_GO_KEY }}
