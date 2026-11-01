@@ -49,9 +49,10 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = 'uichat-mira/cloud-pi'
 
-          # GitHub issue_comment workflows always come from the repository default branch.
-          if test "$EVENT_NAME" = 'issue_comment' && test "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH"; then
-            echo '::error::Comment dispatch must use the reviewed default-branch caller.' >&2
+          # Both triggers must execute only the reviewed dev/default-branch caller.
+          # This also prevents manual workflow_dispatch from an unreviewed feature ref.
+          if test "$DEFAULT_BRANCH" != 'dev' || test "$GITHUB_REF_NAME" != 'dev'; then
+            echo '::error::Worker caller must execute from the default dev branch.' >&2
             exit 1
           fi
           test -s "$GITHUB_EVENT_PATH"
