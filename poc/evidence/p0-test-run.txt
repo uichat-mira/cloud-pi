@@ -1,6 +1,6 @@
 ﻿Cloud Pi P0 - recorded test run
 
-Date (UTC): 2026-11-01T15:36:34Z
+Date (UTC): 2026-11-01T15:58:07Z
 Node: v24.9.0
 npm: 11.6.0
 Pi SDK: 1.4.0 (package-lock.json)
@@ -18,27 +18,47 @@ Guanlan fixture already prepared at C:\Users\ADMINI~1\AppData\Local\Temp\cloud-p
 > node --test "tests/**/*.test.mjs"
 
 ▶ P0: real Pi SDK session -> native MCP extension -> isolated Guanlan
-  ✔ the installed Pi SDK is pinned and exposes the two Guanlan read tools over the real MCP transport (221.9152ms)
-  ✔ whoami and news execute through Pi's tool pipeline, keep their structured output and ignore spoofed identity arguments (154.9168ms)
-  ✔ accounts and stable consumers are isolated from each other (378.9662ms)
-  ✔ a cursor is bound to the verified identity and filter set (378.5648ms)
-  ✔ pagination is exact and a scan-budget-limited page keeps a continuation cursor (266.2265ms)
-  ✔ a permission extension blocks execution without touching the server (111.9466ms)
-  ✔ a timed-out MCP call is an explicit tool error and is cancelled on the wire (1172.1178ms)
-  ✔ aborting the agent cancels an in-flight MCP call (596.2219ms)
-  ✔ an interrupted transport reconnects on the next call (143.6412ms)
-  ✔ rotating the test credential changes the verified identity in place (331.7676ms)
-  ✔ invalid credentials never expose tools or reach a tools/call (4648.9585ms)
-✔ P0: real Pi SDK session -> native MCP extension -> isolated Guanlan (16288.912ms)
+  ✔ the installed Pi SDK is pinned and exposes the two Guanlan read tools over the real MCP transport (218.9807ms)
+  ✔ whoami and news execute through Pi's tool pipeline, keep their structured output and ignore spoofed identity arguments (136.1173ms)
+  ✔ accounts and stable consumers are isolated from each other (347.4559ms)
+  ✔ a cursor is bound to the verified identity and filter set (354.792ms)
+  ✔ pagination is exact and a scan-budget-limited page keeps a continuation cursor (282.2188ms)
+  ✔ a permission extension blocks execution without touching the server (104.8653ms)
+  ✔ a timed-out MCP call is an explicit tool error and is cancelled on the wire (1200.9777ms)
+  ✔ aborting the agent cancels an in-flight MCP call (611.3719ms)
+  ✔ an interrupted transport reconnects on the next call (146.3612ms)
+  ✔ rotating the test credential changes the verified identity in place (312.2548ms)
+  ✔ invalid credentials never expose tools or reach a tools/call (4661.3964ms)
+✔ P0: real Pi SDK session -> native MCP extension -> isolated Guanlan (16217.5801ms)
 ▶ P0: storage failure is an explicit MCP tool error
-  ✔ a failed news read is never downgraded to an empty page (129.3598ms)
-✔ P0: storage failure is an explicit MCP tool error (7804.5756ms)
-ℹ tests 12
-ℹ suites 2
-ℹ pass 12
+  ✔ a failed news read is never downgraded to an empty page (112.2525ms)
+✔ P0: storage failure is an explicit MCP tool error (7581.8802ms)
+warning: in the working copy of 'tracked.txt', LF will be replaced by CRLF the next time Git touches it
+▶ prepare-guanlan-fixture: external GUANLAN_DIR is read-only
+  ✔ reuses a clean checkout at the pinned commit with the built fixture (1.3577ms)
+  ✔ refuses a checkout at another commit (0.2465ms)
+  ✔ refuses a checkout with uncommitted tracked changes (0.1105ms)
+  ✔ refuses to build inside a checkout without the built fixture (0.1103ms)
+  ✔ refuses --force against an external checkout (0.1292ms)
+  ✔ refuses a missing GUANLAN_DIR instead of creating it (0.1034ms)
+  ✔ refuses a directory that is not a git checkout (0.0993ms)
+  ✔ refuses a checkout of a different repository (0.1159ms)
+✔ prepare-guanlan-fixture: external GUANLAN_DIR is read-only (3.173ms)
+▶ prepare-guanlan-fixture: only the script-owned cache is rebuilt
+  ✔ clones when the managed cache is missing (0.1498ms)
+  ✔ rebuilds the managed cache at another commit (0.153ms)
+  ✔ rebuilds the managed cache on --force (0.0919ms)
+  ✔ reuses the managed cache when it is ready (0.0683ms)
+✔ prepare-guanlan-fixture: only the script-owned cache is rebuilt (0.6308ms)
+▶ prepare-guanlan-fixture: real script guard
+  ✔ a dirty external worktree at another commit is refused and left byte-identical (484.6624ms)
+✔ prepare-guanlan-fixture: real script guard (484.7483ms)
+ℹ tests 25
+ℹ suites 5
+ℹ pass 25
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 25635.9493
+ℹ duration_ms 25874.7308
 

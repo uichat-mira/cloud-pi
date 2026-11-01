@@ -37,9 +37,16 @@ npm test                  # node --test "tests/**/*.test.mjs"
 
 `prepare:guanlan` clones and builds into the OS temp directory
 (`cloud-pi-guanlan`, e.g. `%TEMP%\cloud-pi-guanlan`), so the fixture checkout and
-its `node_modules` never pollute this repository. Set `GUANLAN_DIR` to reuse an
-existing checkout, or pass `--force` to rebuild. `pretest` runs it automatically
-and skips when the pinned build is already present.
+its `node_modules` never pollute this repository. That directory is owned by the
+script and may be rebuilt with `--force`.
+
+`GUANLAN_DIR` is different: an existing checkout supplied by the caller is only
+ever **read**. It is reused when it is a clean checkout of the pinned commit with
+the built fixture already present; otherwise preparation fails and explains why.
+The script never runs `git checkout --force`, `git reset`, `npm ci` or a build in
+a directory it did not create. `pretest` runs the script automatically, so a
+misconfigured `GUANLAN_DIR` fails loudly instead of touching a developer's
+worktree.
 
 ## What is real, and what is scripted
 
@@ -60,8 +67,9 @@ and skips when the pinned build is already present.
 
 ## Evidence map
 
-Recorded with `node --test "tests/**/*.test.mjs"`: **12 tests, 12 passed,
-0 failed** (≈25 s on the recorded machine).
+Recorded with `node --test "tests/**/*.test.mjs"`: **25 tests, 25 passed,
+0 failed** (12 MCP acceptance tests + 13 fixture-safety tests, ≈26 s on the
+recorded machine).
 
 | Requirement | Test | Observed result |
 | --- | --- | --- |
@@ -78,9 +86,10 @@ Recorded with `node --test "tests/**/*.test.mjs"`: **12 tests, 12 passed,
 | Timeout | `a timed-out MCP call is an explicit tool error…` | with a 1 s server timeout and 2.5 s injected response latency, the call fails in ~1.0 s with `MCP request timed out after 1000ms`; the client sends `notifications/cancelled` with the matching `requestId` and reason `Request timed out` |
 | Cancel | `aborting the agent cancels an in-flight MCP call` | `session.abort()` yields `MCP request aborted` and `notifications/cancelled` with the matching `requestId` |
 | Reconnect | `an interrupted transport reconnects on the next call` | after `dropConnections()` the next call is an `isError` (`fetch failed`), the following call succeeds; stopping the listener and restarting it behaves the same |
-| Test-credential update | `rotating the test credential changes the verified identity in place` | replacing the registration with `fixture-consumer-2` reconnects in place; the next `whoami` reports `consumer-2`, no session rebuild |
+| Test-credential update | `rotating the test credential changes the verified identity in place` | replacing the registration with `fixture-consumer-2` reconnects in place; the next `whoami` reports `consumer-2`, no session rebuild. This proves the wiring can be swapped, **not** that a production session may switch consumers |
 | Bad credentials | `invalid credentials never expose tools…` | wrong scope, expired and missing-consumer tokens: no MCP tools declared, `initialize` rejected with HTTP ≥ 400, zero `tools/call` |
 | Error is not empty success | `a failed news read is never downgraded…` | dropping `poc_news` makes the news call `isError: true` with `guanlan_news_unavailable: the news index could not be read`; `whoami` still works |
+| Fixture preparation is safe | `prepare-guanlan-fixture: …` | an external `GUANLAN_DIR` at another commit with an uncommitted tracked file is refused; file content, HEAD and `git status` are byte-identical, and no `node_modules`/`dist` is written |
 
 ## Findings worth carrying forward
 
@@ -104,7 +113,12 @@ Recorded with `node --test "tests/**/*.test.mjs"`: **12 tests, 12 passed,
 5. **Protocol ceiling is Pi's, not Guanlan's.** Pi offers at most `2025-11-25`
    and Guanlan serves its legacy stateless path for it. If Guanlan later drops
    legacy protocol versions, Pi's client will need a newer protocol version.
-6. **Miniflare is in-process only.** The HTTP bridge is test scaffolding; it is
+6. **Credential refresh is not identity switching.** The rotation test proves the
+   MCP registration can be replaced and reconnected; it does not authorize
+   reusing a live session that holds consumer A's conversation context for
+   consumer B. Production must treat a session as single-identity and create a
+   new session for a different consumer.
+7. **Miniflare is in-process only.** The HTTP bridge is test scaffolding; it is
    not production transport and does not change the MCP client or server.
 
 ## Deliberately not executed

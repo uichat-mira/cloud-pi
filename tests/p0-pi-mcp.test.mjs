@@ -446,6 +446,9 @@ describe("P0: real Pi SDK session -> native MCP extension -> isolated Guanlan", 
   });
 
   test("rotating the test credential changes the verified identity in place", async () => {
+    // Wiring proof only: the registration can be replaced and reconnected.
+    // Production must NOT reuse a live session across consumers; a session is
+    // single-identity even though the transport can be re-pointed.
     const p0 = await openSession();
     try {
       assert.deepEqual(identityOf(await callTool(p0, TOOL_WHOAMI, {})), {
