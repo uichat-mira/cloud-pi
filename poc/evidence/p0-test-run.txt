@@ -1,0 +1,44 @@
+﻿Cloud Pi P0 - recorded test run
+
+Date (UTC): 2026-11-01T15:36:34Z
+Node: v24.9.0
+npm: 11.6.0
+Pi SDK: 1.4.0 (package-lock.json)
+Guanlan fixture commit: 3362ef9254be154694cb786fc35921884c62b792
+Fixture dir: C:\Users\ADMINI~1\AppData\Local\Temp\cloud-pi-guanlan
+
+Command: npm test
+
+> cloud-pi@0.0.0-poc pretest
+> node scripts/prepare-guanlan-fixture.mjs
+
+Guanlan fixture already prepared at C:\Users\ADMINI~1\AppData\Local\Temp\cloud-pi-guanlan (3362ef9254be154694cb786fc35921884c62b792).
+
+> cloud-pi@0.0.0-poc test
+> node --test "tests/**/*.test.mjs"
+
+▶ P0: real Pi SDK session -> native MCP extension -> isolated Guanlan
+  ✔ the installed Pi SDK is pinned and exposes the two Guanlan read tools over the real MCP transport (221.9152ms)
+  ✔ whoami and news execute through Pi's tool pipeline, keep their structured output and ignore spoofed identity arguments (154.9168ms)
+  ✔ accounts and stable consumers are isolated from each other (378.9662ms)
+  ✔ a cursor is bound to the verified identity and filter set (378.5648ms)
+  ✔ pagination is exact and a scan-budget-limited page keeps a continuation cursor (266.2265ms)
+  ✔ a permission extension blocks execution without touching the server (111.9466ms)
+  ✔ a timed-out MCP call is an explicit tool error and is cancelled on the wire (1172.1178ms)
+  ✔ aborting the agent cancels an in-flight MCP call (596.2219ms)
+  ✔ an interrupted transport reconnects on the next call (143.6412ms)
+  ✔ rotating the test credential changes the verified identity in place (331.7676ms)
+  ✔ invalid credentials never expose tools or reach a tools/call (4648.9585ms)
+✔ P0: real Pi SDK session -> native MCP extension -> isolated Guanlan (16288.912ms)
+▶ P0: storage failure is an explicit MCP tool error
+  ✔ a failed news read is never downgraded to an empty page (129.3598ms)
+✔ P0: storage failure is an explicit MCP tool error (7804.5756ms)
+ℹ tests 12
+ℹ suites 2
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 25635.9493
+
