@@ -1,7 +1,7 @@
 # AGT-028 · Independent verification report
 
-Status: **verification PASS on confirmation HEAD `47fb5b7`**, with one new
-integration finding (F10) and accepted residual risks. This document records what
+Status: **verification PASS on confirmation HEAD `b7609d2`** (F10 fixed),
+with accepted residual risks. This document records what
 an independent verifier actually ran against the AGT-028 working tree, what
 passed, what failed, and what remains unproven. It is not acceptance: the live
 evidence in [docs/evidence/agt-028/](../evidence/agt-028/README.md) was produced
@@ -9,8 +9,8 @@ by the team, not independently re-run here, and the Issue owner decides.
 
 - Audited worktree: `/Users/tao/Desktop/workspace/cloud-pi-agt-028`
   (the main `cloud-pi` checkout was not modified).
-- Audited at: 2026-11-02 17:30–18:00 +08:00 (first pass) and 18:17–18:30
-  (confirmation pass on HEAD `47fb5b7`).
+- Audited at: 2026-11-02 17:30–18:00 +08:00 (first pass), 18:17–18:30
+  (confirmation on `47fb5b7`) and 18:30–18:45 (confirmation on `b7609d2`).
 - Environment: Node.js v22.23.2, npm 10.9.8, macOS; no proxy env vars set.
 - No git command was used to change or inspect code content; a single read-only
   `git rev-parse HEAD` confirmed the confirmation-pass revision `47fb5b7`. File
@@ -27,9 +27,9 @@ by the team, not independently re-run here, and the Issue owner decides.
 ## Audited artifacts (SHA-256)
 
 ```
-# confirmation HEAD 47fb5b7
-20b9012e127a4d223c65bcfab4de2d63080b708827f39924e801d4b26fa567eb  src/research/execute.mjs
-88188b5a662d338991e8506c8cdac7d667c0e698615ba423de964dadc49bb313  src/research/port.mjs
+# confirmation HEAD b7609d2
+4cb580deb8778cee5d8da2e82df2aae7549d3429ccc2e2f98fad3149b490631d  src/research/execute.mjs
+d43a59479490f7c558d09bd9548e384208cd4d27251df5bc2b28009b3fbb2e7c  src/research/port.mjs
 9e74f1dae04ec0bb5b96e6c5df6ad1ecefd33be26c01502d65e84154d7c9da0d  src/research/runtime/agt-027.mjs
 df9aa74d730311e5ad0bc5551a1edb5c6a595555460bcbcd8a8f7205cb707d3c  src/research/prompt.mjs
 c560efad35aea11a55a0c6ec27fa40bfe89abbe0100c67226d8d94f8ee687e8a  src/research/contracts.mjs
@@ -62,6 +62,8 @@ All commands were run from the audited worktree.
 | `node --test tests/research-verify-adapter.test.mjs` | **14 tests, 14 pass, 0 fail**, exit 0 (~1.0 s) |
 | `npm test` (full suite, ten runs before triage) | **8 green / 2 red**: 278/278 pass (×2), 277/277 pass (×2), 276/276 pass (×3), 275/275 pass (×1); two runs ended **260 pass + 18 cancelled, 0 fail, exit 1** and **257 pass + 18 cancelled, 0 fail, exit 1**. The red runs were the flaky test finding **F2**, not a product assertion. |
 | `npm test` (confirmation HEAD `47fb5b7`, five consecutive runs) | **279/279 pass, 0 fail, 0 cancelled, exit 0, all five runs** |
+| `npm test` (confirmation HEAD `b7609d2`, five consecutive runs) | **282/282 pass, 0 fail, 0 cancelled, exit 0, all five runs** |
+| `node --test tests/research-runtime-adapter.test.mjs` | **9 tests, 9 pass** (includes the new default-fallback end-to-end test) |
 | `node --test --test-name-pattern "external abort" tests/research-execute.test.mjs` (×20) | **20/20 pass** (flake-fix stress) |
 | `node --test --test-name-pattern "maxTotalPageChars refuses further page reads|external abort" tests/research-execute.test.mjs` | **2 tests, 2 pass** (F2 + F4 fixes) |
 
@@ -90,16 +92,35 @@ triage:
 - F8: design doc now lists `runtime/agt-027.mjs`, says `run.json` is written at
   start and finalisation, and replaces the stale live-acceptance block with the
   three real runs in `docs/evidence/agt-028/`. **Fixed**, except the §11 claim
-  that the port loader auto-resolves `src/index.mjs` — contradicted by **F10**.
+  that the port loader auto-resolves `src/index.mjs` — contradicted by **F10** at
+  the time; true after the `b7609d2` fix.
 - F3/F5/F6/F7: owner rationale accepted (see each finding); no code change.
 
-**New finding F10 (medium)**: the new default-module fallback in
-`src/research/port.mjs:112` imports the wrong variable.
+**New finding F10 (medium, fixed in `b7609d2`; §2.2)**: the new
+  default-module fallback in `src/research/port.mjs:112` imported the wrong
+  variable.
 
 Historical note: before the F1 fix landed at 17:51, the full suite was red with
 exactly one failing assertion — the verification test that detects credential
 tokens in `sources.json` / `sources.md`. That is the only failing product check
 this audit saw; it now passes.
+
+### 2.2 Confirmation on HEAD `b7609d2` (F10 fix)
+
+- `src/research/port.mjs` now exports `DEFAULT_RUNTIME_MODULE` and a pure
+  `resolveRuntimeModuleSpecifier(moduleSpecifier, fallbackUrl)`; the loader uses
+  the resolved value (`import(specifier)`, `port.mjs:120-135`). On `b7609d2` the
+  default fallback therefore works when the sibling exists and still fails closed
+  when it does not.
+- The new tests in `tests/research-runtime-adapter.test.mjs` (9/9) cover explicit
+  wins, blank → null, missing sibling → null, and an end-to-end copy of
+  `src/research` beside a fake `src/index.mjs` loaded with
+  `loadAgentRuntimePort({})` (portVersion 1, run completed). **F10 closed.**
+- F4 schema nuance closed: the initial `run.json` counters no longer contain
+  `pageChars` (`execute.mjs:496`), matching the final `deriveCounters()` shape;
+  the one-page overshoot is documented as stop-before-next-read by design.
+- Five consecutive `npm test` runs: **282/282 pass, 0 fail, 0 cancelled**;
+  verifier suites re-run 70/70.
 
 ## 3. Verdict by area
 
@@ -111,9 +132,9 @@ this audit saw; it now passes.
 | Limits / failure taxonomy | **PASS** | gzip bomb and 2.5 MB body → `too_large`; slow → `timeout` (no retry); 429/5xx → classified and retried exactly once; PDF/CSS → `unsupported_content_type`; *(t4)* empty/JS shell → `extract_failed`; all codes come from `ERROR_CODE`. **F4 fixed** on `47fb5b7` (`maxTotalPageChars` now refuses further reads); F5 accepted/documented |
 | Executor / artifacts / provenance | **PASS** | citation audit for unfetched/unresolved ids; fabricated model URL never enters the ledger; unknown/corrupt/tampered runs → `not_found`/`invalid_run_id`/`parse_error`; tampered `paths` cannot read arbitrary files; live path fails closed with no run directory; cancelled/timeout statuses map correctly |
 | Secret hygiene | **PASS after F1 fix** | token-bearing URL no longer reaches `sources.json`/`sources.md`; runtime error bearer/sk token redacted in `run.json`; no `authorization`/`cookie`/`x-api-key` sent by tools; proxy credential never persisted. **F7** is a low residual: raw model text in `report.md` can echo a credential-looking URL |
-| AGT-027 adapter | **PASS (interface), F10 integration risk** | real Pi session built from the options the adapter passes: research policy is prepended in the **model-visible** system prompt and the runtime's own prompt survives; cwd is an empty temp dir outside the repo and is removed on success and on throw; `maxToolCalls` 8 → 28 override; `timeoutMs` reaches `run()`; status/usage/tool-call/error mapping; official `createAgentRuntimePort` wins over the adapter; module without either export fails closed. The real AGT-027 sibling module was loaded through the explicit `moduleSpecifier` path (not executed). **F10**: the sibling auto-discovery path is broken |
+| AGT-027 adapter | **PASS (interface)** | real Pi session built from the options the adapter passes: research policy is prepended in the **model-visible** system prompt and the runtime's own prompt survives; cwd is an empty temp dir outside the repo and is removed on success and on throw; `maxToolCalls` 8 → 28 override; `timeoutMs` reaches `run()`; status/usage/tool-call/error mapping; official `createAgentRuntimePort` wins over the adapter; module without either export fails closed. The real AGT-027 sibling module was loaded through the explicit `moduleSpecifier` path (not executed). **F10 fixed on `b7609d2`**: auto-discovery works and is covered by an end-to-end test |
 | Prompt policy | **PASS** | 检索策略 present in the brief (HN short keywords, quoted Bing phrases, no repeated navigational queries); system prompt keeps “only cite actually-read pages”, forbids fabricated URLs, adds recall-quality rule; no topic, URL, source id or web content interpolated into the system prompt; deterministic for the same clock |
-| Repository audit | **PASS** | no second runtime/provider/config/credential loading/MCP/client in `src/research`; only `defineTool`/`Type` imported from Pi; one contracts module and one port module; no free-form error codes or statuses; docs/CLI scope consistent after F8 fix (F10 is a code/doc mismatch) |
+| Repository audit | **PASS** | no second runtime/provider/config/credential loading/MCP/client in `src/research`; only `defineTool`/`Type` imported from Pi; one contracts module and one port module; no free-form error codes or statuses; docs/CLI scope consistent after F8 fix (the F10 mismatch is also fixed) |
 | Live acceptance | **NOT VERIFIED HERE** | no live network or model run was performed by this audit; three redacted runs exist in `docs/evidence/agt-028/` (numeric provider usage, `completed`/`completed_with_errors`, 2–3 fetched sources each) and were shape-checked, not re-executed |
 
 ## 4. Findings
@@ -176,13 +197,11 @@ working tree during this audit and re-verified here.
   `budget_exceeded` once the total is at/above the limit
   (`src/research/execute.mjs:316`, `:403`); test at
   `tests/research-execute.test.mjs:405` passes.
-- Two low-severity nuances: (a) the check runs **before** the next read, so the
-  total can overshoot by the `contentChars` of the last allowed page (bounded by
-  `maxCharsPerPage`); it is a stop-future-reads budget, not a hard clamp. (b) The
-  initial `run.json` still contains `tools.counters.pageChars: 0`
-  (`execute.mjs:496`) even though the final record's `deriveCounters()` omits it;
-  “not persisted in run.json counters” is therefore true only for the final
-  state. Neither affects the enforced behavior or `assertRunShape`.
+- One low-severity nuance remains by design: the check runs **before** the next
+  read, so the total can overshoot by the `contentChars` of the last allowed page
+  (bounded by `maxCharsPerPage`); it is a stop-future-reads budget, not a hard
+  clamp. On `b7609d2` the initial `run.json` counters no longer contain
+  `pageChars` (`execute.mjs:496`), so start/final records share one schema.
 
 ### F5 · low · ACCEPTED (owner decision, verified against the real module) — adapter drops `maxTurns` / `maxTotalTokens`
 
@@ -227,7 +246,7 @@ working tree during this audit and re-verified here.
   `redactSecrets()` while keeping the in-memory body for citation parsing) if a
   future requirement treats reports as shareable evidence.
 
-### F8 · minor · FIXED on `47fb5b7` (except the §11 claim, see F10) — design doc drift
+### F8 · minor · FIXED on `47fb5b7` (the §11 claim became true with the F10 fix) — design doc drift
 
 `docs/engineering/agt-028-live-research.md` is captain-owned; these were
 accuracy gaps, not implementation bugs:
@@ -238,11 +257,12 @@ accuracy gaps, not implementation bugs:
 - The live-acceptance section describes the three real runs and points at
   `docs/evidence/agt-028/`; the stale “blocked until AGT-027 is on dev” line is
   gone and §11 describes post-merge integration.
-- Remaining inaccuracy: §11 says the loader resolves sibling `src/index.mjs`
-  automatically — false because of **F10**. The absolute sentence “No secret is
-  read, logged or persisted” is also broader than reality: AGT-028 does not read
-  credentials, but the AGT-027 runtime reads the model key from the host
-  environment in memory; consider narrowing it.
+- §11 says the loader resolves sibling `src/index.mjs` automatically; that claim
+  was false under F10 and is now true on `b7609d2` (fallback covered by a new
+  end-to-end test). The absolute sentence “No secret is read, logged or
+  persisted” is still broader than reality: AGT-028 does not read credentials,
+  but the AGT-027 runtime reads the model key from the host environment in
+  memory; consider narrowing it (documentation-only).
 
 ### F9 · info — ledger excerpt escapes invisibles but not fence sequences
 
@@ -253,7 +273,7 @@ The excerpt is never re-fed into a model prompt (it is only shown in
 `sources.md` / `sources.json`), so this is inert today; escape it if the ledger
 is ever reused as prompt input.
 
-### F10 · medium · OPEN — the default AGT-027 module fallback imports the wrong variable
+### F10 · medium · FIXED on `b7609d2` — the default AGT-027 module fallback imported the wrong variable
 
 - In `47fb5b7`: `src/research/port.mjs:102-112` resolves a default sibling
   `src/index.mjs`, but the import uses `moduleSpecifier` instead of the resolved
@@ -276,13 +296,16 @@ is ever reused as prompt input.
   the fail-closed test passes only because `src/index.mjs` does not exist yet.
   After AGT-027 is merged, `node scripts/research.mjs --topic …` without
   `--runtime-module` will exit 3 instead of running.
-- Fix: `mod = await import(specifier);` (one line). Also update
-  `tests/research-verify-artifacts.test.mjs`'s fail-closed expectation when the
-  sibling file actually exists, and add a loader test for the default fallback.
-- Verified statically and with `import(undefined)`; the explicit
-  `moduleSpecifier` path loads the real AGT-027 `src/index.mjs` successfully
-  (`portVersion: 1`, `loadConfig`/`createAgentRuntime` functions, default
-  `maxToolCalls: 8`). This audit did not modify `port.mjs` (not verifier-owned).
+- Fix landed on `b7609d2`: the loader now imports the resolved value
+  (`port.mjs:130`), and resolution was extracted into
+  `resolveRuntimeModuleSpecifier()` / `DEFAULT_RUNTIME_MODULE`. A new end-to-end
+  test copies `src/research` beside a fake `src/index.mjs` and loads it with
+  `loadAgentRuntimePort({})`; it passes (9/9 in
+  `tests/research-runtime-adapter.test.mjs`), as do the explicit-wins and
+  missing-sibling cases.
+- The explicit `moduleSpecifier` path also loads the real AGT-027
+  `src/index.mjs` (`portVersion: 1`, `loadConfig`/`createAgentRuntime`
+  functions, default `maxToolCalls: 8`). **Closed.**
 
 ### Observations (no action required)
 
