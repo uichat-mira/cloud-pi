@@ -215,6 +215,7 @@ export async function createAgentRuntime(options = {}) {
         }));
         await session.bindExtensions({});
       } catch (error) {
+        session?.dispose();
         const record = buildFailureRecord({ runId, config, startedAt, timeoutMs, error, secrets });
         emit(runOptions.onEvent, { type: "run_end", runId, status: record.status });
         return record;
