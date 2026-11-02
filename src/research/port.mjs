@@ -29,7 +29,10 @@ export class RuntimeUnavailableError extends Error {
  * @property {import("@earendil-works/pi-ai").ToolDefinition[]} customTools
  *   Pi tool definitions (createAgentSession `customTools`). The runtime decides
  *   exposure/permissions; research tools are read-only and must stay read-only.
- * @property {{ maxTurns: number, timeoutMs: number, maxTotalTokens?: number }} limits
+ * @property {{ maxTurns: number, timeoutMs: number, maxTotalTokens?: number,
+ *   maxToolCalls?: number }} limits
+ *   `timeoutMs`/`maxToolCalls` are the research budget; a runtime default must
+ *   not silently cap a research run below them.
  * @property {AbortSignal} [signal]
  * @property {(event: AgentRunEvent) => void} [onEvent]  Observation only.
  * @property {{ runId: string, purpose: "research" }} metadata

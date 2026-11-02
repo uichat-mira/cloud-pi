@@ -64,15 +64,31 @@ Verified by live probes on 2026-11-02 (host proxy `127.0.0.1:1080`):
 | public SearXNG instances | antibot challenge |
 | Brave / Tavily / Serper | API key required (none provided) |
 
-**Selected provider: Bing RSS (primary), Bing HTML (fallback), optional SearXNG**
-(`RESEARCH_SEARXNG_URL`), which is the standard self-hosted metasearch API and
-the only listed provider with native time-range filtering.
+**Selected providers.** `auto` runs **Hacker News (Algolia)** and **Bing RSS**,
+merges and de-duplicates the result sets, then falls back to Bing HTML and to an
+operator-provided **SearXNG** instance (`RESEARCH_SEARXNG_URL`) when needed.
 
-Bing ignores `filters=ex1:"ez1|ez2|ez3"` on the RSS endpoint (verified: identical
-body). Therefore time filtering is applied **client-side on item `pubDate`**
-against the requested window, and the run record states `timeRangeApplied:
-"client_pubdate"`. When too few in-window items are returned, the tool fetches
-subsequent result pages (`&first=11`, 21, …) up to `maxSearchPages`.
+| Provider | Why | Date trust |
+| --- | --- | --- |
+| `hackernews` | public Algolia API, keyless, real ISO `created_at`, direct publisher URLs, real engineering signal for "最近 48 小时" | **verified** (`dateSource: "provider"`, HN submission time) |
+| `bing-rss` | general web, direct publisher URLs, `pubDate` present | **unverified hint** (`dateConfidence: "unverified"`) |
+| `bing-html` | same engine without RSS; parsed `li.b_algo`, `ck/a` links decoded | mostly absent |
+| `searxng` | operator-run metasearch JSON, native `time_range` | provider |
+
+**Date honesty is mandatory.** Live probing showed Bing RSS `pubDate` on
+evergreen pages equals a recent crawl date (e.g. `en.wikipedia.org/wiki/Anthropic`
+→ today), so a provider date is never presented as a publication date. The tool
+marks every result with `dateSource`/`dateConfidence`; only page metadata read by
+`research_read_page` is treated as verified (`dateSource: "page"`).
+
+**Time window.** HN uses an epoch cutoff (`numericFilters=created_at_i>…`). Bing
+ignores `filters=ex1:"ez1|ez2|ez3"` (verified: identical body), so its window is
+applied client-side over the provider hint and stated as
+`timeRangeApplied: "provider_hint"`. Undated hits are **not silently dropped**:
+they are retained with `publishedAt: null`, `dateConfidence: "none"` and counted
+(`undatedIncluded` / `undatedDropped`); the call then reports
+`timeRangeApplied: "partial"`. When too few in-window items are returned the tool
+pages further (`&first=11`, 21, …) up to `maxSearchPages`.
 
 Honesty rule: a search result is discovery evidence only. A claim may only be
 cited as fact when its page body was actually fetched; unfetched hits are
