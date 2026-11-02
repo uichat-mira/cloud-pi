@@ -1,7 +1,7 @@
 # AGT-027 · 真实模型调用证据（脱敏）
 
-> 采集时间：2026-11-02 17:39（Asia/Shanghai）
-> 被测代码 commit：`41a77afa5718ff358d3e0aa41f50cd0676752483`（`feat/agt-027-live-agent`）
+> 采集时间：2026-11-02 18:15（Asia/Shanghai）
+> 被测代码 commit：`032c6a75a02d79de4f5277c8b16593826a30f82d`（`feat/agt-027-live-agent`；证据文档 commit 在其后，仅文档变更）
 > 原始 TAP 输出：[poc/evidence/agt-027-live-test.txt](../../poc/evidence/agt-027-live-test.txt)
 > 性质：**开发者本地真实付费调用**，独立于 CI。本文不包含 API Key、Authorization 头或完整敏感正文。
 
@@ -25,14 +25,14 @@
 
 | # | 场景 | 状态 | 耗时 | Token（in/out/cacheRead/total） | 工具调用 | 关键观察 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 纯文本 | succeeded | 2116 ms | 170 / 7 / 1280 / 1457 | — | 真实模型返回 `CLOUD_PI_OK` |
-| 2 | 模型自主 Tool Call | succeeded | 2826 ms | 381 / 93 / 3328 / 3802 | `local_read_text` **ok**（2 ms） | 模型自行选择工具，读取 `notes/welcome.md`，回答 `alpha` |
-| 3 | 可见但未授权工具 | succeeded | 3218 ms | 412 / 119 / 3200 / 3731 | `local_read_text` **blocked**（`tool_not_granted`） | 模型发起调用，运行时拒绝，**未读取文件内容** |
-| 4 | 错误 API Key | failed | 38 ms | 0 / 0 / 0 / 0 | — | `auth_error`；错误消息已脱敏，记录中不含 Key |
-| 5 | 超时 | timeout | 63 ms | 0 / 0 / 0 / 0 | — | `timeout`；真实请求被中止 |
-| 6 | 调用方取消 | cancelled | 503 ms | 0 / 0 / 0 / 0 | — | `cancelled`；`AbortSignal` 生效 |
+| 1 | 纯文本 | succeeded | 1862 ms | 170 / 7 / 1280 / 1457 | — | 真实模型返回 `CLOUD_PI_OK` |
+| 2 | 模型自主 Tool Call | succeeded | 5045 ms | 381 / 63 / 3328 / 3772 | `local_read_text` **ok**（1 ms） | 模型自行选择工具，读取 `notes/welcome.md`，回答 `alpha` |
+| 3 | 可见但未授权工具 | succeeded | 3819 ms | 412 / 90 / 3200 / 3702 | `local_read_text` **blocked**（`tool_not_granted`） | 模型发起调用，运行时拒绝，**未读取文件内容** |
+| 4 | 错误 API Key | failed | 37 ms | 0 / 0 / 0 / 0 | — | `auth_error`；错误消息已脱敏，记录中不含 Key |
+| 5 | 超时 | timeout | 62 ms | 0 / 0 / 0 / 0 | — | `timeout`；真实请求被中止 |
+| 6 | 调用方取消 | cancelled | 505 ms | 0 / 0 / 0 / 0 | — | `cancelled`；`AbortSignal` 生效 |
 
-runId（可追溯）：`51d5e4bc…`、`0e23d927…`、`2585a7d4…`、`9d4fe793…`、`bed7153c…`、`f366701c…`（完整值见 TAP 文件）。
+runId（可追溯）：`bdd18c8a…`、`0d37997c…`、`3e5750d7…`、`94aaf63a…`、`da62f564…`、`ae7a165a…`（完整值见 TAP 文件）。
 
 ## 真实调用路径
 
@@ -60,7 +60,7 @@ CLI / run-live-tests
 
 ```bash
 git switch feat/agt-027-live-agent
-git rev-parse HEAD     # 应为 41a77af… 或其后仅含文档变更的 commit
+git rev-parse HEAD     # 应为 032c6a7… 或其后仅含文档变更的 commit
 npm ci
 cp .env.example .env   # 填入开发者自己的 Provider / Key / Model
 CLOUD_PI_ENV_FILE=.env npm run test:live

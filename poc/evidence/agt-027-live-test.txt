@@ -3,53 +3,53 @@
 > node scripts/run-live-tests.mjs
 
 TAP version 13
-# {"label":"text","runId":"51d5e4bc-592c-4a26-91ca-5e01bafc3aef","status":"succeeded","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":2116,"usage":{"input":170,"output":7,"cacheRead":1280,"cacheWrite":0,"total":1457,"cost":0},"toolCalls":[],"textPreview":"CLOUD_PI_OK"}
+# {"label":"text","runId":"bdd18c8a-8eb9-4186-897f-e387822bf955","status":"succeeded","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":1862,"usage":{"input":170,"output":7,"cacheRead":1280,"cacheWrite":0,"total":1457,"cost":0},"toolCalls":[],"textPreview":"CLOUD_PI_OK"}
 # Subtest: AGT-027 T4: live model + tool (real provider, real tokens)
     # Subtest: real model returns real text
     ok 1 - real model returns real text
       ---
-      duration_ms: 2139.994
+      duration_ms: 1885.650917
       type: 'test'
       ...
-# {"label":"tool","runId":"0e23d927-ac1c-48d9-80d2-0218a17105c1","status":"succeeded","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":2826,"usage":{"input":381,"output":93,"cacheRead":3328,"cacheWrite":0,"total":3802,"cost":0},"toolCalls":[{"name":"local_read_text","status":"ok","durationMs":2}],"textPreview":"The fixture key in `welcome.md` is:\\n\\n**`alpha`**"}
+# {"label":"tool","runId":"0d37997c-3452-486a-bac3-8b24894d39af","status":"succeeded","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":5045,"usage":{"input":381,"output":63,"cacheRead":3328,"cacheWrite":0,"total":3772,"cost":0},"toolCalls":[{"name":"local_read_text","status":"ok","durationMs":1}],"textPreview":"The fixture key in `welcome.md` is: **`alpha`**"}
     # Subtest: the model autonomously selects and executes the real restricted tool
     ok 2 - the model autonomously selects and executes the real restricted tool
       ---
-      duration_ms: 2862.265167
+      duration_ms: 5066.944084
       type: 'test'
       ...
-# {"label":"denied","runId":"2585a7d4-7561-41af-9fa1-2d6d3d2a1fc9","status":"succeeded","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":3218,"usage":{"input":412,"output":119,"cacheRead":3200,"cacheWrite":0,"total":3731,"cost":0},"toolCalls":[{"name":"local_read_text","status":"blocked","reason":"tool_not_granted"}],"textPreview":"The tool call failed as anticipated:\\n\\n```\\ntool_not_granted: local_read_text is not granted to this session\\n```\\n\\n`local_read_text` isn't available in this session, so I can't read `welcome.md` or any o"}
+# {"label":"denied","runId":"3e5750d7-5ea3-4e7e-b655-5f77989c4bde","status":"succeeded","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":3819,"usage":{"input":412,"output":90,"cacheRead":3200,"cacheWrite":0,"total":3702,"cost":0},"toolCalls":[{"name":"local_read_text","status":"blocked","reason":"tool_not_granted"}],"textPreview":"The call failed as anticipated: `local_read_text` is not granted to this session, so I can't read `welcome.md`.\\n\\nIf you can grant that tool or provide the file contents another way, I'll continue from"}
     # Subtest: a tool that is visible but not granted is rejected at runtime
     ok 3 - a tool that is visible but not granted is rejected at runtime
       ---
-      duration_ms: 3254.64925
+      duration_ms: 3863.025208
       type: 'test'
       ...
-# {"label":"invalid-key","runId":"9d4fe793-cbe8-418b-bfde-6f5985b1e07d","status":"failed","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":38,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0,"cost":0},"toolCalls":[],"errorCode":"auth_error","textPreview":""}
+# {"label":"invalid-key","runId":"94aaf63a-520d-4509-be77-1e132a947418","status":"failed","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":37,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0,"cost":0},"toolCalls":[],"errorCode":"auth_error","textPreview":""}
     # Subtest: an invalid API key fails with a classified, redacted error
     ok 4 - an invalid API key fails with a classified, redacted error
       ---
-      duration_ms: 62.715042
+      duration_ms: 76.79425
       type: 'test'
       ...
-# {"label":"timeout","runId":"bed7153c-3ba7-4aaf-8621-91258793001b","status":"timeout","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":63,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0,"cost":0},"toolCalls":[],"errorCode":"timeout","textPreview":""}
+# {"label":"timeout","runId":"da62f564-35b7-47ee-a71a-1cdf073eacf4","status":"timeout","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":62,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0,"cost":0},"toolCalls":[],"errorCode":"timeout","textPreview":""}
     # Subtest: a run timeout aborts a real in-flight request
     ok 5 - a run timeout aborts a real in-flight request
       ---
-      duration_ms: 78.123542
+      duration_ms: 74.887375
       type: 'test'
       ...
-# {"label":"cancel","runId":"f366701c-9959-407c-b535-bc7a0dca694a","status":"cancelled","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":503,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0,"cost":0},"toolCalls":[],"errorCode":"cancelled","textPreview":""}
+# {"label":"cancel","runId":"ae7a165a-24b8-4437-b9fb-c53c43e659fe","status":"cancelled","providerId":"mira-ai","modelId":"deepseek-v4.1-flash-od","api":"openai-completions","durationMs":505,"usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0,"cost":0},"toolCalls":[],"errorCode":"cancelled","textPreview":""}
     # Subtest: caller cancellation aborts a real in-flight request
     ok 6 - caller cancellation aborts a real in-flight request
       ---
-      duration_ms: 515.793875
+      duration_ms: 521.823166
       type: 'test'
       ...
     1..6
 ok 1 - AGT-027 T4: live model + tool (real provider, real tokens)
   ---
-  duration_ms: 8918.756875
+  duration_ms: 11491.287459
   type: 'suite'
   ...
 1..1
@@ -60,4 +60,4 @@ ok 1 - AGT-027 T4: live model + tool (real provider, real tokens)
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 9817.631166
+# duration_ms 12371.516625
