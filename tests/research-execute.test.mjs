@@ -333,15 +333,17 @@ test("external abort → cancelled", async (t) => {
     portVersion: RUNTIME_PORT_VERSION,
     async runAgent(spec) {
       return new Promise((_resolve, reject) => {
-        spec.signal.addEventListener(
-          "abort",
-          () => {
-            const error = new Error("client cancelled");
-            error.name = "AbortError";
-            reject(error);
-          },
-          { once: true },
-        );
+        const abort = () => {
+          const error = new Error("client cancelled");
+          error.name = "AbortError";
+          reject(error);
+        };
+        // The run may be aborted before the port is even called.
+        if (spec.signal.aborted) {
+          abort();
+          return;
+        }
+        spec.signal.addEventListener("abort", abort, { once: true });
       });
     },
   };
@@ -398,6 +400,23 @@ test("budget exhaustion refuses calls and records budget_exceeded", async (t) =>
   // Only successfully executed calls contribute sources.
   const { sources } = await readResearchRun(record.runId, { rootDir });
   assert.deepEqual(sources.map((source) => source.url), ["https://example.com/one"]);
+});
+
+test("maxTotalPageChars refuses further page reads", async (t) => {
+  const rootDir = await tempRoot(t);
+  const port = scriptedPort(async ({ call, toolCalls }) => {
+    await call(TOOL.READ_PAGE, { url: "https://example.com/a" });
+    await call(TOOL.READ_PAGE, { url: "https://example.com/b" });
+    return { status: "completed", text: LONG_REPORT, usage: USAGE, toolCalls };
+  });
+  const record = await executeResearch(
+    { topic: "page chars", limits: { maxTotalPageChars: 300 } },
+    { runtimePort: port, toolLayer: fixtureToolLayer(), rootDir },
+  );
+  assert.equal(record.tools.counters.pages, 1);
+  assert.equal(record.tools.counters.refused, 1);
+  assert.ok(record.tools.calls.some((call) => call.status === "refused" && call.errorCode === ERROR_CODE.BUDGET_EXCEEDED));
+  assert.equal(record.status, RUN_STATUS.COMPLETED_WITH_ERRORS);
 });
 
 test("limits are clamped and rootDir precedence is explicit > env", async (t) => {

@@ -313,6 +313,9 @@ function budgetRefusal(kind, limits, counters) {
   if (kind === "page" && counters.pages >= limits.maxPages) {
     return `maxPages (${limits.maxPages}) exhausted`;
   }
+  if (kind === "page" && counters.pageChars >= limits.maxTotalPageChars) {
+    return `maxTotalPageChars (${limits.maxTotalPageChars}) exhausted`;
+  }
   return null;
 }
 
@@ -396,6 +399,8 @@ function wrapTools({ tools, limits, signal, calls, provenance, counters }) {
             );
           }
         } else if (kind === "page") {
+          const chars = Number(details?.contentChars);
+          if (Number.isFinite(chars) && chars > 0) counters.pageChars += chars;
           const annotation = provenance.addPage(details);
           if (annotation) {
             return appendModelFacingText(
@@ -488,7 +493,7 @@ function buildInitialRecord(normalized) {
     statusHistory: [{ status: RUN_STATUS.RUNNING, at: createdAt }],
     runtime: null,
     tools: {
-      counters: { searches: 0, pages: 0, toolCalls: 0, refused: 0 },
+      counters: { searches: 0, pages: 0, toolCalls: 0, refused: 0, pageChars: 0 },
       calls: [],
     },
     sourcesSummary: null,
@@ -570,7 +575,7 @@ async function prepareExecution(request, deps) {
     record,
     provenance: createSourceLedger(),
     calls: [],
-    counters: { searches: 0, pages: 0, toolCalls: 0, refused: 0 },
+    counters: { searches: 0, pages: 0, toolCalls: 0, refused: 0, pageChars: 0 },
   };
   const ready = store.createRun(record);
   const done = ready.then(() => runPreparedExecution(context));

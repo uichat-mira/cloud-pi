@@ -52,6 +52,8 @@ export function mapAgentRuntimeRecord(record) {
   return {
     status: STATUS_MAP[raw.status] ?? "failed",
     text: typeof raw.text === "string" ? raw.text : "",
+    // AGT-027's run record always carries numeric token stats (0 when absent),
+    // so usage is provider-reported by contract.
     usage: {
       inputTokens: numberOrNull(usage.input),
       outputTokens: numberOrNull(usage.output),

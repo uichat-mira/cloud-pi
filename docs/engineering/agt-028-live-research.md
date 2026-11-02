@@ -34,6 +34,8 @@ Feishu, Cloud Auth delegation, deployment, article publication.
 src/research/
   contracts.mjs      frozen enums, limits, error taxonomy, env names (this team)
   port.mjs           AGT-027 runtime port contract + loader
+  runtime/agt-027.mjs thin adapter: official createAgentRuntime().run() → port
+                     (system prompt via before_agent_start, isolated cwd, budgets)
   tools/search.mjs   research_web_search (Pi ToolDefinition)
   tools/read-page.mjs research_read_page (Pi ToolDefinition)
   net/http.mjs       bounded HTTP: proxy, timeout, redirects, size cap, abort
@@ -131,8 +133,8 @@ sources.md      human-readable source list
 transcript.md   sanitised tool/assistant trace (no secrets)
 ```
 
-`run.json` is written when the run starts (`status: running`) and rewritten at
-every state transition, so a crash leaves evidence rather than silence.
+`run.json` is written when the run starts (`status: running`) and again when the
+run finalises (with `statusHistory`), so a crash mid-run still leaves evidence.
 `readResearchRun(runId, {rootDir})` returns `{run, report, sources}` and fails
 with a classified error for unknown/corrupt runs.
 
@@ -186,25 +188,36 @@ network + real runtime) and tests use fixtures.
 | Variable | Meaning |
 | --- | --- |
 | `RESEARCH_RUNS_DIR` | artifact root (default `.work/research-runs`) |
-| `RESEARCH_SEARCH_PROVIDER` | `auto` (default), `bing-rss`, `bing-html`, `searxng` |
+| `RESEARCH_SEARCH_PROVIDER` | `auto` (default), `hackernews`, `bing-rss`, `bing-html`, `searxng` |
 | `RESEARCH_SEARXNG_URL` | base URL of an operator-provided SearXNG instance |
 | `RESEARCH_HTTPS_PROXY` | HTTP(S) proxy for tool traffic (falls back to `HTTPS_PROXY`) |
-| `RESEARCH_AGENT_RUNTIME_MODULE` | AGT-027 runtime module specifier (temporary integration shim) |
+| `RESEARCH_AGENT_RUNTIME_MODULE` | AGT-027 runtime module path; after AGT-027 lands on `dev`, `src/index.mjs` is used automatically |
 
 No secret is read, logged or persisted by this feature.
 
-## 10. Live acceptance (pending AGT-027)
+## 10. Live acceptance
 
-Blocked until AGT-027 is on `dev`. Procedure:
+Status: **done against AGT-027's runtime branch** (PR #8, `feat/agt-027-live-agent`);
+the only remaining step is the post-merge rebase described in §11.
 
-1. Rebase this branch on `dev`, delete temporary runtime shims, wire the official port.
-2. Run the business topic **three independent times**:
-   「研究最近 48 小时值得《见π》关注的 AI Agent 工程进展」
-   with different run IDs / query angles.
-3. For each run keep: run ID, timestamps, model ID (redacted), usage, tool-call
-   counts, failures, report path, source ledger path.
-4. Spot-check ≥3 substantive claims per report: open the final URL, confirm the
-   body supports the claim, mark unsupported claims as pending verification.
-5. Record failures (rate limits, unreachable pages, timeouts) verbatim.
+Procedure (executed 2026-11-02, see `docs/evidence/agt-028/README.md`):
+
+1. Wire the official runtime through `src/research/runtime/agt-027.mjs` (no shim
+   session, no provider, no credential code).
+2. Run the business topic three independent times:
+   「研究最近 48 小时值得《见π》关注的 AI Agent 工程进展」, 48h window,
+   different budgets and run IDs.
+3. Keep per run: run ID, timings, model ID, real usage, tool-call counts,
+   failures, report and source-ledger paths.
+4. Spot-check substantive claims per report against the live page.
+5. Record failures (403, unreachable pages, timeouts) verbatim.
 
 No live claim may be made from fixture or scripted results.
+
+## 11. Post-merge integration
+
+Once AGT-027 is on `dev`, its runtime entry is the sibling `src/index.mjs`; the
+port loader resolves it automatically (explicit `RESEARCH_AGENT_RUNTIME_MODULE`
+or `--runtime-module` still wins). Then: rebase this branch, re-run
+`npm test`, run one live smoke run per the commands in `docs/evidence/agt-028/README.md`,
+and hand the PR to Mira for final acceptance and merge.

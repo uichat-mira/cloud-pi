@@ -12,10 +12,10 @@ still needs real runs, and the Issue owner decides.
 - Environment: Node.js v22.23.2, npm 10.9.8, macOS; no proxy env vars set.
 - No git command was run (per task constraints). The audited file content is
   pinned below by SHA-256 instead.
-- T4 was **in progress** while this audit ran. The working tree already contained
-  its excerpt-from-body and `extract_failed` behavior
-  (`src/research/tools/read-page.mjs`, modified 17:43); the checks marked *(t4)*
-  below are against that state and must be re-run if T4 changes further.
+- T4 completed during this audit. Its excerpt-from-body and `extract_failed`
+  behavior (`src/research/tools/read-page.mjs`, modified 17:43) was present for
+  the final runs; the checks marked *(t4)* below were re-run against that final
+  file.
 - The captain reported a successful live run (`r-20261102T093914-e90abe`, 26
   sources, 3 fetched). That is **not** independent evidence from this audit; see
   “Not proven”.
