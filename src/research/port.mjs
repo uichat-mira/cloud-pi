@@ -12,6 +12,9 @@
  * an API key or build its own Pi session outside tests.
  */
 
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 export const RUNTIME_PORT_VERSION = 1;
 
 export class RuntimeUnavailableError extends Error {
@@ -92,11 +95,16 @@ export function assertAgentRuntimePort(port) {
  * @returns {Promise<AgentRuntimePort>}
  */
 export async function loadAgentRuntimePort({ moduleSpecifier } = {}) {
-  if (!moduleSpecifier) {
+  // After AGT-027 lands on the same branch, its runtime is the sibling
+  // `src/index.mjs`; before that the live path still fails closed.
+  const fallback = new URL("../index.mjs", import.meta.url);
+  const requested = typeof moduleSpecifier === "string" && moduleSpecifier.trim() ? moduleSpecifier.trim() : null;
+  const specifier = requested ?? (existsSync(fileURLToPath(fallback)) ? fallback.href : null);
+  if (!specifier) {
     throw new RuntimeUnavailableError(
       "Agent runtime module is not configured. AGT-027 provides the real model " +
         "runtime; set RESEARCH_AGENT_RUNTIME_MODULE (or pass --runtime-module) " +
-        "to the module it publishes.",
+        "to the module it publishes (default candidate: src/index.mjs).",
     );
   }
   let mod;
@@ -104,7 +112,7 @@ export async function loadAgentRuntimePort({ moduleSpecifier } = {}) {
     mod = await import(moduleSpecifier);
   } catch (error) {
     throw new RuntimeUnavailableError(
-      `Cannot load agent runtime module ${moduleSpecifier}: ${error?.message ?? error}`,
+      `Cannot load agent runtime module ${specifier}: ${error?.message ?? error}`,
     );
   }
   let port =

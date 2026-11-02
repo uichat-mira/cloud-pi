@@ -12,9 +12,10 @@
  * 1. Every tool dependency is pointed at a `startFixtureServer()` instance on
  *    127.0.0.1 and called with `allowLoopback: true` / `proxyUrl: null` /
  *    `env: {}`.
- * 2. `installNetworkGuard()` patches `net.Socket.prototype.connect` so an
- *    outbound connection to anything other than loopback throws immediately and
- *    is recorded. The guard is installed on import; every test file asserts
+ * 2. The network guard patches `net.Socket.prototype.connect`, `net.connect` /
+ *    `net.createConnection` and `tls.connect` (the path undici's fetch uses) so
+ *    an outbound connection to anything other than loopback throws immediately
+ *    and is recorded. The guard is installed on import; every test file asserts
  *    `assertNoNetworkEgress()` in `after`. A guard violation fails the test even
  *    if the tool swallowed the resulting transport error.
  *
@@ -25,6 +26,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import net from "node:net";
+import tls from "node:tls";
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -59,37 +61,73 @@ function connectTarget(args) {
   return { local: true, host: String(first) };
 }
 
+function tlsTarget(args) {
+  const [options] = args;
+  if (options && typeof options === "object") {
+    // TLS over an existing local socket is local by construction.
+    if (options.socket) return { local: true, host: "<existing socket>" };
+    if (typeof options.path === "string") return { local: true, host: options.path };
+    return { local: false, host: String(options.host ?? options.hostname ?? "localhost"), port: options.port };
+  }
+  return { local: false, host: "localhost", port: undefined };
+}
+
 function createGuard() {
   const violations = [];
-  const original = net.Socket.prototype.connect;
+  const originals = {
+    socketConnect: net.Socket.prototype.connect,
+    netConnect: net.connect,
+    netCreateConnection: net.createConnection,
+    tlsConnect: tls.connect,
+  };
   let installed = false;
 
-  function patched(...args) {
-    const target = connectTarget(args);
-    if (!target.local && !ALLOWED_CONNECT_HOSTS.has(target.host)) {
-      const violation = {
-        host: target.host,
-        port: target.port ?? null,
-        stack: new Error("network guard stack").stack,
-      };
-      violations.push(violation);
-      throw new Error(
-        `[network-guard] blocked outbound connection to ${target.host}:${target.port ?? "?"}; tests must only use loopback fixtures`,
-      );
-    }
-    return original.apply(this, args);
+  function recordAndThrow(target) {
+    violations.push({
+      host: target.host,
+      port: target.port ?? null,
+      stack: new Error("network guard stack").stack,
+    });
+    throw new Error(
+      `[network-guard] blocked outbound connection to ${target.host}:${target.port ?? "?"}; tests must only use loopback fixtures`,
+    );
   }
+
+  function check(target) {
+    if (!target.local && !ALLOWED_CONNECT_HOSTS.has(target.host)) recordAndThrow(target);
+  }
+
+  // undici's connector calls the module-level `net.connect` / `tls.connect`,
+  // not only `Socket#connect`; protect both so a tool using fetch is covered.
+  const patchedSocketConnect = function patchedSocketConnect(...args) {
+    check(connectTarget(args));
+    return originals.socketConnect.apply(this, args);
+  };
+  const patchedNetConnect = function patchedNetConnect(...args) {
+    check(connectTarget(args));
+    return originals.netConnect.apply(this, args);
+  };
+  const patchedTlsConnect = function patchedTlsConnect(...args) {
+    check(tlsTarget(args));
+    return originals.tlsConnect.apply(this, args);
+  };
 
   return {
     violations,
     install() {
       if (installed) return;
-      net.Socket.prototype.connect = patched;
+      net.Socket.prototype.connect = patchedSocketConnect;
+      net.connect = patchedNetConnect;
+      net.createConnection = patchedNetConnect;
+      tls.connect = patchedTlsConnect;
       installed = true;
     },
     restore() {
       if (!installed) return;
-      net.Socket.prototype.connect = original;
+      net.Socket.prototype.connect = originals.socketConnect;
+      net.connect = originals.netConnect;
+      net.createConnection = originals.netCreateConnection;
+      tls.connect = originals.tlsConnect;
       installed = false;
     },
   };

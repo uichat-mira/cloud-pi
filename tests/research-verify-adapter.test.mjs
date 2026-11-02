@@ -13,9 +13,10 @@
  *
  * No network: the socket guard from the shared harness is active.
  */
-import { after, describe, test } from "node:test";
+import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { sendHtml, sendJson, startFixtureServer } from "./helpers/fixture-server.mjs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -36,10 +37,45 @@ import { loadAgentRuntimePort, RUNTIME_PORT_VERSION } from "../src/research/port
 import { executeResearch } from "../src/research/execute.mjs";
 import { ERROR_CODE, RUN_STATUS, TOOL, UNTRUSTED } from "../src/research/contracts.mjs";
 import { buildResearchBrief, buildResearchSystemPrompt } from "../src/research/prompt.mjs";
+import { createReadPageTool } from "../src/research/tools/read-page.mjs";
+import { createWebSearchTool } from "../src/research/tools/search.mjs";
 
 const REPO_ROOT = realpathSync(join(import.meta.dirname, ".."));
 
-after(() => {
+let fixture;
+let baseUrl;
+
+before(async () => {
+  fixture = await startFixtureServer({
+    "/hn": (req, res) =>
+      sendJson(res, {
+        hits: [
+          {
+            objectID: "1",
+            title: "Agent article",
+            url: `${baseUrl}/article`,
+            created_at: "2026-11-01T10:00:00.000Z",
+            author: "fixture",
+            points: 1,
+            num_comments: 0,
+          },
+        ],
+      }),
+    "/article": (req, res) =>
+      sendHtml(
+        res,
+        `<!doctype html><html><head><title>Agent article</title><meta property="article:published_time" content="2026-11-01T10:00:00Z"></head><body><article><h1>Agent article</h1>${Array.from(
+          { length: 12 },
+          (_, index) =>
+            `<p>Paragraph ${index + 1}. Agent engineering details, evaluation notes and release evidence for the adapter integration test.</p>`,
+        ).join("")}</article></body></html>`,
+      ),
+  });
+  baseUrl = fixture.url;
+});
+
+after(async () => {
+  await fixture?.close();
   assertNoNetworkEgress();
 });
 
@@ -212,10 +248,12 @@ describe("adapter: budget and mapping", () => {
     const sentinel = {};
     const module = fakeAgt027Module({ plan: {}, sentinel });
     const port = createAgt027RuntimePort({ module });
+    const controller = new AbortController();
     await port.runAgent({
       prompt: "p",
       customTools: [dummyTool(), dummyTool(TOOL.READ_PAGE)],
       limits: { maxTurns: 36, maxToolCalls: 28, timeoutMs: 12345, maxTotalTokens: 300_000 },
+      signal: controller.signal,
     });
     const create = sentinel.calls.find((call) => call.kind === "create");
     assert.equal(create.options.config.maxToolCalls, 28, "research budget must beat the runtime default of 8");
@@ -226,6 +264,7 @@ describe("adapter: budget and mapping", () => {
 
     const run = sentinel.calls.find((call) => call.kind === "run");
     assert.equal(run.runOptions.timeoutMs, 12345);
+    assert.equal(run.runOptions.signal, controller.signal, "the caller's abort signal must reach the runtime");
     assert.deepEqual(sentinel.baseConfigAtCreate, { providerId: "fake", modelId: "fake-model", maxToolCalls: 8, runTimeoutMs: 1000 });
   });
 
@@ -409,5 +448,68 @@ describe("prompts: search strategy and untrusted-content rules", () => {
     const briefA = buildResearchBrief({ topic: "t", now, limits: { maxSearches: 3 } });
     const briefB = buildResearchBrief({ topic: "t", now: new Date(now.getTime()), limits: { maxSearches: 3 } });
     assert.equal(briefA, briefB);
+  });
+});
+
+describe("adapter: executor + real Pi end to end", () => {
+  test("a real Pi session through the adapter produces a completed research run with a fetched source", async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), "cloud-pi-t3-adapter-e2e-"));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const report = [
+      "## 摘要",
+      "",
+      "- 来源给出了一项事实 [S1]。",
+      "",
+      "## 关键进展",
+      "",
+      "- 细节说明 [S1]。",
+      "",
+      "## 来源与证据",
+      "",
+      "- [S1] 支撑摘要。",
+      "",
+      "## 不确定性/失败项",
+      "",
+      "- 无。",
+    ].join("\n");
+    const module = fakeAgt027Module({
+      plan: {
+        responses: [
+          toolCallStep(TOOL.SEARCH, { query: "agent" }, { id: "a1" }),
+          toolCallStep(TOOL.READ_PAGE, { url: `${baseUrl}/article` }, { id: "a2" }),
+          fauxAssistantMessage(report),
+        ],
+      },
+    });
+    const search = createWebSearchTool({
+      provider: "hackernews",
+      endpoints: { hackernews: `${baseUrl}/hn` },
+      env: {},
+      proxyUrl: null,
+      retryTransient: false,
+    });
+    const read = createReadPageTool({ allowLoopback: true, env: {}, proxyUrl: null, retryTransient: false });
+    const record = await executeResearch(
+      { topic: "adapter end to end" },
+      { runtimePort: createAgt027RuntimePort({ module }), toolLayer: { tools: [search, read] }, rootDir },
+    );
+
+    assert.equal(record.status, RUN_STATUS.COMPLETED);
+    assert.equal(record.sourcesSummary.fetched, 1);
+    assert.ok(record.sourcesSummary.total >= 1);
+    assert.equal(record.runtime.usage.source, "provider");
+    assert.equal(record.runtime.usage.modelId, "adapter-model");
+    assert.deepEqual(
+      record.tools.calls.map((call) => call.name),
+      [TOOL.SEARCH, TOOL.READ_PAGE],
+      "the executor ledger and the runtime tool calls must not duplicate",
+    );
+    assert.equal(record.tools.calls.every((call) => call.status === "ok"), true);
+    const reportText = readFileSync(join(rootDir, record.runId, "report.md"), "utf8");
+    assert.match(reportText, /## 摘要/);
+    assert.match(reportText, /\[S1\]/);
+    const sources = JSON.parse(readFileSync(join(rootDir, record.runId, "sources.json"), "utf8")).sources;
+    assert.equal(sources[0].status, "fetched");
+    assert.equal(sources[0].httpStatus, 200);
   });
 });

@@ -15,6 +15,7 @@
  */
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -441,4 +442,27 @@ describe("T3: executor mapping over a real Pi pipeline", () => {
       port.disposeAll();
     }
   });
+});
+
+test("the network guard really blocks net.connect and tls.connect from a child process", () => {
+  const harness = new URL("./helpers/session-harness.mjs", import.meta.url).href;
+  const script = `
+    import net from "node:net";
+    import tls from "node:tls";
+    import { networkGuard } from ${JSON.stringify(harness)};
+    const failures = [];
+    for (const attempt of [
+      () => net.connect({ host: "93.184.216.34", port: 80 }),
+      () => tls.connect({ host: "93.184.216.34", port: 443 }),
+    ]) {
+      try { attempt(); failures.push("not blocked"); } catch (error) {
+        if (!String(error.message).includes("[network-guard]")) failures.push(String(error.message));
+      }
+    }
+    if (failures.length) { console.error(failures.join(" | ")); process.exit(2); }
+    if (networkGuard.violations.length !== 2) { console.error("violations=" + networkGuard.violations.length); process.exit(3); }
+    console.log("blocked=" + networkGuard.violations.map((v) => v.host + ":" + v.port).join(","));
+  `;
+  const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" });
+  assert.match(stdout, /blocked=93\.184\.216\.34:80,93\.184\.216\.34:443/);
 });

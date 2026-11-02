@@ -1,0 +1,257 @@
+{
+  "contractVersion": 1,
+  "runId": "r-20261102T100311-480125",
+  "status": "completed_with_errors",
+  "createdAt": "2026-11-02T10:03:11.107Z",
+  "updatedAt": "2026-11-02T10:03:59.220Z",
+  "startedAt": "2026-11-02T10:03:11.107Z",
+  "finishedAt": "2026-11-02T10:03:59.220Z",
+  "durationMs": 48108,
+  "request": {
+    "topic": "研究最近 48 小时值得《见π》关注的 AI Agent 工程进展",
+    "goal": "",
+    "timeRange": "48h"
+  },
+  "limits": {
+    "maxSearches": 5,
+    "maxPages": 3,
+    "maxResultsPerSearch": 8,
+    "maxCharsPerPage": 20000,
+    "maxTotalPageChars": 120000,
+    "maxRuntimeMs": 240000,
+    "maxToolCalls": 28,
+    "maxTurns": 36,
+    "maxTotalTokens": 300000,
+    "requestTimeoutMs": 15000,
+    "maxSearchPages": 2
+  },
+  "statusHistory": [
+    {
+      "status": "running",
+      "at": "2026-11-02T10:03:11.107Z"
+    },
+    {
+      "status": "completed_with_errors",
+      "at": "2026-11-02T10:03:59.220Z"
+    }
+  ],
+  "runtime": {
+    "status": "completed",
+    "durationMs": 48102,
+    "usage": {
+      "inputTokens": 10791,
+      "outputTokens": 3942,
+      "totalTokens": 46861,
+      "modelId": "deepseek-v4.1-flash-od",
+      "providerId": "mira-ai",
+      "source": "provider"
+    },
+    "error": null
+  },
+  "tools": {
+    "counters": {
+      "searches": 5,
+      "pages": 3,
+      "toolCalls": 8,
+      "refused": 0
+    },
+    "calls": [
+      {
+        "seq": 1,
+        "callId": "call_00_ET_91gUZ2KNkXsIYkomZVsa5709",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 2506,
+        "errorCode": null
+      },
+      {
+        "seq": 2,
+        "callId": "call_01_ET_Gb74qI8b3h8944HSyx5R5117",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 4868,
+        "errorCode": null
+      },
+      {
+        "seq": 3,
+        "callId": "call_00_ETSDZ8kNSxzh0G5xqp8N1737",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 1571,
+        "errorCode": null
+      },
+      {
+        "seq": 4,
+        "callId": "call_01_dIpp2Ccow9DKcGKMRbe07653",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 2208,
+        "errorCode": null
+      },
+      {
+        "seq": 5,
+        "callId": "call_00_RwlHvZ36CzaW9aWWFVDf6738",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 1205,
+        "errorCode": null
+      },
+      {
+        "seq": 6,
+        "callId": "call_00_NNJpVmDOXqlpxfBnn5AS2477",
+        "name": "research_read_page",
+        "status": "ok",
+        "durationMs": 1078,
+        "errorCode": null
+      },
+      {
+        "seq": 7,
+        "callId": "call_01_jFBsGhMuJi4ZzlY7d49z3721",
+        "name": "research_read_page",
+        "status": "ok",
+        "durationMs": 1188,
+        "errorCode": null
+      },
+      {
+        "seq": 8,
+        "callId": "call_00_5yIHCgPeo4TrcfgB9pPh0234",
+        "name": "research_read_page",
+        "status": "error",
+        "durationMs": 3593,
+        "errorCode": "http_error"
+      }
+    ]
+  },
+  "sourcesSummary": {
+    "total": 39,
+    "fetched": 2,
+    "failed": 1,
+    "not_fetched": 36,
+    "failures": [
+      {
+        "id": "S36",
+        "code": "http_error"
+      }
+    ]
+  },
+  "citations": {
+    "references": [
+      {
+        "id": "S35",
+        "count": 13
+      },
+      {
+        "id": "S34",
+        "count": 10
+      },
+      {
+        "id": "S36",
+        "count": 3
+      },
+      {
+        "id": "S16",
+        "count": 1
+      },
+      {
+        "id": "S22",
+        "count": 1
+      },
+      {
+        "id": "S37",
+        "count": 1
+      },
+      {
+        "id": "S9",
+        "count": 1
+      }
+    ],
+    "resolved": [
+      {
+        "id": "S35",
+        "count": 13,
+        "status": "fetched"
+      },
+      {
+        "id": "S34",
+        "count": 10,
+        "status": "fetched"
+      },
+      {
+        "id": "S36",
+        "count": 3,
+        "status": "failed"
+      },
+      {
+        "id": "S16",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S22",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S37",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S9",
+        "count": 1,
+        "status": "not_fetched"
+      }
+    ],
+    "unresolved": [],
+    "unfetched": [
+      {
+        "id": "S36",
+        "count": 3,
+        "status": "failed"
+      },
+      {
+        "id": "S16",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S22",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S37",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S9",
+        "count": 1,
+        "status": "not_fetched"
+      }
+    ]
+  },
+  "errors": [
+    {
+      "code": "http_error",
+      "message": "S36 fetch failed: Page returned HTTP 403",
+      "retryable": false,
+      "phase": "sources",
+      "at": "2026-11-02T10:03:59.224Z"
+    },
+    {
+      "code": "http_error",
+      "message": "tool research_read_page failed",
+      "retryable": false,
+      "phase": "tools",
+      "at": "2026-11-02T10:03:59.224Z"
+    }
+  ],
+  "paths": {
+    "run": "run.json",
+    "report": "report.md",
+    "sources": "sources.json",
+    "sourcesMarkdown": "sources.md",
+    "transcript": "transcript.md"
+  }
+}

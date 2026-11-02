@@ -51,13 +51,13 @@ All commands were run from the audited worktree.
 
 | Command | Result |
 | --- | --- |
-| `node --test tests/research-verify-pipeline.test.mjs` | **7 tests, 7 pass, 0 fail**, exit 0 (~6.8 s) |
+| `node --test tests/research-verify-pipeline.test.mjs` | **8 tests, 8 pass, 0 fail**, exit 0 (~6.9 s) |
 | `node --test tests/research-verify-adversarial.test.mjs` | **38 tests, 38 pass, 0 fail**, exit 0 (~6.4 s) |
 | `node --test tests/research-verify-artifacts.test.mjs` | **10 tests, 10 pass, 0 fail**, exit 0 (~1.0 s) |
-| `node --test tests/research-verify-adapter.test.mjs` | **13 tests, 13 pass, 0 fail**, exit 0 (~0.7 s) |
-| `npm test` (full suite, five runs in this window) | **4 green / 1 red**: 276/276 pass (×3), 275/275 pass (×1), and 257 pass + **18 cancelled, 0 fail, exit 1** (×1). The red run is the flaky test finding **F2**, not a product assertion. |
+| `node --test tests/research-verify-adapter.test.mjs` | **14 tests, 14 pass, 0 fail**, exit 0 (~1.0 s) |
+| `npm test` (full suite, ten runs in this window) | **8 green / 2 red**: 278/278 pass (×2), 277/277 pass (×2), 276/276 pass (×3), 275/275 pass (×1); two runs ended **260 pass + 18 cancelled, 0 fail, exit 1** and **257 pass + 18 cancelled, 0 fail, exit 1**. The red runs are the flaky test finding **F2**, not a product assertion. |
 
-The verifier suites total **68 tests**; all pass on their own.
+The verifier suites total **70 tests**; all pass on their own.
 
 `npm test` scripts: `pretest` = `node scripts/prepare-guanlan-fixture.mjs`
 (cached fixture reused), `test` = `node --test "tests/**/*.test.mjs"`.
@@ -104,9 +104,9 @@ working tree during this audit and re-verified here.
 
 ### F2 · medium · OPEN — full `npm test` is flaky (18 tests cancelled, exit 1)
 
-- Reproduction: 2 of 5 full-suite runs failed with
+- Reproduction: 2 of 10 full-suite runs failed with
   `failureType: 'cancelledByParent'`, `18` cancelled, `0` assertion failures;
-  the other 3 runs were fully green. The failure starts at
+  the other 8 runs were fully green. The failure starts at
   `tests/research-execute.test.mjs:329` (“external abort → cancelled”),
   then cancels its 17 siblings.
 - Root cause: that test double registers the abort listener **after** the run has
@@ -241,7 +241,7 @@ is ever reused as prompt input.
 ```bash
 cd /Users/tao/Desktop/workspace/cloud-pi-agt-028
 
-# Verifier suites (68 tests, all green)
+# Verifier suites (70 tests, all green)
 node --test tests/research-verify-pipeline.test.mjs
 node --test tests/research-verify-adversarial.test.mjs
 node --test tests/research-verify-artifacts.test.mjs

@@ -1,0 +1,300 @@
+{
+  "contractVersion": 1,
+  "runId": "r-20261102T100143-1198d5",
+  "status": "completed",
+  "createdAt": "2026-11-02T10:01:43.725Z",
+  "updatedAt": "2026-11-02T10:02:21.600Z",
+  "startedAt": "2026-11-02T10:01:43.725Z",
+  "finishedAt": "2026-11-02T10:02:21.600Z",
+  "durationMs": 37844,
+  "request": {
+    "topic": "研究最近 48 小时值得《见π》关注的 AI Agent 工程进展",
+    "goal": "",
+    "timeRange": "48h"
+  },
+  "limits": {
+    "maxSearches": 3,
+    "maxPages": 3,
+    "maxResultsPerSearch": 8,
+    "maxCharsPerPage": 20000,
+    "maxTotalPageChars": 120000,
+    "maxRuntimeMs": 240000,
+    "maxToolCalls": 28,
+    "maxTurns": 36,
+    "maxTotalTokens": 300000,
+    "requestTimeoutMs": 15000,
+    "maxSearchPages": 2
+  },
+  "statusHistory": [
+    {
+      "status": "running",
+      "at": "2026-11-02T10:01:43.725Z"
+    },
+    {
+      "status": "completed",
+      "at": "2026-11-02T10:02:21.600Z"
+    }
+  ],
+  "runtime": {
+    "status": "completed",
+    "durationMs": 37829,
+    "usage": {
+      "inputTokens": 7993,
+      "outputTokens": 3500,
+      "totalTokens": 23909,
+      "modelId": "deepseek-v4.1-flash-od",
+      "providerId": "mira-ai",
+      "source": "provider"
+    },
+    "error": null
+  },
+  "tools": {
+    "counters": {
+      "searches": 3,
+      "pages": 3,
+      "toolCalls": 6,
+      "refused": 0
+    },
+    "calls": [
+      {
+        "seq": 1,
+        "callId": "call_00_ET_rNLtPg3rmwj52K7jbn6N1452",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 2364,
+        "errorCode": null
+      },
+      {
+        "seq": 2,
+        "callId": "call_01_ET_MwdgLSI3y5wzVL583KJt5053",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 3148,
+        "errorCode": null
+      },
+      {
+        "seq": 3,
+        "callId": "call_00_S7Tzu9xZqG2TbY0UKLdy5552",
+        "name": "research_web_search",
+        "status": "ok",
+        "durationMs": 3638,
+        "errorCode": null
+      },
+      {
+        "seq": 4,
+        "callId": "call_00_TeBBQQ9P6pryetMzoXuv8477",
+        "name": "research_read_page",
+        "status": "ok",
+        "durationMs": 1294,
+        "errorCode": null
+      },
+      {
+        "seq": 5,
+        "callId": "call_02_9wrBJWB6yuliwn32gCMl8547",
+        "name": "research_read_page",
+        "status": "ok",
+        "durationMs": 1995,
+        "errorCode": null
+      },
+      {
+        "seq": 6,
+        "callId": "call_01_NTGfpPb0kZa8DXyeMSyx4752",
+        "name": "research_read_page",
+        "status": "ok",
+        "durationMs": 5035,
+        "errorCode": null
+      }
+    ]
+  },
+  "sourcesSummary": {
+    "total": 21,
+    "fetched": 3,
+    "failed": 0,
+    "not_fetched": 18,
+    "failures": []
+  },
+  "citations": {
+    "references": [
+      {
+        "id": "S13",
+        "count": 16
+      },
+      {
+        "id": "S2",
+        "count": 5
+      },
+      {
+        "id": "S9",
+        "count": 5
+      },
+      {
+        "id": "S6",
+        "count": 1
+      },
+      {
+        "id": "S7",
+        "count": 1
+      },
+      {
+        "id": "S8",
+        "count": 1
+      },
+      {
+        "id": "S12",
+        "count": 1
+      },
+      {
+        "id": "S10",
+        "count": 1
+      },
+      {
+        "id": "S11",
+        "count": 1
+      },
+      {
+        "id": "S3",
+        "count": 1
+      },
+      {
+        "id": "S14",
+        "count": 1
+      },
+      {
+        "id": "S20",
+        "count": 1
+      },
+      {
+        "id": "S1",
+        "count": 1
+      }
+    ],
+    "resolved": [
+      {
+        "id": "S13",
+        "count": 16,
+        "status": "fetched"
+      },
+      {
+        "id": "S2",
+        "count": 5,
+        "status": "fetched"
+      },
+      {
+        "id": "S9",
+        "count": 5,
+        "status": "fetched"
+      },
+      {
+        "id": "S6",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S7",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S8",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S12",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S10",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S11",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S3",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S14",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S20",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S1",
+        "count": 1,
+        "status": "not_fetched"
+      }
+    ],
+    "unresolved": [],
+    "unfetched": [
+      {
+        "id": "S6",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S7",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S8",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S12",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S10",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S11",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S3",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S14",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S20",
+        "count": 1,
+        "status": "not_fetched"
+      },
+      {
+        "id": "S1",
+        "count": 1,
+        "status": "not_fetched"
+      }
+    ]
+  },
+  "errors": [],
+  "paths": {
+    "run": "run.json",
+    "report": "report.md",
+    "sources": "sources.json",
+    "sourcesMarkdown": "sources.md",
+    "transcript": "transcript.md"
+  }
+}
