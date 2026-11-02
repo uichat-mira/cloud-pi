@@ -131,6 +131,7 @@ export async function createResearchSession({
   systemPrompt = "You are a deterministic research test agent. Use the provided read-only research tools.",
   cwd,
   modelId = "research-scripted",
+  extensionFactories = [],
 } = {}) {
   if (!Array.isArray(tools) || tools.length === 0) throw new Error("createResearchSession requires tools");
   const dir = cwd ?? tempDirFor("cloud-pi-t3-session-");
@@ -171,7 +172,7 @@ export async function createResearchSession({
   const resourceLoader = new DefaultResourceLoader({
     cwd: dir,
     agentDir: dir,
-    extensionFactories: [plugin],
+    extensionFactories: [...extensionFactories, plugin],
     systemPrompt,
     noContextFiles: true,
     noSkills: true,

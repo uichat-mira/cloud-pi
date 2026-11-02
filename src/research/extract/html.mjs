@@ -20,6 +20,8 @@ export const READABLE_CONTENT_TYPES = Object.freeze(["text/html", "text/plain", 
 const MIN_READABILITY_CHARS = 200;
 const MIN_EXTRACT_CHARS = 20;
 const META_SCAN_BYTES = 4096;
+/** Ledger excerpt length: a body-text preview, not the page's meta description. */
+const EXCERPT_CHARS = 600;
 
 /** Parse `text/html; charset=UTF-8` into `{mediaType, charset}`. */
 export function parseContentType(header) {
@@ -170,10 +172,15 @@ function bodyTextFallback(document) {
   return normalizeExtractedText(body?.textContent ?? "");
 }
 
+/**
+ * Excerpt for the source ledger: what the model actually read, i.e. the start of
+ * the extracted body. The page's meta description is only a fallback for pages
+ * whose body is empty (where it is the only human-readable text).
+ */
 function excerptOf(text, description) {
-  const descriptionText = normalizeWhitespace(description);
-  if (descriptionText) return descriptionText.slice(0, 300);
-  return normalizeWhitespace(text).slice(0, 300);
+  const body = normalizeWhitespace(text);
+  if (body) return body.slice(0, EXCERPT_CHARS);
+  return normalizeWhitespace(description).slice(0, EXCERPT_CHARS);
 }
 
 /**
@@ -226,7 +233,7 @@ export function extractFromHtml(html, { url, maxChars = 20_000 } = {}) {
     title: normalizeWhitespace(article?.title ?? "") || metadata.title,
     siteName: normalizeWhitespace(article?.siteName ?? "") || metadata.siteName,
     publishedAt: metadata.publishedAt,
-    excerpt: excerptOf(text, article?.excerpt || metadata.description),
+    excerpt: excerptOf(text, metadata.description),
     text,
     contentChars: text.length,
     rawChars,
@@ -253,7 +260,7 @@ export function extractFromPlainText(body, { url, maxChars = 20_000 } = {}) {
     title: normalizeWhitespace(firstLine).slice(0, 200),
     siteName: hostname,
     publishedAt: null,
-    excerpt: normalizeWhitespace(capped).slice(0, 300),
+    excerpt: normalizeWhitespace(capped).slice(0, EXCERPT_CHARS),
     text: capped,
     contentChars: capped.length,
     rawChars,

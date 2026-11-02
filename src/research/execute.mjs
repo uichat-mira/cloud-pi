@@ -191,6 +191,28 @@ function redactDeep(value) {
   return value;
 }
 
+/**
+ * Remove credential-looking substrings from a source record before it is
+ * persisted. URLs stay usable as provenance (the source id is the citation
+ * key), but `access_token=…`, `api_key=…`, bearer tokens and similar values
+ * never reach sources.json / sources.md. The model-facing tool text keeps the
+ * real URL, so citation-by-id still works.
+ */
+function redactSourceRecord(source) {
+  return {
+    ...source,
+    title: redactSecrets(source.title),
+    url: redactSecrets(source.url),
+    finalUrl: source.finalUrl === null ? null : redactSecrets(source.finalUrl),
+    siteName: redactSecrets(source.siteName),
+    excerpt: source.excerpt === null ? null : redactSecrets(source.excerpt),
+    aliases: Array.isArray(source.aliases) ? source.aliases.map((url) => redactSecrets(url)) : [],
+    error: source.error
+      ? { ...source.error, message: redactSecrets(source.error.message) }
+      : null,
+  };
+}
+
 function toErrorRecord({ code, message, phase }) {
   const safeCode = isErrorCode(code) ? code : ERROR_CODE.INTERNAL_ERROR;
   return errorRecord(safeCode, redactSecrets(String(message ?? safeCode)), { phase });
@@ -649,17 +671,17 @@ async function runPreparedExecution(context) {
 
   const finishedAt = context.clock().toISOString();
   const reportBody = extractReportBody(runtimeResult?.text);
+  const mergedCalls = mergeToolCalls(calls, runtimeResult?.toolCalls);
+  // Persisted provenance is redacted; ledger identity stays the source id.
+  const sources = provenance.snapshot().map(redactSourceRecord);
   const status = resolveRunStatus({
     abortReason,
     runtimeError,
     runtimeResult,
     reportBody,
     calls,
-    sources: provenance.snapshot(),
+    sources,
   });
-
-  const mergedCalls = mergeToolCalls(calls, runtimeResult?.toolCalls);
-  const sources = provenance.snapshot();
   const sourcesSummary = summarizeSources(sources);
   const citations = reportBody
     ? resolveCitations(reportBody, sources)

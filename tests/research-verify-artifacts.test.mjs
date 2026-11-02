@@ -29,6 +29,16 @@ const execFileAsync = promisify(execFile);
 const CLI = fileURLToPath(new URL("../scripts/research.mjs", import.meta.url));
 const RUN_ID = "r-20261102T090000-abcdef";
 
+const dummyTool = (name) => ({
+  name,
+  label: name,
+  description: "dummy adapter tool",
+  parameters: {},
+  async execute() {
+    return { content: [{ type: "text", text: "dummy" }], isError: false };
+  },
+});
+
 const REPORT = [
   "## 摘要",
   "",
@@ -73,6 +83,15 @@ before(async () => {
         `<!doctype html><html><head><title>Headers</title></head><body><article><h1>Headers</h1>${Array.from(
           { length: 12 },
           (_, index) => `<p>Paragraph ${index + 1}. Agent engineering details and release evidence for the header test.</p>`,
+        ).join("")}</article></body></html>`,
+      );
+    },
+    "/meta": (req, res) => {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(
+        `<!doctype html><html><head><title>Meta versus body</title><meta name="description" content="META-DESCRIPTION-MARKER ${"m".repeat(200)}"></head><body><article><h1>Meta versus body</h1>${Array.from(
+          { length: 8 },
+          (_, index) => `<p>BODY-MARKER paragraph ${index + 1}. The ledger excerpt must come from the read body, not the page meta description.</p>`,
         ).join("")}</article></body></html>`,
       );
     },
@@ -231,6 +250,7 @@ describe("adversarial: run store and tampered artifacts", () => {
     assert.equal(sources, null);
 
     // A corrupt run directory must not hide a healthy one from listResearchRuns.
+    await writeFile(join(dir, "run.json"), "{ corrupt");
     await store.createRun({
       contractVersion: 1,
       runId: "r-20261102T100000-111111",
@@ -296,6 +316,27 @@ describe("adversarial: citations and fabricated provenance", () => {
     assert.match(sourcesMarkdown, /仅用于发现线索，正文未读取，不可作为事实依据/);
   });
 
+  test("the persisted ledger excerpt is the read body, not the page meta description (t4)", async (t) => {
+    const rootDir = await tempRoot(t);
+    const read = createReadPageTool({ allowLoopback: true, env: {}, proxyUrl: null, retryTransient: false });
+    const port = scriptedPort(async ({ call, toolCalls }) => {
+      await call(TOOL.READ_PAGE, { url: `${baseUrl}/meta` });
+      return { status: "completed", text: REPORT, usage: USAGE, toolCalls };
+    });
+    const record = await executeResearch(
+      { topic: "excerpt provenance" },
+      { runtimePort: port, toolLayer: { tools: [read] }, rootDir },
+    );
+    assert.equal(record.status, RUN_STATUS.COMPLETED);
+    assert.equal(record.sourcesSummary.fetched, 1);
+    const persisted = JSON.parse(await readFile(join(rootDir, record.runId, "sources.json"), "utf8"));
+    assert.match(persisted.sources[0].excerpt, /BODY-MARKER/);
+    assert.ok(!persisted.sources[0].excerpt.includes("META-DESCRIPTION-MARKER"));
+    const sourcesMarkdown = await readFile(join(rootDir, record.runId, "sources.md"), "utf8");
+    assert.match(sourcesMarkdown, /摘要: .*BODY-MARKER/);
+    assert.ok(!sourcesMarkdown.includes("META-DESCRIPTION-MARKER"));
+  });
+
   test("a URL the model merely wrote in its text never becomes a source", async (t) => {
     const rootDir = await tempRoot(t);
     const port = scriptedPort(async () => ({
@@ -306,7 +347,7 @@ describe("adversarial: citations and fabricated provenance", () => {
     }));
     const record = await executeResearch(
       { topic: "fabricated url" },
-      { runtimePort: port, toolLayer: { tools: [] }, rootDir },
+      { runtimePort: port, toolLayer: { tools: [dummyTool("research_web_search")] }, rootDir },
     );
 
     assert.equal(record.status, RUN_STATUS.COMPLETED);
@@ -318,7 +359,7 @@ describe("adversarial: citations and fabricated provenance", () => {
       failures: [],
     });
     const { report, sources } = await readResearchRun(record.runId, { rootDir });
-    assert.equal(sources, null);
+    assert.deepEqual(sources, [], "no tool returned a source, so the ledger is empty");
     assert.match(report, /fabricated\.example/, "the model's text is preserved for review");
     assert.match(report, /来源: 共 0 条/);
     const record_a = await readFile(join(rootDir, record.runId, "sources.json"), "utf8");
@@ -374,7 +415,7 @@ describe("adversarial: secrets and the live boundary", () => {
     }));
     const record = await executeResearch(
       { topic: "runtime redaction" },
-      { runtimePort: port, toolLayer: { tools: [] }, rootDir },
+      { runtimePort: port, toolLayer: { tools: [dummyTool("research_web_search")] }, rootDir },
     );
     assert.equal(record.status, RUN_STATUS.FAILED);
     assert.equal(record.paths.report, null);
@@ -404,6 +445,30 @@ describe("adversarial: secrets and the live boundary", () => {
       if (text.includes(marker)) leaks.push(file);
     }
     assert.deepEqual(leaks, [], `a token-bearing URL reached persisted artifacts: ${leaks.join(", ")}`);
+  });
+
+  test("an already-aborted external signal is visible to the runtime and the run is cancelled", async (t) => {
+    const rootDir = await tempRoot(t);
+    const controller = new AbortController();
+    controller.abort();
+    let sawAbortedSignal = null;
+    const port = {
+      portVersion: RUNTIME_PORT_VERSION,
+      async runAgent(spec) {
+        sawAbortedSignal = spec.signal?.aborted === true;
+        return { status: "completed", text: REPORT, usage: USAGE, toolCalls: [] };
+      },
+    };
+    const record = await executeResearch(
+      { topic: "pre-aborted" },
+      { runtimePort: port, toolLayer: { tools: [dummyTool("research_web_search")] }, rootDir, signal: controller.signal },
+    );
+    assert.equal(sawAbortedSignal, true, "the runtime must receive an already-aborted signal");
+    assert.equal(record.status, RUN_STATUS.CANCELLED);
+    assert.ok(record.errors.some((error) => error.code === ERROR_CODE.ABORTED));
+    // The executor still invokes the port once even when the caller aborted
+    // before start; a runtime that ignores the signal can therefore leave a
+    // report artifact under a cancelled status (low-risk observation, see doc).
   });
 
   test("the live path fails closed without an AGT-027 runtime module and creates no run", async (t) => {

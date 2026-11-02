@@ -470,6 +470,34 @@ test("credential-looking strings never reach run.json", async (t) => {
   assert.match(raw, /\[redacted\]/);
 });
 
+test("URL credentials are redacted from the persisted source ledger", async (t) => {
+  const rootDir = await tempRoot(t);
+  const marker = "TEST-URL-TOKEN-1a2b3c";
+  const tokenUrl = `https://example.com/article?access_token=${marker}`;
+  const port = scriptedPort(async ({ call, toolCalls }) => {
+    await call(TOOL.SEARCH, { query: "token url" });
+    await call(TOOL.READ_PAGE, { url: tokenUrl });
+    return { status: "completed", text: LONG_REPORT, usage: USAGE, toolCalls };
+  });
+  const record = await executeResearch(
+    { topic: "url token" },
+    {
+      runtimePort: port,
+      toolLayer: fixtureToolLayer({ search: () => searchToolResult([hit(tokenUrl)]), read: () => pageOk(tokenUrl) }),
+      rootDir,
+    },
+  );
+  assert.equal(record.status, RUN_STATUS.COMPLETED);
+  for (const name of ["run.json", "report.md", "sources.json", "sources.md", "transcript.md"]) {
+    const text = await readFile(join(rootDir, record.runId, name), "utf8");
+    assert.ok(!text.includes(marker), `${name} leaked a URL credential`);
+  }
+  assert.match(
+    await readFile(join(rootDir, record.runId, "sources.json"), "utf8"),
+    /access_token=\[redacted\]/,
+  );
+});
+
 test("usage is persisted honestly when the runtime reports none", async (t) => {
   const rootDir = await tempRoot(t);
   const port = scriptedPort(async ({ toolCalls }) => ({

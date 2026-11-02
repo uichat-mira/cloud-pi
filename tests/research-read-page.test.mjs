@@ -237,17 +237,66 @@ describe("read-page: extraction quality", () => {
     );
   });
 
-  test("fails as extract_failed when a page has no readable text", async () => {
+  test("fails as extract_failed instead of returning an empty ok page", async () => {
+    const shell =
+      '<!doctype html><html><head><title>JS only page</title>' +
+      '<meta name="description" content="Shell description that is not page body text">' +
+      '</head><body><div id="root"></div><script>boot()</script></body></html>';
     await withServer(
-      {
-        "/app-shell": (req, res) =>
-          sendHtml(res, "<!doctype html><html><head><title>App</title></head><body><div id=root></div><script>boot()</script></body></html>"),
-      },
+      { "/app-shell": (req, res) => sendHtml(res, shell) },
       async (fx) => {
-        const { details } = await readPage({ url: `${fx.url}/app-shell` }, deps(fx));
+        const { details, content } = await readPage({ url: `${fx.url}/app-shell` }, deps(fx));
         assert.equal(details.status, "error");
         assert.equal(details.error.code, "extract_failed");
         assert.equal(details.error.retryable, false);
+        assert.match(details.error.message, /JS-rendered or empty body/);
+        // Metadata is kept so the ledger can still identify the attempted source.
+        assert.equal(details.title, "JS only page");
+        assert.equal(details.contentChars, 0);
+        assert.equal(content, "");
+      },
+    );
+  });
+
+  test("short HTML bodies below the 120-char threshold are extract_failed", async () => {
+    const tiny = '<!doctype html><html><head><title>Tiny</title></head><body><p>Only a few words here.</p></body></html>';
+    await withServer(
+      { "/tiny": (req, res) => sendHtml(res, tiny) },
+      async (fx) => {
+        const { details } = await readPage({ url: `${fx.url}/tiny` }, deps(fx));
+        assert.equal(details.status, "error");
+        assert.equal(details.error.code, "extract_failed");
+        assert.ok(details.contentChars < 120);
+      },
+    );
+  });
+
+  test("short text/plain files are accepted as-is", async () => {
+    await withServer(
+      { "/tiny.txt": (req, res) => sendText(res, "short note") },
+      async (fx) => {
+        const { details } = await readPage({ url: `${fx.url}/tiny.txt` }, deps(fx));
+        assert.equal(details.status, "ok");
+        assert.equal(details.mediaType, "text/plain");
+        assert.equal(details.extractor, "plain_text");
+        assert.equal(details.excerpt, "short note");
+      },
+    );
+  });
+
+  test("ledger excerpt quotes the extracted body, not the meta description", async () => {
+    const body =
+      '<p>BODY-FIRST-SENTENCE about the agent release and its measured limits.</p>' + paragraphs();
+    await withServer(
+      { "/excerpt": (req, res) => sendHtml(res, articleHtml({ body })) },
+      async (fx) => {
+        const { details } = await readPage({ url: `${fx.url}/excerpt` }, deps(fx));
+        assert.equal(details.status, "ok");
+        assert.ok(details.excerpt.startsWith("BODY-FIRST-SENTENCE"), `excerpt=${details.excerpt.slice(0, 80)}`);
+        assert.ok(details.excerpt.includes("Paragraph 1"));
+        assert.ok(details.excerpt.length <= 600);
+        assert.notEqual(details.excerpt, "A summary of the article for excerpt checks.");
+        assert.ok(!details.excerpt.startsWith("A summary of the article"));
       },
     );
   });

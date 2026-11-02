@@ -36,10 +36,25 @@ import {
   extractFromPlainText,
   parseContentType,
 } from "../extract/html.mjs";
-import { buildUntrustedBlock } from "../untrusted.mjs";
+import { buildUntrustedBlock, sanitizeUntrustedText } from "../untrusted.mjs";
+import { normalizeWhitespace } from "../net/rss.mjs";
 
-const MIN_CONTENT_CHARS = 20;
+/**
+ * HTML pages must yield at least this many non-whitespace characters, otherwise
+ * the click looks successful while the model actually received an empty shell
+ * (JS-rendered app, consent wall, empty body). `text/plain` is exempt: a short
+ * notes file is legitimate content.
+ */
+const MIN_CONTENT_CHARS = 120;
+const MIN_PLAIN_TEXT_CHARS = 1;
+const EXCERPT_CHARS = 600;
 const MAX_HTML_SCAN_CHARS = 500_000;
+const EXTRACT_FAILED_MESSAGE = "page text could not be extracted (JS-rendered or empty body)";
+
+function countNonWhitespace(value) {
+  const matches = String(value ?? "").match(/\S/g);
+  return matches ? matches.length : 0;
+}
 
 function resolveLimits(overrides = {}) {
   return {
@@ -60,9 +75,24 @@ function errorDetails({ code, message, retryable = false, url = null, extra = {}
     finalUrl: extra.finalUrl ?? url,
     httpStatus: extra.httpStatus ?? null,
     contentType: extra.contentType ?? null,
+    mediaType: extra.mediaType ?? null,
     bytes: extra.bytes ?? 0,
     redirects: extra.redirects ?? [],
     elapsedMs: extra.elapsedMs ?? 0,
+    // A failed extraction still keeps whatever the page did disclose, so the
+    // ledger shows which source was attempted and why it is unusable.
+    ...(extra.title !== undefined ? { title: extra.title } : {}),
+    ...(extra.siteName !== undefined ? { siteName: extra.siteName } : {}),
+    ...(extra.publishedAt !== undefined
+      ? {
+          publishedAt: extra.publishedAt,
+          dateSource: extra.publishedAt ? "page" : "none",
+          dateConfidence: extra.publishedAt ? "verified" : "none",
+        }
+      : {}),
+    ...(extra.contentChars !== undefined ? { contentChars: extra.contentChars } : {}),
+    ...(extra.excerpt !== undefined ? { excerpt: extra.excerpt } : {}),
+    ...(extra.extractor !== undefined ? { extractor: extra.extractor } : {}),
     injectionSignals: [],
     error: {
       code: isErrorCode(code) ? code : ERROR_CODE.INTERNAL_ERROR,
@@ -199,15 +229,27 @@ export async function readPage(params = {}, deps = {}) {
       };
     }
 
-    if (extracted.contentChars < MIN_CONTENT_CHARS) {
+    const nonWhitespaceChars = countNonWhitespace(extracted.text);
+    const minChars = effectiveType === "text/plain" ? MIN_PLAIN_TEXT_CHARS : MIN_CONTENT_CHARS;
+    if (nonWhitespaceChars < minChars) {
+      // Do not return status "ok" with an empty body: the model would be able
+      // to cite a page it never read. Report a classified failure instead.
       return {
         content: "",
         details: errorDetails({
           code: ERROR_CODE.EXTRACT_FAILED,
-          message: `No readable content found (${extracted.contentChars} chars extracted)`,
+          message: EXTRACT_FAILED_MESSAGE,
           retryable: false,
           url: target.href,
-          extra: baseExtra,
+          extra: {
+            ...baseExtra,
+            mediaType: effectiveType,
+            title: extracted.title,
+            siteName: extracted.siteName,
+            publishedAt: extracted.publishedAt,
+            contentChars: extracted.contentChars,
+            extractor: extracted.extractor,
+          },
         }),
       };
     }
@@ -237,6 +279,10 @@ export async function readPage(params = {}, deps = {}) {
       html: effectiveType === "text/plain" ? undefined : decoded.text.slice(0, MAX_HTML_SCAN_CHARS),
     });
     const truncated = extracted.truncated || block.truncated;
+    // The ledger excerpt must show what the model actually read. `extractFromHtml`
+    // already prefers the body over the page's meta description; sanitizing keeps
+    // the excerpt on the same untrusted-content footing as the fenced body.
+    const excerpt = sanitizeUntrustedText(normalizeWhitespace(extracted.excerpt)).slice(0, EXCERPT_CHARS);
     const details = {
       status: "ok",
       url: target.href,
@@ -252,7 +298,7 @@ export async function readPage(params = {}, deps = {}) {
       dateSource: extracted.publishedAt ? "page" : "none",
       dateConfidence: extracted.publishedAt ? "verified" : "none",
       accessedAt,
-      excerpt: extracted.excerpt,
+      excerpt,
       contentChars: extracted.contentChars,
       extractor: extracted.extractor,
       truncated,
@@ -341,4 +387,4 @@ export function createReadPageTool(deps = {}) {
 /** Production tool: real network, contract limits, no test hooks. */
 export const readPageTool = createReadPageTool();
 
-export { MAX_BODY_BYTES, MAX_REDIRECTS, MIN_CONTENT_CHARS };
+export { EXCERPT_CHARS, MAX_BODY_BYTES, MAX_REDIRECTS, MIN_CONTENT_CHARS };
