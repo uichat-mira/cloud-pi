@@ -19,6 +19,9 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.4.0",
-    "@earendil-works/pi-coding-agent": "1.4.0"
+    "@earendil-works/pi-coding-agent": "1.4.0",
+    "@mozilla/readability": "^0.6.0",
+    "linkedom": "^0.18.15",
+    "undici": "^6.29.1"
   }
 }
