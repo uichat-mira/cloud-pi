@@ -82,10 +82,23 @@ function slowTool() {
   };
 }
 
+function uncooperativeTool() {
+  return {
+    name: "stuck_tool",
+    label: "Stuck",
+    description: "Test-only tool that ignores AbortSignal.",
+    parameters: Type.Object({}),
+    execute() {
+      return new Promise(() => {});
+    },
+  };
+}
+
 async function makeRuntime({
   customTools = [],
   allowedTools = [],
   exposedTools,
+  extensionFactories = [],
   configOverrides = {},
   agentDir,
 } = {}) {
@@ -105,6 +118,7 @@ async function makeRuntime({
     customTools,
     allowedTools,
     exposedTools,
+    extensionFactories,
     agentDir,
   });
   cleanup.push(() => runtime.dispose());
@@ -249,6 +263,73 @@ describe("AGT-027 T2: timeout, cancellation and failure classification", () => {
     assert.equal(classifyError(new Error("400 bad request: max_tokens invalid")).code, "invalid_request");
     assert.equal(classifyError(new Error("insufficient balance")).code, "rate_limit");
     assert.equal(classifyError(new Error("getaddrinfo ENOTFOUND host"), { secrets: [] }).code, "network_error");
+  });
+
+  test("an already-aborted caller never starts the model or a tool", async () => {
+    const calls = [];
+    const { faux, runtime } = await makeRuntime({
+      customTools: [spyTool(calls)],
+      allowedTools: ["spy_tool"],
+    });
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall("spy_tool", {}, { id: "call-1" })], { stopReason: "toolUse" }),
+    ]);
+
+    const controller = new AbortController();
+    controller.abort();
+    const record = await runtime.run("Use spy_tool.", { signal: controller.signal });
+
+    assert.equal(record.status, "cancelled");
+    assert.equal(record.error.code, "cancelled");
+    assert.equal(calls.length, 0, "an aborted run must not execute tools");
+    assert.equal(record.toolCalls.length, 0);
+  });
+
+  test("a tool that ignores abort cannot hang the run past its deadline", async () => {
+    const { faux, runtime } = await makeRuntime({
+      customTools: [uncooperativeTool()],
+      allowedTools: ["stuck_tool"],
+    });
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall("stuck_tool", {}, { id: "call-1" })], { stopReason: "toolUse" }),
+    ]);
+
+    const started = Date.now();
+    const record = await runtime.run("Use stuck_tool.", { timeoutMs: 200 });
+
+    assert.equal(record.status, "timeout");
+    assert.equal(record.error.code, "timeout");
+    assert.ok(Date.now() - started < 5_000, "the run deadline must be enforced");
+  });
+
+  test("final assistant text is redacted like every other record field", async () => {
+    const { faux, runtime, config } = await makeRuntime();
+    faux.setResponses([fauxAssistantMessage(`the key is ${config.apiKey}`)]);
+
+    const record = await runtime.run("repeat the key");
+
+    assert.equal(record.text.includes(config.apiKey), false);
+    assert.match(record.text, /\[redacted\]/);
+    assert.equal(JSON.stringify(record).includes(config.apiKey), false);
+  });
+
+  test("extension session_shutdown runs once per session", async () => {
+    let shutdowns = 0;
+    const { faux, runtime } = await makeRuntime({
+      extensionFactories: [
+        (pi) => {
+          pi.on("session_shutdown", () => {
+            shutdowns += 1;
+          });
+        },
+      ],
+    });
+    faux.setResponses([fauxAssistantMessage("one"), fauxAssistantMessage("two")]);
+
+    await runtime.run("first");
+    await runtime.run("second");
+
+    assert.equal(shutdowns, 2);
   });
 });
 

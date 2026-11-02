@@ -180,6 +180,8 @@ function describeConfigProblem(fields, env) {
         return `${field} may contain only letters, digits, dot, underscore and dash`;
       case CONFIG_KEYS.maxOutputTokens:
         return `${field} must be a positive integer no larger than ${CONFIG_KEYS.contextWindow}`;
+      case CONFIG_KEYS.modelId:
+        return `${field} must be a non-empty string no longer than 200 characters`;
       default:
         return `${field} must be an integer within ${BOUNDS[fieldKey(field)]?.min ?? 0}..${BOUNDS[fieldKey(field)]?.max ?? "?"}`;
     }
@@ -192,6 +194,28 @@ function fieldKey(field) {
     if (name === field) return key;
   }
   return field;
+}
+
+/**
+ * Re-validate and normalize an injected config object through the same rules
+ * used for environment input, filling defaults and rejecting missing secrets.
+ */
+export function normalizeConfig(config) {
+  if (!config || typeof config !== "object") {
+    throw new TypeError("config must be an object");
+  }
+  const value = (input) => (input === undefined || input === null ? undefined : String(input));
+  return loadConfig({
+    [CONFIG_KEYS.baseUrl]: value(config.baseUrl),
+    [CONFIG_KEYS.apiKey]: value(config.apiKey),
+    [CONFIG_KEYS.modelId]: value(config.modelId),
+    [CONFIG_KEYS.api]: value(config.api),
+    [CONFIG_KEYS.providerId]: value(config.providerId),
+    [CONFIG_KEYS.contextWindow]: value(config.contextWindow),
+    [CONFIG_KEYS.maxOutputTokens]: value(config.maxOutputTokens),
+    [CONFIG_KEYS.runTimeoutMs]: value(config.runTimeoutMs),
+    [CONFIG_KEYS.maxToolCalls]: value(config.maxToolCalls),
+  });
 }
 
 /**
@@ -217,7 +241,7 @@ export function redactSecrets(text, secrets = []) {
   if (typeof text !== "string" || text.length === 0) return text;
   let out = text;
   for (const secret of secrets) {
-    if (typeof secret === "string" && secret.length >= 6) out = out.split(secret).join("[redacted]");
+    if (typeof secret === "string" && secret.length > 0) out = out.split(secret).join("[redacted]");
   }
   out = out.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]");
   out = out.replace(/\bsk-[A-Za-z0-9_-]{6,}/g, "sk-[redacted]");

@@ -9,7 +9,7 @@
  * configuration. Secrets are never printed; provider errors are redacted.
  */
 import { resolve } from "node:path";
-import { ConfigError, describeConfig, loadConfig } from "./config.mjs";
+import { CONFIG_KEYS, ConfigError, describeConfig, loadConfig } from "./config.mjs";
 import { RuntimeError } from "./errors.mjs";
 import { createAgentRuntime } from "./runtime.mjs";
 import { LOCAL_READ_TOOL_NAME, createLocalReadTool } from "./tools.mjs";
@@ -82,6 +82,10 @@ async function main() {
     }
     throw error;
   }
+
+  // The key is held by the memory-only runtime credential; do not let
+  // extension-spawned child processes (native MCP stdio) inherit it.
+  delete process.env[CONFIG_KEYS.apiKey];
 
   const toolRoot = process.env.CLOUD_PI_TOOL_ROOT
     ? resolve(process.env.CLOUD_PI_TOOL_ROOT)

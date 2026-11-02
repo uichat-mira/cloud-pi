@@ -13,6 +13,7 @@ export {
   SUPPORTED_APIS,
   describeConfig,
   loadConfig,
+  normalizeConfig,
   redactSecrets,
 } from "./config.mjs";
 export { RuntimeError, classifyError } from "./errors.mjs";

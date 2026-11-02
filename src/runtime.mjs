@@ -22,11 +22,12 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { classifyError, RuntimeError } from "./errors.mjs";
-import { describeConfig, loadConfig, redactSecrets } from "./config.mjs";
+import { CONFIG_KEYS, describeConfig, loadConfig, normalizeConfig, redactSecrets } from "./config.mjs";
 import { createModelRuntime } from "./provider.mjs";
 
 const RESULT_PREVIEW_CHARS = 2_000;
 const IDLE_GRACE_MS = 10_000;
+const ABORT_SETTLE_MS = 2_000;
 
 function globToRegExp(pattern) {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
@@ -140,7 +141,12 @@ function normalizePatterns(value, name) {
  * @param {object} [options.model] injected Pi model (tests)
  */
 export async function createAgentRuntime(options = {}) {
-  const config = options.config ?? loadConfig(options.env ?? process.env);
+  const usingProcessEnv = !options.config && (options.env ?? process.env) === process.env;
+  const config = options.config ? normalizeConfig(options.config) : loadConfig(options.env ?? process.env);
+  // The key is not needed in the environment once the memory-only runtime
+  // credential is set; removing it stops extension-spawned child processes
+  // (for example native MCP stdio servers) from inheriting it.
+  if (usingProcessEnv) delete process.env[CONFIG_KEYS.apiKey];
   const secrets = [config.apiKey].filter(Boolean);
 
   const allowedTools = normalizePatterns(options.allowedTools, "allowedTools");
@@ -185,108 +191,172 @@ export async function createAgentRuntime(options = {}) {
       }
 
       const timeoutMs = runOptions.timeoutMs ?? config.runTimeoutMs;
+      if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        throw new TypeError("runOptions.timeoutMs must be a positive number");
+      }
+
       const runId = randomUUID();
       const startedAt = Date.now();
       const capture = { records: new Map(), order: [] };
 
-      const resourceLoader = new DefaultResourceLoader({
-        cwd,
-        agentDir,
-        extensionFactories: [
-          createRunGuard({ capture, allowedTools, maxToolCalls: config.maxToolCalls, onEvent: runOptions.onEvent, secrets }),
-          ...extensionFactories,
-        ],
+      let timedOut = false;
+      let cancelled = false;
+      let stopRequested = false;
+      let resolveStop;
+      const stopPromise = new Promise((resolvePromise) => {
+        resolveStop = resolvePromise;
       });
 
       let session;
-      try {
-        await resourceLoader.reload();
-        ({ session } = await createAgentSession({
-          cwd,
-          agentDir,
-          modelRuntime,
-          model,
-          resourceLoader,
-          settingsManager: SettingsManager.inMemory({}),
-          sessionManager: SessionManager.inMemory(),
-          customTools,
-          // Empty list is meaningful: no built-in read/bash/edit/write tools leak in.
-          tools: exposedTools,
-        }));
-        await session.bindExtensions({});
-      } catch (error) {
-        session?.dispose();
-        const record = buildFailureRecord({ runId, config, startedAt, timeoutMs, error, secrets });
-        emit(runOptions.onEvent, { type: "run_end", runId, status: record.status });
-        return record;
-      }
-
-      let timedOut = false;
-      let cancelled = false;
-      let idleTimedOut = false;
-      let promptError;
-
-      const abort = () => {
-        void session.abort().catch(() => {});
+      const requestStop = (reason) => {
+        if (reason === "timeout") timedOut = true;
+        else cancelled = true;
+        if (stopRequested) return;
+        stopRequested = true;
+        resolveStop();
+        if (session) void session.abort().catch(() => {});
       };
-      const onCallerAbort = () => {
-        cancelled = true;
-        abort();
-      };
+      const onCallerAbort = () => requestStop("cancelled");
 
-      const timer =
-        Number.isFinite(timeoutMs) && timeoutMs > 0
-          ? setTimeout(() => {
-              timedOut = true;
-              abort();
-            }, timeoutMs)
-          : undefined;
-
+      // Stop sources are registered before assembly: an already-aborted caller
+      // must never reach the model, and the timeout must cover session setup.
+      const timer = setTimeout(() => requestStop("timeout"), timeoutMs);
       if (runOptions.signal) {
-        if (runOptions.signal.aborted) onCallerAbort();
+        if (runOptions.signal.aborted) requestStop("cancelled");
         else runOptions.signal.addEventListener("abort", onCallerAbort, { once: true });
       }
 
-      emit(runOptions.onEvent, { type: "run_start", runId });
-
-      try {
-        try {
-          await session.prompt(prompt);
-        } catch (error) {
-          promptError = error;
-        }
-        const idle = session.waitForIdle().then(
-          () => true,
-          () => true,
-        );
-        const becameIdle = await Promise.race([
-          idle,
-          new Promise((resolveWait) => setTimeout(() => resolveWait(false), IDLE_GRACE_MS).unref?.()),
-        ]);
-        idleTimedOut = becameIdle === false;
-      } finally {
-        if (timer) clearTimeout(timer);
+      const cleanup = () => {
+        clearTimeout(timer);
         runOptions.signal?.removeEventListener("abort", onCallerAbort);
-      }
+      };
+
+      emit(runOptions.onEvent, { type: "run_start", runId });
 
       let record;
       try {
-        record = buildRunRecord({
-          runId,
-          config,
-          capture,
-          session,
-          promptError,
-          timedOut,
-          cancelled,
-          idleTimedOut,
-          startedAt,
-          timeoutMs,
-          secrets,
-        });
+        if (stopRequested) {
+          record = buildStoppedRecord({
+            runId,
+            config,
+            startedAt,
+            timeoutMs,
+            secrets,
+            status: timedOut ? "timeout" : "cancelled",
+            beforeModelCall: true,
+          });
+        } else {
+          const resourceLoader = new DefaultResourceLoader({
+            cwd,
+            agentDir,
+            extensionFactories: [
+              createRunGuard({ capture, allowedTools, maxToolCalls: config.maxToolCalls, onEvent: runOptions.onEvent, secrets }),
+              ...extensionFactories,
+            ],
+          });
+
+          const setup = (async () => {
+            await resourceLoader.reload();
+            const created = await createAgentSession({
+              cwd,
+              agentDir,
+              modelRuntime,
+              model,
+              resourceLoader,
+              settingsManager: SettingsManager.inMemory({}),
+              sessionManager: SessionManager.inMemory(),
+              customTools,
+              // Empty list is meaningful: no built-in read/bash/edit/write tools leak in.
+              tools: exposedTools,
+            });
+            await created.session.bindExtensions({});
+            return created.session;
+          })();
+
+          const setupResult = await Promise.race([
+            setup.then((created) => ({ session: created })),
+            stopPromise.then(() => ({ stopped: true })),
+          ]);
+
+          if (setupResult.stopped) {
+            // Assembly may still complete after the stop; close that session.
+            setup.then((created) => closeSession(created)).catch(() => {});
+            record = buildStoppedRecord({
+              runId,
+              config,
+              startedAt,
+              timeoutMs,
+              secrets,
+              status: timedOut ? "timeout" : "cancelled",
+              beforeModelCall: true,
+            });
+          } else {
+            session = setupResult.session;
+            let promptError;
+            let idleTimedOut = false;
+
+            if (stopRequested) {
+              record = buildRunRecord({
+                runId,
+                config,
+                capture,
+                session,
+                promptError,
+                timedOut,
+                cancelled,
+                idleTimedOut,
+                startedAt,
+                timeoutMs,
+                secrets,
+              });
+            } else {
+              const promptPromise = session.prompt(prompt).then(
+                () => undefined,
+                (error) => {
+                  promptError = error;
+                },
+              );
+
+              const first = await Promise.race([
+                promptPromise.then(() => "settled"),
+                stopPromise.then(() => "stopped"),
+              ]);
+
+              if (first === "stopped") {
+                // A tool that ignores AbortSignal can keep prompt() pending.
+                // Wait boundedly so a cooperative prompt settles, then report.
+                await raceTimeout(promptPromise, ABORT_SETTLE_MS);
+              } else {
+                const idle = session.waitForIdle().then(
+                  () => true,
+                  () => true,
+                );
+                idleTimedOut = (await raceTimeout(idle, IDLE_GRACE_MS, false)) === false;
+              }
+
+              record = buildRunRecord({
+                runId,
+                config,
+                capture,
+                session,
+                promptError,
+                timedOut,
+                cancelled,
+                idleTimedOut,
+                startedAt,
+                timeoutMs,
+                secrets,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        record = buildFailureRecord({ runId, config, startedAt, timeoutMs, error, secrets });
       } finally {
-        session.dispose();
+        cleanup();
+        if (session) await raceTimeout(closeSession(session), ABORT_SETTLE_MS);
       }
+
       emit(runOptions.onEvent, { type: "run_end", runId, status: record.status });
       return record;
     },
@@ -300,11 +370,57 @@ export async function createAgentRuntime(options = {}) {
   };
 }
 
-function buildFailureRecord({ runId, config, startedAt, timeoutMs, error, secrets }) {
-  const failure = classifyError(error, { secrets });
+function buildStoppedRecord({ runId, config, startedAt, timeoutMs, secrets, status, beforeModelCall }) {
+  const message =
+    status === "timeout"
+      ? beforeModelCall
+        ? "run timed out before the model call started"
+        : `run timed out after ${timeoutMs}ms`
+      : beforeModelCall
+        ? "run was cancelled before the model call started"
+        : "run was cancelled by the caller";
+  return buildFailureRecord({ runId, config, startedAt, timeoutMs, secrets, status, error: new Error(message) });
+}
+
+/** Race a promise against a timer, clearing the timer either way. */
+async function raceTimeout(promise, ms, value) {
+  let handle;
+  const timer = new Promise((resolveTimer) => {
+    handle = setTimeout(() => resolveTimer(value), ms);
+  });
+  try {
+    return await Promise.race([promise, timer]);
+  } finally {
+    clearTimeout(handle);
+  }
+}
+
+/**
+ * Pi's AgentSession.dispose() does not emit `session_shutdown`, but extensions
+ * (notably the native MCP extension) close transports only on that event.
+ */
+async function closeSession(session) {
+  try {
+    await session.extensionRunner?.emit?.({ type: "session_shutdown", reason: "dispose" });
+  } catch {
+    // Extension shutdown is best effort; disposal must still happen.
+  }
+  try {
+    session.dispose();
+  } catch {
+    // Disposal is best effort during failure paths.
+  }
+}
+
+function buildFailureRecord({ runId, config, startedAt, timeoutMs, error, secrets, status = "failed" }) {
+  const failure = classifyError(error, {
+    secrets,
+    timedOut: status === "timeout",
+    cancelled: status === "cancelled",
+  });
   return {
     runId,
-    status: "failed",
+    status,
     startedAt: new Date(startedAt).toISOString(),
     durationMs: Date.now() - startedAt,
     model: { providerId: config.providerId, modelId: config.modelId, api: config.api },
@@ -341,7 +457,7 @@ function buildRunRecord({ runId, config, capture, session, promptError, timedOut
     status = "failed";
     error = classifyError(promptError, { secrets });
   } else if (idleTimedOut) {
-    status = "failed";
+    status = "timeout";
     error = classifyError(new Error(`session did not become idle within ${IDLE_GRACE_MS}ms`), {
       secrets,
       timedOut: true,
@@ -357,7 +473,7 @@ function buildRunRecord({ runId, config, capture, session, promptError, timedOut
     });
   }
 
-  const text = textOfContent(lastAssistant?.content ?? []);
+  const text = redactSecrets(textOfContent(lastAssistant?.content ?? []), secrets);
   const toolCalls = capture.order.map((record) => ({
     name: record.name,
     toolCallId: record.id,

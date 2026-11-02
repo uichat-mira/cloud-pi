@@ -13,6 +13,7 @@ import {
   describeConfig,
   isToolAllowed,
   loadConfig,
+  normalizeConfig,
   redactSecrets,
 } from "../src/index.mjs";
 
@@ -116,6 +117,30 @@ describe("AGT-027 T1: model configuration", () => {
     assert.equal(redacted.includes(key), false);
     assert.equal(redacted.includes("sk-othersecret123"), false);
     assert.match(redacted, /\[redacted\]/);
+  });
+
+  test("redacts short secrets too", () => {
+    assert.equal(redactSecrets("token=abc", ["abc"]), "token=[redacted]");
+  });
+
+  test("normalizeConfig re-validates injected objects and fills defaults", () => {
+    const normalized = normalizeConfig({
+      baseUrl: "https://mira-ai.example.com/v1",
+      apiKey: "short",
+      modelId: "test-model",
+    });
+    assert.equal(normalized.apiKey, "short");
+    assert.equal(normalized.maxToolCalls, DEFAULT_LIMITS.maxToolCalls);
+    assert.equal(normalized.runTimeoutMs, DEFAULT_LIMITS.runTimeoutMs);
+    assert.ok(Object.isFrozen(normalized));
+
+    const error = configError(() => normalizeConfig({ baseUrl: "https://example.com/v1", modelId: "m" }));
+    assert.ok(error.fields.includes(CONFIG_KEYS.apiKey));
+  });
+
+  test("a modelId failure gets a modelId hint, not an integer range", () => {
+    const error = configError(() => loadConfig(env({ CLOUD_PI_MODEL_ID: "x".repeat(201) })));
+    assert.match(error.message, /CLOUD_PI_MODEL_ID must be a non-empty string/);
   });
 });
 

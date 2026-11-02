@@ -79,7 +79,7 @@ const runtime = await createAgentRuntime({
 try {
   const record = await runtime.run("Find recent Guanlan items about …", {
     signal,          // AbortSignal，可选
-    timeoutMs: 90_000,
+    timeoutMs: 90_000, // 整个 run 的硬截止时间（含 session 装配）
     onEvent(event) { /* 只含工具名/状态，不含正文 */ },
   });
   // record.status: succeeded | failed | timeout | cancelled
@@ -93,7 +93,7 @@ try {
 
 - `allowedTools`：**执行**白名单，默认空（fail closed）。空值表示任何工具都不能执行。
 - `exposedTools`：模型**可见**的工具；默认与 `allowedTools` 相同。二者分开时，可见但未授权的调用会在 `tool_call` 钩子被拒绝，返回 `tool_not_granted`，且**不会**进入工具执行体。
-- `maxToolCalls`：超过预算的调用返回 `tool_budget_exhausted` 并终止当前批次。
+- `maxToolCalls`：超过预算的调用返回 `tool_budget_exhausted` 并拒绝执行；是否终止当前批次由 Pi 对同一批全部工具结果的处理决定。
 - 内置 `read` / `bash` / `edit` / `write` 默认不暴露（`tools: []`），除非调用方显式允许。
 
 ### Run record（稳定契约）
@@ -116,13 +116,14 @@ try {
 }
 ```
 
-`status`：`succeeded | failed | timeout | cancelled`。错误分类：`config_error`、`auth_error`、`model_not_found`、`rate_limit`、`invalid_request`、`provider_unavailable`、`network_error`、`timeout`、`cancelled`、`tool_denied`、`tool_budget_exhausted`、`tool_error`、`provider_error`。消息在写出前统一脱敏并截断。
+`status`：`succeeded | failed | timeout | cancelled`。超时是**整个 run 的硬截止时间**（含 session 装配）；到期后中止并在有界等待后返回 `timeout`，即使工具忽略 AbortSignal。调用方在 run 开始前已取消时不会启动模型或工具。错误分类：`config_error`、`auth_error`、`model_not_found`、`rate_limit`、`invalid_request`、`provider_unavailable`、`network_error`、`timeout`、`cancelled`、`tool_denied`、`tool_budget_exhausted`、`tool_error`、`provider_error`。消息在写出前统一脱敏并截断。
 
 ## 5. 安全边界
 
 - API Key 通过 `ModelRuntime.setRuntimeApiKey()` 只存在内存；运行目录是私有临时目录，不读写 `~/.pi`。
 - 会话默认 `SessionManager.inMemory()`，不把对话写盘。
-- 错误、run record、CLI 输出都经过 `redactSecrets()`；证据文件只记录脱敏摘要。
+- 错误、run record（含最终文本与工具结果预览）、CLI 输出都经过 `redactSecrets()`；证据文件只记录脱敏摘要。
+- 从 `process.env` 读取 Key 后会立即从进程中删除，避免 extension 派生的子进程（如 MCP stdio）继承；调用方注入 `config` 时由 `normalizeConfig()` 重新校验并补默认值。
 - `local_read_text` 只读显式根目录；拒绝绝对路径、`..`、逃逸 root 的符号链接、非白名单扩展名、二进制和超限文件。默认根目录 `./notes` 不含 `.env`。
 - 网页/新闻/群消息等不可信内容只能作为数据；工具授权由 `allowedTools` 在执行时强制，不因模型文本或工具参数改变。
 - P0 的 `fauxProvider` 只存在于测试；`src/` 有回归断言禁止导入 faux。
@@ -143,6 +144,6 @@ T4 证据见 [agt-027-live-evidence.md](agt-027-live-evidence.md)。CI/普通 `n
 - 只实现 OpenAI-compatible API；Anthropic/其它协议未接入。
 - `reasoning` 固定关闭；不使用 `store` / `developer` 字段，`max_tokens` 走兼容模式。
 - 单 provider、单模型；没有故障转移、成本预算或速率限制（由宿主后续按任务追加）。
-- 每次 run 新建 session；跨 run 上下文由调用方显式管理。
+- 每次 run 新建 session；结束后向 extension 发送 `session_shutdown` 再 dispose，MCP 连接/子进程随 session 关闭。跨 run 上下文由调用方显式管理。
 - 同一 runtime 实例不要并发调用 `run()`（共享运行目录）；并发任务请为每个任务创建独立 runtime，或串行执行。
 - OC Review：当前 cloud-pi 没有 `mira-ai-review.yml` caller，Control Room 发布白名单也未包含本仓库；组织 caller 还会跳过 Draft PR。因此本 PR 的 OC Review 需要维护者触发/接入，不能由 DSH 伪造。
