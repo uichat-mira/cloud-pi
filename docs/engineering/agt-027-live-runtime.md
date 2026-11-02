@@ -144,4 +144,5 @@ T4 证据见 [agt-027-live-evidence.md](agt-027-live-evidence.md)。CI/普通 `n
 - `reasoning` 固定关闭；不使用 `store` / `developer` 字段，`max_tokens` 走兼容模式。
 - 单 provider、单模型；没有故障转移、成本预算或速率限制（由宿主后续按任务追加）。
 - 每次 run 新建 session；跨 run 上下文由调用方显式管理。
+- 同一 runtime 实例不要并发调用 `run()`（共享运行目录）；并发任务请为每个任务创建独立 runtime，或串行执行。
 - OC Review：当前 cloud-pi 没有 `mira-ai-review.yml` caller，Control Room 发布白名单也未包含本仓库；组织 caller 还会跳过 Draft PR。因此本 PR 的 OC Review 需要维护者触发/接入，不能由 DSH 伪造。
