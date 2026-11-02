@@ -107,9 +107,14 @@ export async function loadAgentRuntimePort({ moduleSpecifier } = {}) {
       `Cannot load agent runtime module ${moduleSpecifier}: ${error?.message ?? error}`,
     );
   }
-  const port =
+  let port =
     typeof mod.createAgentRuntimePort === "function"
       ? await mod.createAgentRuntimePort({ purpose: "research" })
       : mod.agentRuntimePort;
+  if (!port && typeof mod.createAgentRuntime === "function") {
+    // AGT-027 shape: adapt the official runtime instead of duplicating it.
+    const { createAgt027RuntimePort } = await import("./runtime/agt-027.mjs");
+    port = createAgt027RuntimePort({ module: mod });
+  }
   return assertAgentRuntimePort(port);
 }
