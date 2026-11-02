@@ -1,6 +1,6 @@
 # Mira Cloud Agent · cloud-pi
 
-> **状态：产品设计基线 / 尚未实现运行时（2026-11-01）。** 仓库由空白工程起步；本文不是已上线、已测试或已部署声明。
+> **状态：产品设计基线 + 本地已验证的基础 Agent 运行时（2026-11-02）。** P0（fixture 只读 MCP）与 AGT-027（真实模型 + 受限工具）已在本地验证；不是已部署、已排期或生产可用声明。
 
 **Mira Cloud Agent** 是面向日常研究与团队协作的轻量、常驻云端智能体，定位为 **Hermes Agent 的轻量替代品**，也是未来「云 Mira」可以逐步生长的前身。首版先让一只 Agent 真正能工作：**定时研究、读取观澜、飞书双向对话、原生 MCP 工具连接**。
 
@@ -19,6 +19,8 @@
 | [docs/product-design.md](docs/product-design.md) | **产品目标、已确认用户决定与 V1 范围** |
 | [docs/architecture.md](docs/architecture.md) | 技术边界、候选模块划分、内部服务信任模型 |
 | [docs/engineering/p0-mcp-poc.md](docs/engineering/p0-mcp-poc.md) | **只读 Pi SDK → Guanlan MCP** 的最小 POC 及验收清单 |
+| [docs/engineering/agt-027-live-runtime.md](docs/engineering/agt-027-live-runtime.md) | **真实模型 Agent Runtime**：配置、命令、AGT-028 接口契约与安全边界 |
+| [docs/engineering/agt-027-live-evidence.md](docs/engineering/agt-027-live-evidence.md) | AGT-027 真实模型/真实工具的脱敏调用证据 |
 | [AGENTS.md](AGENTS.md) | 仓库工程协作约束 |
 
 跨服务协议参考：[Mira Cloud MCP 互操作讨论稿](https://github.com/uichat-mira/.github/blob/main/docs/engineering/mira-cloud-mcp.md)。该文件仍属组织级架构提案，尚非正式凭证签发合同。
@@ -27,11 +29,22 @@
 
 **已确定的产品方向**：Pi SDK 优先；插件优先、薄适配；飞书私聊与已授权群 @；授权群成员可私聊；定时计划在 Cloud Auth 控制台管理，任务投递可配置多个接收目标；使用 Mira 统一身份，观澜不额外登录；本地 DSH 开发后评估广州 Docker 部署。
 
-**尚未证明**：仓库的 Pi SDK 锁定版本和实际 Session 实现、调度/飞书插件兼容性、多目标飞书投递、云端无人值守委托凭证、观澜生产 MCP 接通、Docker 资源占用。**不得把产品决定、上游文档支持和运行验证混为一谈。**
+**已在本地证明**：锁定版 Pi SDK 的真实 Session、确定性工具管线（P0）、真实 OpenAI-compatible 模型调用与模型自主 Tool Call、工具权限/超时/取消（AGT-027）。证据见上表工程文档。
+
+**尚未证明**：调度/飞书插件兼容性、多目标飞书投递、云端无人值守委托凭证、观澜生产 MCP 接通、Docker 资源占用与生产并发。**不得把产品决定、上游文档支持和运行验证混为一谈。**
 
 ## 开发起点
 
-先按 [P0 MCP 方案](docs/engineering/p0-mcp-poc.md) 验证一条真实 Pi SDK ↔ 隔离观澜 workerd/D1 的只读协议链路。P0 **不需要**搭建完整控制台、飞书机器人、定时器、云账号委托或生产环境；通过后再按业务价值递进。
+P0 已按 [P0 MCP 方案](docs/engineering/p0-mcp-poc.md) 验证真实 Pi SDK ↔ 隔离观澜 workerd/D1 的只读协议链路。AGT-027 进一步让 Pi 用**真实模型**运行，并通过受限工具执行一次真实 Tool Call；实现见 [Agent Runtime 文档](docs/engineering/agt-027-live-runtime.md)。
+
+```bash
+npm ci
+cp .env.example .env        # 填入 CLOUD_PI_MODEL_BASE_URL / API_KEY / ID
+npm run agent -- "Use local_read_text to read welcome.md and reply with the fixture key"
+npm run test:agent          # 确定性回归，不需要 Key
+```
+
+**不要**把 `.env` 提交进仓库；密钥只由宿主环境注入。真实调用证据与失败案例见 [AGT-027 证据](docs/engineering/agt-027-live-evidence.md)。P0 **不需要**完整控制台、飞书机器人、定时器、云账号委托或生产环境；通过后再按业务价值递进。
 
 ## OpenCode 付费 Worker（工程施工）
 
