@@ -223,6 +223,7 @@ export async function createAgentRuntime(options = {}) {
 
       let timedOut = false;
       let cancelled = false;
+      let idleTimedOut = false;
       let promptError;
 
       const abort = () => {
@@ -254,10 +255,15 @@ export async function createAgentRuntime(options = {}) {
         } catch (error) {
           promptError = error;
         }
-        await Promise.race([
-          session.waitForIdle().catch(() => {}),
-          new Promise((resolveWait) => setTimeout(resolveWait, IDLE_GRACE_MS).unref?.()),
+        const idle = session.waitForIdle().then(
+          () => true,
+          () => true,
+        );
+        const becameIdle = await Promise.race([
+          idle,
+          new Promise((resolveWait) => setTimeout(() => resolveWait(false), IDLE_GRACE_MS).unref?.()),
         ]);
+        idleTimedOut = becameIdle === false;
       } finally {
         if (timer) clearTimeout(timer);
         runOptions.signal?.removeEventListener("abort", onCallerAbort);
@@ -273,6 +279,7 @@ export async function createAgentRuntime(options = {}) {
           promptError,
           timedOut,
           cancelled,
+          idleTimedOut,
           startedAt,
           timeoutMs,
           secrets,
@@ -310,7 +317,7 @@ function buildFailureRecord({ runId, config, startedAt, timeoutMs, error, secret
   };
 }
 
-function buildRunRecord({ runId, config, capture, session, promptError, timedOut, cancelled, startedAt, timeoutMs, secrets }) {
+function buildRunRecord({ runId, config, capture, session, promptError, timedOut, cancelled, idleTimedOut, startedAt, timeoutMs, secrets }) {
   const messages = session.messages;
   const lastAssistant = messages.findLast((message) => message.role === "assistant");
   const stats = session.getSessionStats();
@@ -333,6 +340,12 @@ function buildRunRecord({ runId, config, capture, session, promptError, timedOut
   } else if (promptError) {
     status = "failed";
     error = classifyError(promptError, { secrets });
+  } else if (idleTimedOut) {
+    status = "failed";
+    error = classifyError(new Error(`session did not become idle within ${IDLE_GRACE_MS}ms`), {
+      secrets,
+      timedOut: true,
+    });
   } else if (lastAssistant?.stopReason === "error") {
     status = "failed";
     error = classifyError(new Error(lastAssistant.errorMessage ?? "model request failed"), { secrets });
