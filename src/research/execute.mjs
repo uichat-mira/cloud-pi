@@ -493,7 +493,7 @@ function buildInitialRecord(normalized) {
     statusHistory: [{ status: RUN_STATUS.RUNNING, at: createdAt }],
     runtime: null,
     tools: {
-      counters: { searches: 0, pages: 0, toolCalls: 0, refused: 0, pageChars: 0 },
+      counters: { searches: 0, pages: 0, toolCalls: 0, refused: 0 },
       calls: [],
     },
     sourcesSummary: null,

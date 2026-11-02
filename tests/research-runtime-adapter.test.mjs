@@ -6,7 +6,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -15,7 +15,11 @@ import {
   mapAgentRuntimeRecord,
   researchSystemPromptExtension,
 } from "../src/research/runtime/agt-027.mjs";
-import { loadAgentRuntimePort } from "../src/research/port.mjs";
+import {
+  DEFAULT_RUNTIME_MODULE,
+  loadAgentRuntimePort,
+  resolveRuntimeModuleSpecifier,
+} from "../src/research/port.mjs";
 
 function fakeModule({ record, onCall } = {}) {
   return {
@@ -124,4 +128,46 @@ export async function createAgentRuntime() {
 
 test("loadAgentRuntimePort still fails closed without a module", async () => {
   await assert.rejects(() => loadAgentRuntimePort({ moduleSpecifier: null }), /not configured/);
+});
+
+test("resolveRuntimeModuleSpecifier prefers an explicit module", () => {
+  assert.equal(
+    resolveRuntimeModuleSpecifier("./my-runtime.mjs", DEFAULT_RUNTIME_MODULE),
+    "./my-runtime.mjs",
+  );
+  assert.equal(resolveRuntimeModuleSpecifier("  ", DEFAULT_RUNTIME_MODULE), null);
+});
+
+test("resolveRuntimeModuleSpecifier falls back only when the sibling exists", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "agt028-fallback-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const modulePath = join(dir, "index.mjs");
+  const missing = pathToFileURL(join(dir, "missing.mjs"));
+
+  assert.equal(resolveRuntimeModuleSpecifier(null, missing), null);
+
+  writeFileSync(modulePath, "export const createAgentRuntime = () => ({});\n");
+  assert.equal(
+    resolveRuntimeModuleSpecifier(null, pathToFileURL(modulePath)),
+    pathToFileURL(modulePath).href,
+  );
+});
+
+test("with no configured module the port loads the sibling src/index.mjs", async (t) => {
+  // Simulates the post-merge layout (AGT-027's src/index.mjs beside src/research).
+  const dir = mkdtempSync(join(tmpdir(), "agt028-sibling-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  cpSync(new URL("../src/research", import.meta.url), join(dir, "src", "research"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(dir, "src", "index.mjs"),
+    'export function createAgentRuntime() { return { async run() { return { status: "succeeded", text: "ok", usage: {}, toolCalls: [] }; }, dispose() {} }; }\n',
+  );
+
+  const copiedPort = await import(pathToFileURL(join(dir, "src", "research", "port.mjs")).href);
+  const port = await copiedPort.loadAgentRuntimePort({});
+  assert.equal(port.portVersion, 1);
+  const result = await port.runAgent({ prompt: "p", customTools: [], limits: {} });
+  assert.equal(result.status, "completed");
 });

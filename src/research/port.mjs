@@ -94,12 +94,30 @@ export function assertAgentRuntimePort(port) {
  * @param {{ moduleSpecifier?: string|null }} [options]
  * @returns {Promise<AgentRuntimePort>}
  */
+/** Candidate location of AGT-027's runtime once it lives on the same branch. */
+export const DEFAULT_RUNTIME_MODULE = new URL("../index.mjs", import.meta.url);
+
+/**
+ * Resolve the runtime module to load: an explicit specifier always wins;
+ * otherwise the sibling `src/index.mjs` is used only when it exists, so the
+ * live path fails closed before AGT-027 lands.
+ */
+export function resolveRuntimeModuleSpecifier(
+  moduleSpecifier,
+  fallbackUrl = DEFAULT_RUNTIME_MODULE,
+) {
+  const requested =
+    typeof moduleSpecifier === "string" && moduleSpecifier.trim()
+      ? moduleSpecifier.trim()
+      : null;
+  if (requested) return requested;
+  return existsSync(fileURLToPath(fallbackUrl)) ? fallbackUrl.href : null;
+}
+
 export async function loadAgentRuntimePort({ moduleSpecifier } = {}) {
   // After AGT-027 lands on the same branch, its runtime is the sibling
   // `src/index.mjs`; before that the live path still fails closed.
-  const fallback = new URL("../index.mjs", import.meta.url);
-  const requested = typeof moduleSpecifier === "string" && moduleSpecifier.trim() ? moduleSpecifier.trim() : null;
-  const specifier = requested ?? (existsSync(fileURLToPath(fallback)) ? fallback.href : null);
+  const specifier = resolveRuntimeModuleSpecifier(moduleSpecifier);
   if (!specifier) {
     throw new RuntimeUnavailableError(
       "Agent runtime module is not configured. AGT-027 provides the real model " +
@@ -109,7 +127,7 @@ export async function loadAgentRuntimePort({ moduleSpecifier } = {}) {
   }
   let mod;
   try {
-    mod = await import(moduleSpecifier);
+    mod = await import(specifier);
   } catch (error) {
     throw new RuntimeUnavailableError(
       `Cannot load agent runtime module ${specifier}: ${error?.message ?? error}`,
