@@ -5,6 +5,14 @@
 - 基线证据：[docs/evidence/agt-03x-baseline.md](../evidence/agt-03x-baseline.md)（2026-11-04 实测）
 - 组织口径：`uichat-mira/.github` `docs/engineering/testing-standard.md`（T1–T5 分层）
 
+## 0. 执行闸门（2026-11-04 校准）
+
+维护者尚未提供企业微信机器人凭证与管理员配置，且 `src/` 中没有任何企业微信代码（见基线 §2.3）。因此：
+
+1. **凡依赖真实企业微信或真实模型的行，状态一律写作「凭证就绪后执行」**（等价于 `待凭证`）。凭证就绪前这些行**不得**记为通过、不得记为「不适用」、不得用 fixture 结果顶替，只能记为「未执行（阻塞：凭证）」。
+2. 凭证就绪前唯一有效的门禁是 §7 的离线套件；它只能防「飞书退化」，**不能**证明企业微信闭环。
+3. 凭证一旦到位，执行顺序固定为：A1→A3（单轮打通）→ D1/D2/D3（负例）→ B1–B7（定时 + 投递）→ A5（Trace 关联）。链路未打通之前不追 Trace，避免把「链路不通」误判成「Trace 缺失」。
+
 ## 1. 使用规则
 
 1. **一条判据 = 可执行判定**：每条判据必须写成「运行 X 命令 / 读取 Y 证据文件，看到 Z」，不接受「观察行为正常」「人工确认可用」这类不可复核描述。
@@ -31,10 +39,10 @@
 | --- | --- | --- |
 | **脱敏 JSONL** | 每行一个 JSON 事件，字段受 §2.1 约束，落盘到 `poc/evidence/*.jsonl` 或 `docs/evidence/<card>/` | 证明「事件确实发生过」，可按时间排序与计数 |
 | **API 读回** | `GET /v1/...` 的响应体（已过 `views.mjs` 白名单投影） | 证明「系统自己记下的状态」与运行链路一致，而不是脚本自己打印的结论 |
-| **Trace 关联** | `traceId` 贯穿 入口→事件→run→trigger→delivery→API 读回 | 证明「同一条用户请求的各阶段可以串起来」；**当前代码无 trace 实现**，字段名与落地方式待 t7（AGT-037）定稿，本矩阵只固定「必须可关联」这一要求 |
+| **Trace 关联** | 同一 `runId` 在 入口事件→run→trigger→delivery→Management API / run-store 之间逐级互查 | 证明「同一条请求的各阶段可串起来且可由 API 读回」；**当前 `src/` 中无任何 traceId/span 实现**（基线 §2.3），范围已由 lead 于 2026-11-04 收紧到「runId 贯穿 + 可读回关联」，见下行口径 |
 | 测试输出 | `node --test` 汇总行（tests/pass/fail/duration_ms）+ 版本信息 | 证明离线回归（T1–T3）未退化 |
 
-> Trace 草案（**待 t7 定稿，勿当成已实现**）：一次企业微信入站最迟在 `traceId` 下记录 `channel.ingress`、`channel.route`、`agent.run`、`scheduler.trigger`（若走定时）、`delivery.attempt`、`api.readback` 六类事件，每类含 `traceId`、`at`、`status`、`durationMs`、脱敏目标标识。判定时只要求「同一 traceId 下这六类事件齐全且状态自洽」。
+> Trace 判定口径（lead 2026-11-04 裁定，**不按理想 trace 系统要求**）：只要求同一 `runId` 能从 channel 入口→run→schedule trigger→delivery→Management API / run-store 读回并互相对应；**不引入** OTel、分布式 span、新可观测平台。具体字段名与落盘形态由 t7（AGT-037）定稿，本矩阵不预设实现。若 t7 最终选择在 JSONL 里额外记录 `channel.ingress` / `delivery.attempt` 等事件，判定仍以 `runId` 关联为准。
 
 ### 2.3 通用前置条件（所有真实场景判据共同要求）
 
@@ -49,17 +57,21 @@
 
 目标：真人/真机在企业微信里 @机器人 提问，机器人用真实模型回答，同一会话可读回。
 
+> **凭证就绪后执行**：企业微信机器人当前既无凭证也无通道代码，A1–A5 全部记「未执行（阻塞：凭证）」，不得填「通过」或「不适用」。
+
 | # | 判据 | 判定方式（命令 / 证据） | 证据要点 | 状态 |
 | --- | --- | --- | --- | --- |
-| A1 | 入站事件被接收并归一为可信字段（发送者、会话、消息 id、文本），且**未经模型**即完成路由判定 | 运行 `npm run wecom:live -- --expect reply`（**待新增**，t6 交付；类比现有 `npm run feishu:live`），检查 `poc/evidence/agt-036-live.jsonl` 中 `channel.ingress` 事件 | 事件数 ≥1；含 `traceId`、脱敏发送者/会话、`messageId`（脱敏）、`at` | 待能力（t6） |
-| A2 | 真实模型推理发生且 usage 来自 provider | 同一 JSONL 中 `agent.run` 事件 | `providerId`、`modelId`、`usage.input>0`、`usage.output>0`、`durationMs`、`status:"completed"` | 待能力（t6） |
-| A3 | 回复真实回到企业微信，且被平台接受 | JSONL 中 `delivery.attempt`/`reply.sent` 事件 + 真人在客户端看到答案（截图归档为本地附件，不入库正文） | `status:"sent"`、`messageId`（脱敏）、`attempts:1` | 待能力（t6） |
-| A4 | 单轮不越权：该轮 `allowedTools`/MCP 工具集合与策略一致 | 运行 `npm run test:feishu` 不应变绿/变红（回归），并检查 A1 事件里 `tools.exposed` 数组为空或仅为白名单 | `tools.exposed` 与 `docs/engineering/agt-036-*.md` 声明的白名单逐项相等 | 待能力（t6） |
-| A5 | 同一 `traceId` 能把 A1→A2→A3 串起来 | 用 `traceId` 过滤 JSONL：`Select-String -Pattern $traceId` | 三类事件全部命中，时间单调递增 | 待能力（t7 的 Trace） |
+| A1 | 入站事件被接收并归一为可信字段（发送者、会话、消息 id、文本），且**未经模型**即完成路由判定 | 运行 `npm run wecom:live -- --expect reply`（**待新增**，t6 交付；类比现有 `npm run feishu:live`），检查 `poc/evidence/agt-036-live.jsonl` 中 `channel.ingress` 事件 | 事件数 ≥1；含 `runId`（t7 若另定 `traceId` 则同时要求）、脱敏发送者/会话、`messageId`（脱敏）、`at` | 凭证就绪后执行；待能力（t6） |
+| A2 | 真实模型推理发生且 usage 来自 provider | 同一 JSONL 中 `agent.run` 事件 | `providerId`、`modelId`、`usage.input>0`、`usage.output>0`、`durationMs`、`status:"completed"` | 凭证就绪后执行；待能力（t6） |
+| A3 | 回复真实回到企业微信，且被平台接受 | JSONL 中 `delivery.attempt`/`reply.sent` 事件 + 真人在客户端看到答案（截图归档为本地附件，不入库正文） | `status:"sent"`、`messageId`（脱敏）、`attempts:1` | 凭证就绪后执行；待能力（t6） |
+| A4 | 单轮不越权：该轮 `allowedTools`/MCP 工具集合与策略一致 | 运行 `npm run test:feishu` 不应变绿/变红（回归），并检查 A1 事件里 `tools.exposed` 数组为空或仅为白名单 | `tools.exposed` 与 `docs/engineering/agt-036-*.md` 声明的白名单逐项相等 | 凭证就绪后执行；待能力（t6） |
+| A5 | 同一请求的 A1→A2→A3 可由 `runId` 串起，并能从 Management API / run-store 读回同一 `runId` | 用 `runId` 过滤 JSONL 与 API：`GET /v1/runs/:runId`、`GET /v1/runs/:runId/delivery`，再读磁盘 `run.json` | 三处 `runId` 相等；事件时间单调递增；`run.status` 与投递状态自洽（若 t7 另记 `traceId`，则同一 `traceId` 亦须一致） | 凭证就绪后执行；待能力（t7：runId 贯穿 + API 读回） |
 
 ## 4. 场景 B：定时研究 + 主动投递
 
 目标：Scheduler 按 cron 触发真实研究（真实模型 + 真实 Guanlan MCP），把结果主动投递到指定企业微信/飞书目标，并且可经 API 读回。
+
+> **凭证就绪后执行**：凡依赖真实企业微信投递（B4/B5 的真实投递）或真实 Guanlan MCP 令牌（B2）的行，凭证/能力就绪前记「未执行（阻塞）」。离线可执行部分（B1 的 `scheduler:poc`、B3/B6/B7 的套件与 API 读回）照常在 §7 门禁里跑，但**不得**用于证明企业微信闭环。
 
 | # | 判据 | 判定方式 | 证据要点 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -79,12 +91,14 @@
 | --- | --- | --- | --- | --- |
 | C1 | 飞书离线套件全绿且用例数不减少 | `npm run test:feishu` | `tests ≥ 48`、`fail 0`（基线：48/48，`duration_ms 1885`） | **可执行** |
 | C2 | API / 调度 / 目标解析套件不退化 | `npm run test:api`、`npm run test:scheduler`、`npm run test:targets` | 26 / 31 / 29，`fail 0` | **可执行** |
-| C3 | 全量 `npm test` 的失败集合不扩大 | `npm test` | 基线为 555 tests；Windows 上已知 2 项失败（`research-store.test.mjs:52`、`research-verify-adapter.test.mjs:162`，见基线 §4）。接入后要求：**失败集合 ⊆ 已知 2 项**，且新增用例必须 pass | **可执行**（判据即「不新增 fail」；建议 pi-dev 修掉这 2 项后改为「fail 0」） |
+| C3 | 全量 `npm test` 的失败集合不扩大 | `npm test` | 基线为 555 tests；Windows 上已知 2 项失败（`research-store.test.mjs:52`、`research-verify-adapter.test.mjs:162`，见基线 §4）。t7 首个 commit 修掉这 2 项前：**失败集合 ⊆ 已知 2 项**；t7 合并后本判据升级为 **Windows `npm test` fail 0**，且新增用例必须 pass | **可执行**（判据随 t7 首个 commit 升级） |
 | C4 | 飞书真实往返仍可用（私聊 + 授权群 @） | `npm run feishu:live -- --expect reply`（真实凭证 + 真人发消息） | `poc/evidence/agt-029-live-p2p.jsonl` 形态的事件：`status:"sent"`、真实 `runId`、`usage` 非零 | **待凭证** |
 | C5 | 飞书侧安全语义未被新通道改动 | `npm run test:feishu`（policy/dedupe 用例）+ 代码审阅 `src/channels/feishu/policy.mjs` 未被企业微信改动波及 | 未授权群/未 @/bot open_id 未验证 三类负例仍 fail closed | **可执行** |
 | C6 | 飞书与企业微信共享同一 Agent 执行入口（不出现第二套 runtime） | 代码检查：企业微信 runner 必须调用 `src/runtime.mjs:createAgentRuntime().run()` 或 `src/research/runtime/agt-027.mjs` 的既有 port | 无新增 provider/session 装配实现。基线事实：`createAgentSession` 在 `src/` 中只出现在 `src/runtime.mjs`（import + 调用），`src/research/port.mjs` 仅注释提及 —— 接入后该集合不得扩大 | 待能力（t6 交付时审） |
 
 ## 6. 场景 D：故障与安全（未授权、无效凭证、重复消息、重启、投递失败）
+
+> **凭证就绪后执行**：飞书侧负例与纯离线用例现在就能跑；标注为「企业微信」的负例（D1/D2/D3/D6 的企业微信部分）与需要真实注入的用例，凭证就绪前记「未执行（阻塞：凭证）」。
 
 | # | 判据 | 判定方式 | 证据要点 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -117,9 +131,11 @@ npm test                 # fail 集合必须 ⊆ 已知 2 项（基线 §4）
 
 | 场景 | 不可判定原因 | 解除条件 |
 | --- | --- | --- |
-| A1–A5 | 企业微信通道不存在 | t6（AGT-036）交付 + 维护者提供机器人凭证 |
+| A1–A5 | 企业微信通道不存在（`src/` 零代码，基线 §2.3） | **凭证就绪后执行**：t6（AGT-036）交付 + 维护者提供机器人凭证 |
 | B2 | 无真实 Cloud Auth 令牌，无法接真实 Guanlan MCP | t8（GLN-013）签发 + t9（AGT-038）接入 |
 | B4/B5 真实投递 | 企业微信投递 transport 不存在 | t7（AGT-037）组合根 |
-| C4/D2/D3/D5 真实用例 | 飞书/企业微信凭证未注入本会话 | 维护者注入凭证（不写入仓库） |
-| A5/B* 的 Trace 关联 | 代码中无 trace 实现 | t7 定稿 Trace 契约（当前无归属卡，需 lead 裁决） |
+| C4/D2/D3/D5 真实用例 | 飞书/企业微信凭证未注入本会话 | 维护者注入凭证（不写入仓库）→ **凭证就绪后执行** |
+| A5 / B* 的 Trace 关联 | `src/` 中无 traceId/span 实现 | 已并入 t7（AGT-037），范围收紧为「runId 贯穿 + Management API/run-store 可读回」，不引入 OTel/span |
 | T5 生产 smoke | 无 prod 环境与部署授权 | 另行授权 |
+
+> 本表所有「无 X」结论都来自基线 §2.3 的代码检索，不是推测；凭证/能力到位后应逐行重测并把「未执行」替换为真实命令输出，而不是直接改成「通过」。
