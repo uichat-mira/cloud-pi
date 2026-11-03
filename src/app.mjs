@@ -23,6 +23,8 @@ import { join, resolve } from "node:path";
 import { createManagementApi } from "./api/server.mjs";
 import { DEFAULT_API_HOST, DEFAULT_API_PORT } from "./api/contracts.mjs";
 import { createDeliveringScheduler } from "./delivery/scheduler.mjs";
+import { createWecomDeliverySender } from "./delivery/wecom-sender.mjs";
+import { DELIVERY_ERROR, DeliveryError } from "./delivery/contracts.mjs";
 import { resolveRunsRoot } from "./research/run-store.mjs";
 import { createChatRunRecorder } from "./runs/chat-runs.mjs";
 import { loadEnvFile, resolveUserPath } from "./env-file.mjs";
@@ -38,6 +40,14 @@ export const APP_ENV = Object.freeze({
   tickIntervalMs: "CLOUD_AGENT_TICK_INTERVAL_MS",
   shutdownTimeoutMs: "CLOUD_AGENT_SHUTDOWN_TIMEOUT_MS",
   wecomSecrets: "CLOUD_AGENT_WECOM_SECRETS",
+  /**
+   * Opt out of the "the bot must have seen this conversation" pre-check.
+   * The platform enforces the same rule on its side; the pre-check only turns an
+   * opaque platform rejection into a clear `session_unknown` code, but the known
+   * -session registry is process-local, so a fresh process may legitimately have
+   * forgotten a conversation that the platform still accepts.
+   */
+  wecomAllowUnknownSession: "WECOM_DELIVERY_ALLOW_UNKNOWN_SESSION",
 });
 
 export const CHANNEL_MODE = Object.freeze({
@@ -233,6 +243,9 @@ function withTimeout(promise, timeoutMs, code) {
 export function createCloudAgentApp({ env = process.env, log = () => {}, now = () => new Date(), baseDir = process.cwd(), config, deps = {} } = {}) {
   const collaborators = { ...defaultAppDeps, ...deps };
   const appConfig = config ?? loadAppConfig(env, { baseDir });
+  const allowUnknownWecomSession = ["1", "true", "yes"].includes(
+    present(env[APP_ENV.wecomAllowUnknownSession]).toLowerCase(),
+  );
 
   let phase = "idle";
   let started = false;
@@ -243,6 +256,8 @@ export function createCloudAgentApp({ env = process.env, log = () => {}, now = (
   let chatRuns = null;
   const channels = {};
   let feishuSender = null;
+  /** Lazily bound WeCom delivery sender: the channel starts after the coordinator. */
+  let wecomDelivery = null;
 
   const describe = () => ({
     stateDir: appConfig.stateDir,
@@ -257,8 +272,39 @@ export function createCloudAgentApp({ env = process.env, log = () => {}, now = (
     },
     api: api?.address ? { url: api.address.url, host: api.address.host, port: api.address.port } : null,
     scheduler: { tickIntervalMs: appConfig.tickIntervalMs, schedules: delivering ? delivering.scheduler.listSchedules().length : 0 },
-    delivery: { enabled: Boolean(delivering), feishuSender: Boolean(feishuSender) },
+    delivery: {
+      enabled: Boolean(delivering),
+      feishuSender: Boolean(feishuSender),
+      wecomSender: Boolean(channels[CHANNEL.WECOM]),
+    },
   });
+
+  /**
+   * The WeCom half of the delivery stage.
+   *
+   * Resolved per send, not at startup: the coordinator is built before the
+   * channels, and a schedule may legitimately be triggered while WeCom is down —
+   * that must become a recorded `channel_unavailable`, not a crash.
+   */
+  function wecomDeliverySender() {
+    const service = channels[CHANNEL.WECOM];
+    if (!service) {
+      throw new DeliveryError(
+        DELIVERY_ERROR.CHANNEL_UNAVAILABLE,
+        "the wecom channel is not running in this process; a WeCom target cannot be pushed",
+      );
+    }
+    if (!wecomDelivery || wecomDelivery.service !== service) {
+      const sender = createWecomDeliverySender({
+        send: (input) => service.transport.send(input),
+        sessions: service.sessions,
+        requireKnownSession: !allowUnknownWecomSession,
+        logger: {},
+      });
+      wecomDelivery = { service, ...sender };
+    }
+    return wecomDelivery;
+  }
 
   function setPhase(next) {
     phase = next;
@@ -339,13 +385,23 @@ export function createCloudAgentApp({ env = process.env, log = () => {}, now = (
           env,
           now,
           researchRunsDir: appConfig.runsDir,
-          // Targets are Feishu-only today; a WeCom target is refused by the
-          // coordinator before this function is called (AGT-036 W1).
+          // Feishu targets go through the Feishu channel's own client; WeCom
+          // targets go through the WeCom channel's transport. Neither id space
+          // can reach the other platform's sender.
           sendMessage: async (request) => {
             if (!feishuSender) {
-              throw new Error("feishu channel is not running; cannot deliver to a Feishu target");
+              throw new DeliveryError(
+                DELIVERY_ERROR.CHANNEL_UNAVAILABLE,
+                "the feishu channel is not running in this process; a Feishu target cannot be pushed",
+              );
             }
             return await feishuSender(request);
+          },
+          senders: {
+            // `async` so a missing channel is a rejected promise, not a
+            // synchronous throw from inside the delivery loop.
+            wecom_user: async (request) => wecomDeliverySender().senders.wecom_user(request),
+            wecom_chat: async (request) => wecomDeliverySender().senders.wecom_chat(request),
           },
           log,
         },

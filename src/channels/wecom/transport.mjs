@@ -282,33 +282,32 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
   }
 
   /**
-   * Proactive push to an existing conversation.
+   * Proactive push to an existing conversation (`aibot_send_msg`).
    *
-   * Deliberately not wired into the scheduler/delivery contract yet: the
-   * destination vocabulary and the known-session requirement are decided in the
-   * AGT-036 follow-up (W1). This method exists so the capability and its limits
-   * are explicit rather than assumed.
+   * `chat_type` is required: when it is absent the platform assumes a group chat,
+   * so a single-chat push would be misrouted. The SDK's typed `SendMsgBody` does
+   * not declare `chat_type`, but `sendMessage()` spreads the body into the frame
+   * unchanged, so the documented field (1 single / 2 group, per the platform's
+   * `aibot_send_msg` reference) is passed explicitly.
+   *
+   * The platform only accepts a push into a conversation the bot has already
+   * seen; that precondition is enforced by the caller (delivery sender), not
+   * guessed here.
    *
    * @param {{chatId: string, chatType: "single"|"group", text: string}} input
+   * @returns {Promise<{delivered: true, errcode: number}>} resolves on a platform ack
    */
   async function send({ chatId, chatType, text } = {}) {
     if (!authenticated || !client) throw new WecomTransportError("not_connected", "send before authentication");
     if (typeof chatId !== "string" || chatId.length === 0) {
       throw new WecomTransportError("invalid_target", "chatId is required");
     }
+    if (chatType !== "single" && chatType !== "group") {
+      throw new WecomTransportError("invalid_target", "chatType must be single or group");
+    }
     const content = typeof text === "string" ? text : "";
     if (content.length === 0) throw new WecomTransportError("empty_message", "refusing to send an empty message");
     assertTextFits(content);
-
-    if (chatType !== "group") {
-      // `WSClient.sendMessage()` sends `{chatid: chatId, ...body}` with no
-      // `chat_type`; the platform then prefers "group". Sending a single-chat
-      // push through it would be misrouted, so refuse and report the gap.
-      throw new WecomTransportError(
-        "chat_type_unsupported",
-        "SDK sendMessage() cannot set chat_type=1; single-chat push needs a raw aibot_send_msg frame",
-      );
-    }
 
     const limit = assertWithinRateLimit(chatId);
     if (limit) {
@@ -320,9 +319,16 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       throw new WecomTransportError("sdk_incompatible", "sendMessage() not available");
     }
 
+    let ack;
     try {
-      await withTimeout(
-        Promise.resolve(client.sendMessage(chatId, { msgtype: "markdown", markdown: { content } })),
+      ack = await withTimeout(
+        Promise.resolve(
+          client.sendMessage(chatId, {
+            chat_type: chatType === "group" ? 2 : 1,
+            msgtype: "markdown",
+            markdown: { content },
+          }),
+        ),
         config.replyTimeoutMs,
         "send_timeout",
       );
@@ -331,7 +337,9 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       throw new WecomTransportError("send_failed", String(error?.message ?? error), { retryable: true });
     }
     recordSend(chatId);
-    return { delivered: true };
+    // The SDK resolves only on a platform acknowledgement; report its code so the
+    // delivery record keeps the real receipt and not just "we called send()".
+    return { delivered: true, errcode: typeof ack?.errcode === "number" ? ack.errcode : 0 };
   }
 
   async function stop() {

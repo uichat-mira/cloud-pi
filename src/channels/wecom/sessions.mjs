@@ -78,5 +78,17 @@ export function createKnownSessionStore({
     get size() {
       return sessions.size;
     },
+
+    /**
+     * Fresh conversations, least-recently-seen first.
+     *
+     * Diagnostics and composition only (for example turning "the conversation
+     * that just messaged us" into a schedule target). Not part of the delivery
+     * decision path: a caller must still go through `assertDeliverable`.
+     */
+    entries() {
+      ensureFresh(now());
+      return [...sessions.values()].map((session) => ({ ...session }));
+    },
   };
 }

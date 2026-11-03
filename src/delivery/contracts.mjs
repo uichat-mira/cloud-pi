@@ -32,6 +32,7 @@ import {
   normalizeDeliveryTargets,
 } from "../scheduler/contracts.mjs";
 import { maskId } from "../channels/feishu/config.mjs";
+import { hashId } from "../channels/wecom/config.mjs";
 
 /** Bump when a persisted delivery shape or status changes incompatibly. */
 export const DELIVERY_CONTRACT_VERSION = 1;
@@ -74,6 +75,19 @@ export const DELIVERY_ERROR = Object.freeze({
   TRANSPORT_ERROR: "transport_error",
   RETRY_EXHAUSTED: "retry_exhausted",
   INTERNAL_ERROR: "internal_error",
+  /* --- WeCom push classes (AGT-036 delivery wiring) -------------------------
+   * Adding codes is additive: an older reader still sees a valid `lastError`
+   * and an unknown code simply is not in this set. `DELIVERY_CONTRACT_VERSION`
+   * therefore stays 1 — no persisted field or status changed.
+   */
+  /** The per-conversation platform limit (30/min, 1000/h) refused the send. */
+  RATE_LIMITED: "rate_limited",
+  /** The platform only allows a push into a conversation the bot has already seen. */
+  SESSION_UNKNOWN: "session_unknown",
+  /** One segment exceeded the platform's byte limit; nothing was sent. */
+  SEGMENT_TOO_LARGE: "segment_too_large",
+  /** The channel that owns this destination is not running in this process. */
+  CHANNEL_UNAVAILABLE: "channel_unavailable",
 });
 
 const DELIVERY_ERROR_CODES = new Set(Object.values(DELIVERY_ERROR));
@@ -148,9 +162,16 @@ export function deliveryFileStem(deliveryKey) {
 export function maskDestination(destination) {
   const type = destination?.type;
   const id = destination?.id;
+  if (typeof id !== "string" || id.length === 0) {
+    return { type: isDeliveryTargetType(type) ? type : "unknown", maskedId: "" };
+  }
+  const masked = maskId(id);
   return {
     type: isDeliveryTargetType(type) ? type : "unknown",
-    maskedId: typeof id === "string" ? maskId(id) : "",
+    // `maskId` leaves short identifiers untouched (a WeCom userid like `zhangsan`
+    // is shorter than its 6+4 window), so fall back to a hash rather than
+    // publishing a raw recipient in an operator view or an evidence file.
+    maskedId: masked === id ? hashId(id) : masked,
   };
 }
 
