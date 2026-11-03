@@ -7,19 +7,33 @@
  */
 export {
   FEISHU_CONFIG_KEYS,
+  FEISHU_RESEARCH_CONFIG_KEYS,
+  RESEARCH_CONCURRENCY,
   FeishuConfigError,
   SUPPORTED_DOMAINS,
   describeFeishuConfig,
   loadFeishuConfig,
+  loadFeishuResearchConfig,
   maskId,
 } from "./config.mjs";
 export { FEISHU_MESSAGE_EVENT, normalizeFeishuMessageEvent, readFeishuEventType } from "./events.mjs";
 export { decideFeishuRoute } from "./policy.mjs";
 export { DEFAULT_DEDUPE_MAX_ENTRIES, DEFAULT_DEDUPE_TTL_MS, createDedupeStore } from "./dedupe.mjs";
-export { CHANNEL_REPLIES, STOP_COMMANDS, createFeishuChannel } from "./channel.mjs";
+export {
+  CHANNEL_REPLIES,
+  MAX_RESEARCH_REPLY_CHARS,
+  RESEARCH_COMMANDS,
+  RESEARCH_REPLIES,
+  STOP_COMMANDS,
+  buildResearchReply,
+  createFeishuChannel,
+  mapResearchStatus,
+  parseResearchCommand,
+} from "./channel.mjs";
 export {
   FEISHU_CHANNEL_SYSTEM_PROMPT,
   createFeishuAgentRunner,
+  createFeishuResearchRunner,
   feishuChannelPromptExtension,
 } from "./runtime.mjs";
 export { createFeishuTransport } from "./transport.mjs";
