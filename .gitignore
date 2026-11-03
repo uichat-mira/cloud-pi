@@ -1,3 +1,8 @@
 node_modules/
 .work/
 *.log
+
+# Local developer configuration: never commit real model credentials.
+.env
+.env.*
+!.env.example

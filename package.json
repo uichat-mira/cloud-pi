@@ -1,16 +1,20 @@
 {
   "name": "cloud-pi",
   "private": true,
-  "version": "0.0.0-poc",
+  "version": "0.1.0",
   "type": "module",
-  "description": "Cloud Pi P0: real Pi SDK session against the isolated Guanlan workerd/D1 MCP fixture",
+  "description": "Cloud Pi Agent runtime: real Pi SDK session with a live OpenAI-compatible model and restricted tools",
   "engines": {
     "node": ">=22.19.0"
   },
   "scripts": {
+    "agent": "node --env-file-if-exists=.env src/cli.mjs",
+    "agent:json": "node --env-file-if-exists=.env src/cli.mjs --json",
     "prepare:guanlan": "node scripts/prepare-guanlan-fixture.mjs",
     "pretest": "node scripts/prepare-guanlan-fixture.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
+    "test:agent": "node --test \"tests/agt-027-*.test.mjs\"",
+    "test:live": "node scripts/run-live-tests.mjs",
     "test:p0": "node --test tests/p0-pi-mcp.test.mjs"
   },
   "dependencies": {

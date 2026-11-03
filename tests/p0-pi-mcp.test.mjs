@@ -422,8 +422,14 @@ describe("P0: real Pi SDK session -> native MCP extension -> isolated Guanlan", 
 
       fx.bridge.dropConnections();
       const dropped = await callTool(p0, TOOL_WHOAMI, {});
-      assert.equal(dropped.isError, true);
-      assert.match(contentText(dropped), /fetch failed|ECONN|socket|network/i);
+      // The SDK transport may transparently reconnect before this call.
+      // Either a classified transient failure or an immediate valid answer is
+      // acceptable; recovery and the hard-offline failure are checked below.
+      if (dropped.isError) {
+        assert.match(contentText(dropped), /fetch failed|ECONN|socket|network/i);
+      } else {
+        assert.ok(identityOf(dropped), "immediate reconnect must return a real tool result");
+      }
       const reconnected = await callTool(p0, TOOL_WHOAMI, {});
       assert.equal(reconnected.isError, false);
 

@@ -1,0 +1,35 @@
+# Deterministic regression for Cloud Pi.
+#
+# No model credentials are configured here: the T1/T2/T3 suites use Pi's
+# scripted test provider, and the live T4 suite is opt-in via `npm run test:live`
+# on a developer machine. `npm test` also prepares the pinned, isolated Guanlan
+# fixture used by the existing P0 acceptance suite.
+name: Validate
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: npm
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Test (P0 + AGT-027, no live provider)
+        run: npm test
