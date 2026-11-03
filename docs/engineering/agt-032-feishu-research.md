@@ -1,8 +1,10 @@
 # AGT-032 · 飞书临时研究委托（`/research` → AGT-028 → 原会话回复）
 
-> 状态（2026-11-03）：实现、T1/T2 自动化与 T3 真实 `startResearch()` 回归已通过；
-> **T4 真实飞书 Live 尚未执行，标记为“未验证”**（见 §8）。不合并、不关 Issue、不部署。
-> 被测实现：`feat/agt-032-feishu-research`，基线 `dev@fad03f8`；PR head SHA 见 Draft PR。
+> 状态（2026-11-03）：实现、T1/T2 自动化、T3 真实 `startResearch()` 回归与
+> **T4 真实飞书私聊 Live 往返**均已执行；Live 研究终态为 **partial（`completed_with_errors`）**，
+> 回复成功送达（见 §8）。不合并、不关 Issue、不部署。
+> 被测实现：`feat/agt-032-feishu-research`，基线 `dev@fad03f8`；Live 运行 commit `03e4f89`，
+> 最终 PR head SHA 见 Draft PR。
 > 环境：macOS arm64，Node `v22.23.2`，`@earendil-works/pi-coding-agent@1.4.0`，
 > `@earendil-works/pi-ai@1.4.0`，`@larksuiteoapi/node-sdk@1.76.0`。
 
@@ -129,37 +131,57 @@ $ cd .work/agt-032 && npm test
 T3 只把模型与网络边界替换为确定性 fixture（AGT-027 port + research tool layer），
 `startResearch`、executor、报告/来源生成、run store、`readResearchRun` 均为真实代码。
 
-## 8. T4 Live（真实飞书）— **未验证**
+## 8. T4 Live（真实飞书私聊）— 已执行，研究终态 partial
 
-未执行原因：Live 必须由真人从飞书发送 `/research <topic>`，并需要真实模型/Web 研究窗口；
-本卡实现期间没有安排到真人操作窗口。**没有伪造、补写或推断任何 Live 结果。**
+执行时间：2026-11-03 16:27–16:32（Asia/Shanghai，UTC 08:27–08:32）。
+环境：真实飞书长连接（`@larksuiteoapi/node-sdk@1.76.0` WSClient）+ 真实 AGT-027 聊天/研究 runtime
++ 真实 AGT-028 工具层与 run store；应用 `cli_aa…dc0e`，bot `ou_57b…2a00`，
+`allowedChatCount=1`，`botOpenIdResolved=true`。运行前确认无其它通道进程占用同一 app。
+Live 运行 commit `03e4f89`（驱动脚本修复仅影响证据元数据，不在研究执行路径上）。
 
-真人执行步骤（具备 `.env` 中 Feishu 应用凭证、模型配置与授权群时）：
+真人从飞书私聊发送一条 `/research <短话题>` 后：
+
+| 项 | 值 |
+| --- | --- |
+| run id | `r-20261103T083122-a94e86` |
+| 持久化终态 | `completed_with_errors`（partial） |
+| 状态历史 | `running → completed_with_errors` |
+| 耗时 | `68198 ms`（研究 runtime `68192 ms`） |
+| 回复 | **已送达原消息**（`replyDelivered=true`，reply `om_x10…e4bc`） |
+| 来源 | `46` 条；报告 `7878` 字符；工具调用 `15`（search 6 / page 9），预算拒绝 1 |
+| 模型用量 | `deepseek-v4.1-flash-od` / `mira-ai`，23831 in / 6185 out / 127936 total |
+| masked ids | event `88b940…d09e`，message `om_x10…ee3c`，chat `oc_3d5…a9b6` |
+
+partial 的真实原因（run.json `errors[]`，非通道失败）：
+`model_error/citations`（11 条引用未读、0 unknown）、2 个来源 HTTP 403、
+2 次 `research_read_page` 工具失败、1 次 search 因 run 预算耗尽被拒绝。
+因此该 run 被 AGT-028 正确判为 `completed_with_errors`，飞书侧按合同回复
+“研究部分完成（部分来源或工具失败）”，**没有**伪装成 `研究完成`。
+
+证据（脱敏，已提交）：`poc/evidence/agt-032-live.jsonl`
+
+- 原始条目 `result.ok=false, reason=research_not_completed`：驱动脚本的严格 PASS 判据是
+  `persistedStatus=completed`；本次研究是 partial，所以该判据为 false，
+  **不代表**通道/run/reply 失败（`roundtrip=verified`，回复已送达）。
+- `run_readback` 条目记录真实 run 状态、耗时、sources、usage、工具计数与错误码；
+- `metadata_correction` 条目修正 `session_start.commit=null`：linked worktree 的
+  `refs/heads/*` 位于 common git dir，旧 `gitHead()` 只读 worktree git dir；
+  驱动已修复并支持 `--print-metadata`，用同一运行 HEAD 复核为 `03e4f89`。
+- 证据不含消息正文/topic、App Secret、token、模型 Key 或完整飞书 id。
+
+复现命令（需真人从飞书发消息）：
 
 ```bash
-# 私聊（推荐先跑）
 node --env-file-if-exists=.env scripts/agt-032/research-live-evidence.mjs \
   --chat-type p2p --timeout-ms 900000
-
-# 授权群 @bot
-node --env-file-if-exists=.env scripts/agt-032/research-live-evidence.mjs \
-  --chat-type group --timeout-ms 900000
 ```
 
-脚本启动真实飞书长连接 + 真实聊天/研究 runtime，等待真人发送一条
-`/research <短而明确的话题>`；成功后读取真实 run 目录并写入脱敏 JSONL：
-`poc/evidence/agt-032-live.jsonl`。
-
-证据只记录：run id、research status、durationMs、sources 数、`replyDelivered`、
-masked message/event/chat id、commit、Node/Pi/飞书 SDK 版本。
-**不记录**消息正文、topic、secret/token、完整飞书 id。
-
-通过标准：outcome `kind=research, action=replied, status=succeeded`，
-且 `readResearchRun()` 读回 `status=completed`。当前状态：**未验证**。
+仍未执行的 Live 场景：授权群 @bot 的 `/research`（自动化 T1/T2 已覆盖路由与回复）。
 
 ## 9. 未证明 / 已知限制
 
-- 真实飞书 `/research` 往返（私聊、授权群 @）与真实模型/Web 研究耗时：**未验证**（需 T4）。
+- 真实飞书授权群 @ 的 `/research` 往返：**未执行**（私聊已通过；群路径自动化覆盖）。
+- 真实研究“完整成功（`completed`）”的 Live 样本：本次为 partial，尚无全绿样本。
 - 真实飞书文本消息长度上限未实测；本卡用 1800 码点主动限流，不依赖平台上限。
 - 长研究（分钟级）期间的用户体验、飞书 reply 窗口与网络重连：仅有自动化取消/排队证据。
 - `/stop` 在真实飞书长任务中的时序（回复后立即取消 vs 取消后回复）仅 T2/T3 覆盖。

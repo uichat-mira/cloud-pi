@@ -44,6 +44,10 @@ function parseArgs(argv) {
       options.help = true;
       continue;
     }
+    if (flag === "--print-metadata") {
+      options.printMetadata = true;
+      continue;
+    }
     const key = ARG_KEYS[flag];
     if (!key) throw new Error(`unknown argument: ${flag}`);
     const value = argv[index + 1];
@@ -67,9 +71,18 @@ function versionOf(packageName) {
   }
 }
 
+function refFile(gitDir, ref) {
+  try {
+    return readFileSync(join(gitDir, ref), "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Read HEAD from fixed repository paths (no subprocess, no PATH lookup). A
- * worktree pointer is resolved relative to the repository root only.
+ * Read HEAD from fixed repository paths (no subprocess, no PATH lookup). In a
+ * linked worktree the worktree git dir only has HEAD/commondir; the branch ref
+ * lives under the common git dir, so fall back to commondir and packed-refs.
  */
 function gitHead() {
   try {
@@ -80,8 +93,19 @@ function gitHead() {
       : dotGit;
     const head = readFileSync(join(gitDir, "HEAD"), "utf8").trim();
     if (!head.startsWith("ref: ")) return head || null;
+    const ref = head.slice(5);
+    const direct = refFile(gitDir, ref);
+    if (direct) return direct;
+    const commonFile = join(gitDir, "commondir");
+    const common = statSync(commonFile).isFile()
+      ? resolve(gitDir, readFileSync(commonFile, "utf8").trim())
+      : gitDir;
+    const fromCommon = refFile(common, ref);
+    if (fromCommon) return fromCommon;
     try {
-      return readFileSync(join(gitDir, head.slice(5)), "utf8").trim() || null;
+      const packed = readFileSync(join(common, "packed-refs"), "utf8").split("\n");
+      const line = packed.find((entry) => entry.endsWith(` ${ref}`));
+      return line ? line.split(" ")[0] : null;
     } catch {
       return null;
     }
@@ -91,10 +115,22 @@ function gitHead() {
 }
 
 const options = parseArgs(process.argv.slice(2));
-if (options.help) {
-  process.stderr.write(
-    "usage: node scripts/agt-032/research-live-evidence.mjs [--chat-type p2p|group] [--timeout-ms N] [--evidence PATH] [--runs-dir DIR]\n",
-  );
+if (options.help || options.printMetadata) {
+  if (options.help) {
+    process.stderr.write(
+      "usage: node scripts/agt-032/research-live-evidence.mjs [--chat-type p2p|group] [--timeout-ms N] [--evidence PATH] [--runs-dir DIR] [--print-metadata]\n",
+    );
+  }
+  if (options.printMetadata) {
+    process.stdout.write(
+      `${JSON.stringify({
+        commit: gitHead(),
+        node: process.version,
+        piCodingAgent: versionOf("@earendil-works/pi-coding-agent"),
+        feishuSdk: versionOf("@larksuiteoapi/node-sdk"),
+      })}\n`,
+    );
+  }
   process.exit(0);
 }
 
