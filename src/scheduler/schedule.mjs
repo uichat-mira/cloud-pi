@@ -23,6 +23,7 @@ import {
   generateScheduleId,
   isScheduleStatus,
   isValidScheduleId,
+  normalizeDeliveryTargets,
 } from "./contracts.mjs";
 
 function isPlainObject(value) {
@@ -287,6 +288,10 @@ export function normalizeScheduleInput(input, { now }) {
     fail(`invalid research request: ${error?.message ?? error}`);
   }
 
+  // Delivery recipients are trusted task configuration (AGT-033), never part of
+  // the research request or anything the model can influence.
+  const deliveryTargets = normalizeDeliveryTargets(input.deliveryTargets);
+
   const nowIso = now.toISOString();
   let cron = null;
   let onceAt = null;
@@ -323,6 +328,8 @@ export function normalizeScheduleInput(input, { now }) {
     onceAt,
     onceAtUtc,
     request: normalizedRequest,
+    // Additive, optional field: records written before AGT-033 remain readable.
+    deliveryTargets: [...deliveryTargets],
     status: enabled ? SCHEDULE_STATUS.ACTIVE : SCHEDULE_STATUS.PAUSED,
     missedRunPolicy: MISSED_RUN_POLICY.COALESCE_ONE,
     createdAt: nowIso,
@@ -373,6 +380,15 @@ export function assertScheduleShape(record, { expectScheduleId } = {}) {
   if (!isScheduleStatus(record.status)) invalid(`unknown schedule status ${JSON.stringify(record.status)}`);
   if (!isPlainObject(record.request) || typeof record.request.topic !== "string") {
     invalid("missing request.topic");
+  }
+  // `deliveryTargets` was added by AGT-033; a persisted record without it is a
+  // valid pre-AGT-033 schedule and simply delivers nothing.
+  if (record.deliveryTargets !== undefined) {
+    try {
+      normalizeDeliveryTargets(record.deliveryTargets);
+    } catch (error) {
+      invalid(`invalid deliveryTargets: ${error?.message ?? error}`);
+    }
   }
   for (const key of ["createdAt", "updatedAt"]) {
     if (typeof record[key] !== "string" || Number.isNaN(Date.parse(record[key]))) {

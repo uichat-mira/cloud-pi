@@ -3,13 +3,68 @@
  * `@larksuiteoapi/node-sdk` (v1.76.0) that the channel needs.
  *
  * It owns network concerns only: WebSocket long connection, event dispatch,
- * bot open-id lookup and message reply. It does not read files, start a daemon,
- * create a Pi session or decide routing. The SDK's own reconnect loop is used;
- * application-level reply retries are deliberately not added in this POC.
+ * bot open-id lookup, replying to an inbound message and proactively sending a
+ * message to a configured destination (AGT-033). It does not read files, start
+ * a daemon, create a Pi session or decide routing/recipients. The SDK's own
+ * reconnect loop is used; application-level retries are deliberately not added
+ * here — delivery policy belongs to `src/delivery/`.
  */
 import * as Lark from "@larksuiteoapi/node-sdk";
+import { maskId } from "./config.mjs";
 
 const BOT_INFO_PATH = "/open-apis/bot/v3/info";
+
+/** Only the two receive id types this POC actually sends to. */
+const RECEIVE_ID_PATTERN = Object.freeze({
+  open_id: /^ou_[A-Za-z0-9]+$/,
+  chat_id: /^oc_[A-Za-z0-9_-]+$/,
+});
+
+/**
+ * Feishu API business codes that are worth retrying. `99991400` is the
+ * documented request-frequency limit; a network failure is also retryable.
+ * Every other API-level rejection (invalid receive id, missing permission) is
+ * treated as terminal so a bad destination cannot spam the API.
+ */
+export const RETRYABLE_FEISHU_SEND_CODES = Object.freeze([99991400]);
+
+/** A send failure the delivery layer can classify without parsing messages. */
+export class FeishuSendError extends Error {
+  /**
+   * @param {string} message
+   * @param {{ code?: string, retryable?: boolean, feishuCode?: number }} [options]
+   */
+  constructor(message, { code = "feishu_send_error", retryable = false, feishuCode } = {}) {
+    super(message);
+    this.name = "FeishuSendError";
+    this.code = code;
+    this.retryable = retryable;
+    this.feishuCode = feishuCode;
+  }
+}
+
+function assertSendInput({ receiveIdType, receiveId, text, uuid }) {
+  const pattern = RECEIVE_ID_PATTERN[receiveIdType];
+  if (!pattern) {
+    throw new FeishuSendError(
+      `unsupported receive_id_type: ${JSON.stringify(receiveIdType)}`,
+      { code: "invalid_destination" },
+    );
+  }
+  if (typeof receiveId !== "string" || !pattern.test(receiveId)) {
+    throw new FeishuSendError("send requires a valid Feishu receive id for its type", {
+      code: "invalid_destination",
+    });
+  }
+  if (typeof text !== "string" || text.length === 0) {
+    throw new FeishuSendError("send requires non-empty text", { code: "invalid_message" });
+  }
+  if (uuid !== undefined && (typeof uuid !== "string" || uuid.length === 0 || uuid.length > 64)) {
+    throw new FeishuSendError("uuid must be a non-empty string of at most 64 characters", {
+      code: "invalid_message",
+    });
+  }
+}
 
 function domainOf(config) {
   return config.domain === "lark" ? Lark.Domain.Lark : Lark.Domain.Feishu;
@@ -20,17 +75,20 @@ function domainOf(config) {
  * @param {object} options.config validated Feishu config
  * @param {Function} options.onEvent async (flattenedEvent) => void
  * @param {Function} [options.log] structured diagnostic sink
+ * @param {object} [options.client] injected official SDK client (tests only)
  */
-export function createFeishuTransport({ config, onEvent, log = () => {} }) {
+export function createFeishuTransport({ config, onEvent, log = () => {}, client: injectedClient }) {
   if (typeof onEvent !== "function") throw new TypeError("createFeishuTransport requires onEvent()");
 
-  const client = new Lark.Client({
-    appId: config.appId,
-    appSecret: config.appSecret,
-    appType: Lark.AppType.SelfBuild,
-    domain: domainOf(config),
-    loggerLevel: Lark.LoggerLevel.error,
-  });
+  const client =
+    injectedClient ??
+    new Lark.Client({
+      appId: config.appId,
+      appSecret: config.appSecret,
+      appType: Lark.AppType.SelfBuild,
+      domain: domainOf(config),
+      loggerLevel: Lark.LoggerLevel.error,
+    });
 
   let wsClient;
   let botOpenId = config.botOpenId;
@@ -108,6 +166,77 @@ export function createFeishuTransport({ config, onEvent, log = () => {} }) {
     return { messageId: response?.data?.message_id };
   }
 
+  /**
+   * Proactively send one text message to a configured user or group.
+   *
+   * Uses the official `client.im.message.create` with
+   * `params.receive_id_type = "open_id" | "chat_id"` (AGT-033). The stable
+   * `uuid` lets Feishu suppress an identical retry within its own window; it
+   * is a best-effort second guard behind the local delivery idempotency store.
+   *
+   * @returns {Promise<{ messageId: string }>}
+   */
+  async function send({ receiveIdType, receiveId, text, uuid }) {
+    assertSendInput({ receiveIdType, receiveId, text, uuid });
+    let response;
+    try {
+      response = await client.im.message.create({
+        params: { receive_id_type: receiveIdType },
+        data: {
+          receive_id: receiveId,
+          msg_type: "text",
+          content: JSON.stringify({ text }),
+          ...(uuid ? { uuid } : {}),
+        },
+      });
+    } catch (error) {
+      // The SDK throws for transport/protocol failures; an API rejection comes
+      // back as a business code below. A thrown network error is retryable.
+      log({
+        level: "warn",
+        event: "feishu_send_network_error",
+        destination: maskId(receiveId),
+        error: String(error?.code ?? error?.name ?? "error"),
+      });
+      throw new FeishuSendError(`Feishu send failed: ${error?.message ?? error}`, {
+        code: "feishu_network_error",
+        retryable: true,
+      });
+    }
+    const code = response?.code;
+    if (typeof code === "number" && code !== 0) {
+      const retryable = RETRYABLE_FEISHU_SEND_CODES.includes(code);
+      log({
+        level: retryable ? "warn" : "error",
+        event: "feishu_send_rejected",
+        destination: maskId(receiveId),
+        feishuCode: code,
+        retryable,
+      });
+      throw new FeishuSendError(`Feishu send failed: code=${code} msg=${response?.msg ?? "unknown"}`, {
+        code: "feishu_api_error",
+        retryable,
+        feishuCode: code,
+      });
+    }
+    const messageId = response?.data?.message_id;
+    if (typeof messageId !== "string" || messageId.length === 0) {
+      // Never report success without a platform message id: a retry could
+      // duplicate a message we cannot identify.
+      throw new FeishuSendError("Feishu send returned no message_id", {
+        code: "missing_message_id",
+        retryable: false,
+      });
+    }
+    log({
+      level: "info",
+      event: "feishu_message_sent",
+      destination: maskId(receiveId),
+      receiveIdType,
+    });
+    return { messageId };
+  }
+
   function stop() {
     if (!started) return;
     started = false;
@@ -126,6 +255,7 @@ export function createFeishuTransport({ config, onEvent, log = () => {} }) {
     start,
     stop,
     reply,
+    send,
     getBotOpenId: () => botOpenId,
   };
 }

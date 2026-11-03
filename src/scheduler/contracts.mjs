@@ -104,6 +104,91 @@ export const MISSED_RUN_POLICY = Object.freeze({
   COALESCE_ONE: "coalesce_one",
 });
 
+/**
+ * Trusted delivery destinations (AGT-033).
+ *
+ * A schedule may name one or more Feishu destinations. The recipient is fixed
+ * by trusted schedule configuration only: neither the model, a web page, a
+ * report nor an inbound message may add, replace or rewrite a destination.
+ *
+ * `type` is the Feishu `receive_id_type` the transport must use, so the stored
+ * contract and the platform API agree on the same two values.
+ */
+export const DELIVERY_TARGET_TYPE = Object.freeze({
+  OPEN_ID: "open_id",
+  CHAT_ID: "chat_id",
+});
+
+export const DELIVERY_TARGET_LIMITS = Object.freeze({
+  /** Bounded fan-out per schedule; keeps one run from becoming a broadcast. */
+  maxTargets: 10,
+  maxLabelChars: 80,
+});
+
+const DELIVERY_OPEN_ID = /^ou_[A-Za-z0-9]+$/;
+const DELIVERY_CHAT_ID = /^oc_[A-Za-z0-9_-]+$/;
+const DELIVERY_TARGET_KEYS = new Set(["type", "id", "label"]);
+
+export function isDeliveryTargetType(value) {
+  return value === DELIVERY_TARGET_TYPE.OPEN_ID || value === DELIVERY_TARGET_TYPE.CHAT_ID;
+}
+
+/**
+ * Validate and normalise `deliveryTargets` from trusted schedule input.
+ *
+ * Unknown keys are rejected rather than ignored: a field such as `receive_id`
+ * or `open_id` must not silently become a recipient, and a typo must fail the
+ * schedule instead of producing a run that cannot deliver.
+ *
+ * @param {unknown} input
+ * @returns {ReadonlyArray<{type:string,id:string,label?:string}>}
+ */
+export function normalizeDeliveryTargets(input) {
+  const invalid = (reason) => {
+    throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, `invalid deliveryTargets: ${reason}`);
+  };
+  if (input === undefined || input === null) return Object.freeze([]);
+  if (!Array.isArray(input)) invalid("must be an array");
+  if (input.length > DELIVERY_TARGET_LIMITS.maxTargets) {
+    invalid(`at most ${DELIVERY_TARGET_LIMITS.maxTargets} targets are supported`);
+  }
+
+  const targets = [];
+  const seen = new Set();
+  for (const [index, entry] of input.entries()) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      invalid(`[${index}] must be an object`);
+    }
+    const unknown = Object.keys(entry).filter((key) => !DELIVERY_TARGET_KEYS.has(key));
+    if (unknown.length > 0) {
+      invalid(`[${index}] has unsupported field(s): ${unknown.join(", ")}`);
+    }
+    if (!isDeliveryTargetType(entry.type)) {
+      invalid(`[${index}].type must be "${DELIVERY_TARGET_TYPE.OPEN_ID}" or "${DELIVERY_TARGET_TYPE.CHAT_ID}"`);
+    }
+    const id = typeof entry.id === "string" ? entry.id.trim() : "";
+    const pattern = entry.type === DELIVERY_TARGET_TYPE.OPEN_ID ? DELIVERY_OPEN_ID : DELIVERY_CHAT_ID;
+    if (!pattern.test(id)) {
+      invalid(
+        `[${index}].id must be a Feishu ${entry.type} id starting with "${
+          entry.type === DELIVERY_TARGET_TYPE.OPEN_ID ? "ou_" : "oc_"
+        }"`,
+      );
+    }
+    let label;
+    if (entry.label !== undefined) {
+      if (typeof entry.label !== "string") invalid(`[${index}].label must be a string`);
+      const trimmed = entry.label.trim();
+      if (trimmed) label = trimmed.slice(0, DELIVERY_TARGET_LIMITS.maxLabelChars);
+    }
+    const key = `${entry.type}:${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    targets.push(Object.freeze(label ? { type: entry.type, id, label } : { type: entry.type, id }));
+  }
+  return Object.freeze(targets);
+}
+
 /** Default state root, relative to the process cwd unless overridden. */
 export const DEFAULT_STATE_DIR = ".work/scheduler";
 
