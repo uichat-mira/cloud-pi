@@ -14,7 +14,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { EXIT, ROOT, createEvidence, gitHead, nowIso, parseArgs, writeUsage } from "./lib/harness.mjs";
+import { EXIT, ROOT, createEvidence, findSecretHits, gitHead, nowIso, parseArgs, writeUsage } from "./lib/harness.mjs";
 import { fullSuiteVerdict } from "./lib/judge.mjs";
 
 const USAGE = `usage: node scripts/agt-03x/self-test.mjs [--full] [--no-write] [--out <file>]`;
@@ -93,6 +93,19 @@ function runUnitCases() {
   reject("writer/union-id", { event: "x", detail: "on_9f8e7d6c5b4a" }, /feishu_union_id/);
   reject("writer/long-mixed-token", { event: "x", detail: "AbCdEf0123456789GhIjKlMnOpQrStUvWx" }, /long_token/);
   reject("writer/absolute-path", { event: "x", detail: "D:\\Users\\someone\\secret.txt" }, /absolute_path/);
+  // A truncated projection is the sanctioned form; an untruncated id is not. The
+  // mask rule lives in the scanner (D8 reads docs, which may use `…`); generated
+  // evidence must stay ASCII, so the writer only ever sees the `...` variant.
+  accept("writer/ascii-mask", { event: "x", detail: "chat_id=0f3b9e...a9b6 attempts=1" });
+  reject("writer/full-chat-id", { event: "x", detail: "chat_id=0f3b9e12ab34cd56ef78a9b6" }, /wecom_chat_id/);
+  const scanCase = (name, text, expected) => {
+    const hits = findSecretHits(text);
+    const ok = expected === 0 ? hits.length === 0 : hits.includes(expected);
+    rows.push({ name, pass: ok, detail: hits.length === 0 ? "no hits" : hits.join(",") });
+  };
+  scanCase("scan/ellipsis-mask-allowed", "chat_id=0f3b9e…a9b6", 0);
+  scanCase("scan/ascii-mask-allowed", "chat_id=0f3b9e...a9b6", 0);
+  scanCase("scan/full-chat-id-detected", "chat_id=0f3b9e12ab34cd56ef78a9b6", "wecom_chat_id");
   reject("writer/oversized-text", { event: "x", detail: "a".repeat(200) }, /longer than 160/);
   reject("writer/forbidden-key", { event: "x", messageId: "wm123" }, /not on the whitelist/);
   accept("writer/seed-label", { event: "x", note: "seed 数据，非 A2 注册链能力（证据必须原样标注）" });

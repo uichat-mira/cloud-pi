@@ -306,3 +306,47 @@
 {"scenario":"A","at":"2026-11-03T18:08:00.774Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
 {"scenario":"A","at":"2026-11-03T18:08:00.774Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl","mode":"real"}
 {"scenario":"A","at":"2026-11-03T18:08:00.774Z","event":"result","mode":"real","status":"blocker","counts":{"total":5,"sent":0,"failed":0,"pending":5},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T18:13:05.337Z","event":"start","mode":"offline","detail":"head=0b5b41e743cb97517d7ac657f33e5e331c340cd6","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T18:13:05.341Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
+{"scenario":"A","at":"2026-11-03T18:13:05.341Z","event":"self-test","status":"pass","detail":"fixture provider -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:13:05.342Z","event":"self-test","status":"pass","detail":"missing ingress -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T18:13:05.342Z","event":"self-test","status":"pass","detail":"reply not accepted -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:13:05.342Z","event":"self-test","status":"pass","detail":"tool outside whitelist -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:13:05.342Z","event":"self-test","status":"pass","detail":"no API readback -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T18:13:05.342Z","check":"self-test","status":"pass","detail":"6/6 bundled cases matched","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T18:13:05.343Z","check":"A1-A5","status":"blocker","detail":"offline self-test only; no real WeCom evidence was collected","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T18:13:05.343Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T18:13:05.437Z","event":"start","mode":"real","detail":"head=0b5b41e743cb97517d7ac657f33e5e331c340cd6","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T18:13:05.441Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first"}
+{"scenario":"A","at":"2026-11-03T18:13:05.441Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"A","at":"2026-11-03T18:13:05.441Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"A","at":"2026-11-03T18:13:05.441Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"A","at":"2026-11-03T18:13:05.441Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl"}
+{"scenario":"A","at":"2026-11-03T18:13:05.442Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:13:05.442Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:13:05.442Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:13:05.442Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:13:05.443Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:13:05.443Z","event":"result","mode":"real","status":"blocker","counts":{"total":5,"sent":0,"failed":0,"pending":5},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T18:14:37.313Z","event":"start","mode":"offline","detail":"head=0b5b41e743cb97517d7ac657f33e5e331c340cd6","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T18:14:37.317Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
+{"scenario":"A","at":"2026-11-03T18:14:37.317Z","event":"self-test","status":"pass","detail":"fixture provider -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:14:37.317Z","event":"self-test","status":"pass","detail":"missing ingress -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T18:14:37.318Z","event":"self-test","status":"pass","detail":"reply not accepted -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:14:37.318Z","event":"self-test","status":"pass","detail":"tool outside whitelist -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:14:37.318Z","event":"self-test","status":"pass","detail":"no API readback -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T18:14:37.318Z","check":"self-test","status":"pass","detail":"6/6 bundled cases matched","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T18:14:37.318Z","check":"A1-A5","status":"blocker","detail":"offline self-test only; no real WeCom evidence was collected","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T18:14:37.319Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T18:14:37.413Z","event":"start","mode":"real","detail":"head=0b5b41e743cb97517d7ac657f33e5e331c340cd6","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T18:14:37.416Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first"}
+{"scenario":"A","at":"2026-11-03T18:14:37.417Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"A","at":"2026-11-03T18:14:37.417Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"A","at":"2026-11-03T18:14:37.417Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"A","at":"2026-11-03T18:14:37.417Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl"}
+{"scenario":"A","at":"2026-11-03T18:14:37.418Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:14:37.418Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:14:37.418Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:14:37.418Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:14:37.418Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:14:37.419Z","event":"result","mode":"real","status":"blocker","counts":{"total":5,"sent":0,"failed":0,"pending":5},"note":"A verdict=blocker","channel":"wecom"}

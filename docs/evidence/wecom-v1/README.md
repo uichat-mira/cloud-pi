@@ -114,25 +114,41 @@ node scripts/agt-03x/b-scheduled-research-delivery.mjs \
   一个标题里含已知子串的新失败会被静默放过（Node 的 TAP 还会为子测试补打父 `describe` 行，
   2 个真实失败会产生 4 行 `not ok`）。基线漂移（修好一个已知缺陷、或新增失败）现在一律判 `fail`，
   必须人工改基线——不允许自动「适应」。
-- **D8 按值扫描，并覆盖写它的文档**：扫描 `poc/evidence`、`docs/evidence`、`docs/engineering`；
-  结构化证据（`.jsonl`/`.json`）先解析再扫字符串值，避免把
+- **D8 按值扫描，覆盖 `docs/**` + `poc/**`**：结构化证据（`.jsonl`/`.json`）先解析再扫字符串值，避免把
   `…_after_sdk_…` 这类键值边界误判为长 token；`.md` 才整篇扫描。形如 `chat_id=0f3b9e…a9b6` 的
-  **掩码**是允许的投影，未截断的完整 id 会被拒。
-- 两者都有进程内回归用例（`self-test.mjs` 的「判定器本身的内建回归」表，16 条）。
+  **掩码**是允许的投影，未截断的完整 id 一律拒。`tests/` **不在**范围内（合成夹具会把扫描器调成噪音）。
+- 两者都有进程内回归用例（`self-test.mjs` 的「判定器本身的内建回归」表，**21 条**），
+  其中 `scan/ellipsis-mask-allowed` / `scan/ascii-mask-allowed`（掩码放行）与
+  `scan/full-chat-id-detected` / `writer/full-chat-id`（完整 id 拒绝）专门守住掩码规则。
+  注意分层：**掩码规则属于扫描器**（D8 读的是人写的文档，允许 `…`），而**生成的证据必须 ASCII**，
+  所以证据里的掩码用 `...`（`writer/ascii-mask` 用例）。
 
-## 8. 历史证据脱敏记录
+## 8. 证据卫生与更正记录
 
-2026-11-04（外审 F-28-1 收紧扫描后暴露；这是**纠正纪律 3 的违规**，不是改分）：
+2026-11-04。两次真实标识符的发现与更正，**属于纠正纪律 3（证据不得含原始用户/消息 id）的违规，不是改分**。
+判定结论、计数、时间戳与证据语义均未改变。
 
-| 位置 | 内容 | 处理 |
-| --- | --- | --- |
-| `poc/evidence/agt-033-live-delivery.jsonl` | 真实 `om_x1…` message id（2 处） | → `om_<redacted>` |
-| `poc/evidence/agt-033-live-final-head.jsonl` | 同上（1 处） | → `om_<redacted>` |
-| `poc/evidence/agt-033-live-status.md` | 同上（3 行） | → `om_<redacted>` |
-| `docs/engineering/agt-033-scheduler-delivery.md` §10 | 同上（1 处 messageId） | → `om_<redacted>`，并在该节留「证据卫生」说明 |
-| `tests/agt-035-targets.test.mjs` | 维护者**完整** `ou_…` open_id（与 §10 掩码同源） | → 合成常量 `ou_000…0001`（该文件 21/21 用例仍通过） |
+| # | 位置 | 原值形状（脱敏后表述） | 引入处 | 发现者 | 修复 commit | 处理 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `poc/evidence/agt-033-live-delivery.jsonl` | `om_x1…`，2 处 `personalTarget/groupTarget.messageId` | `d6ee2ae`（PR #18） | verifier（F-28-1 收紧扫描） | `a9cd3ba` | → `om_<redacted>` |
+| 2 | `poc/evidence/agt-033-live-final-head.jsonl` | 同上，1 处 | `d6ee2ae`（PR #18） | verifier | `a9cd3ba` | → `om_<redacted>` |
+| 3 | `poc/evidence/agt-033-live-status.md` | 同上，3 行 | `d6ee2ae`（PR #18） | verifier | `a9cd3ba` | → `om_<redacted>` |
+| 4 | `docs/engineering/agt-033-scheduler-delivery.md` §10 | 同上，1 处正文引用的 messageId | `1933de1`（PR #18） | **lead 抽查** | `0b5b41e` | → `om_<redacted>` + 该节「证据卫生」说明 |
+| 5 | `tests/agt-035-targets.test.mjs:24` | 维护者**完整** `ou_…` open_id（与第 4 项掩码同源） | `05c4d78`（PR #20，**已合入 dev**） | verifier（全仓复扫） | `0b5b41e` | → 合成常量 `ou_000…0001`，该文件 21/21 仍通过 |
 
-**只替换标识符值**：计数、顺序、时间戳、`attempts`、`checks`、
-`correction.originalSha256`、判定结论与文本其余部分均未改动，JSONL 仍逐行可解析。
-脱敏前 D8 在 30 个文件上命中；脱敏后 42 个文件（含 `docs/engineering`）零命中。
-`om_local_*` / `om_fixture_*` / `wm_local_*` 是合成夹具命名空间，未动、也不会被误报。
+**第 5 项单独说明（已合入 dev 的测试文件，不是文档笔误）**：该 open_id 是维护者本人的真实 open_id，
+随 PR #20 进入 `dev`，影响面仅限本仓测试文件（未外发、未进入运行时代码或证据 JSONL）。
+`git log -S` 确认历史 commit 原样保留——**历史里仍然含这个 id**，本次只改当前树；
+是否重写历史（filter-repo 等）或轮换凭据属**维护者决定**，本卡不做、也不宣称已清除。
+
+**未做什么（逐项，便于复核）**
+
+- 未改任何 `counts` / `attempts` / `sentAt` / `checks` / `runId` / `delivery` 状态 / 判定结论；
+- 未改 `correction.originalSha256`（它记录的正是脱敏前那版 JSONL 的哈希，保留即保留可审计链）；
+- 未重写 git 历史，未 force-push，未改 `dev`；
+- 未动 `om_local_*` / `om_fixture_*` / `wm_local_*` 合成夹具命名空间；
+- 未把 D8 扩到 `tests/`（会因合成夹具产生噪音），也未把扫描结果当作「已无泄漏」的证明——
+  它只覆盖 `docs/**` + `poc/**` 的文本文件。
+
+**脱敏后验证**：`git ls-files` 全量复扫无真实 `om_x*` / 完整 `ou_` / `oc_` / `wm…`；
+D8 在 `docs/**` + `poc/**` 全量（见 `self-test --full` 输出的 `files=` 计数）零命中；JSONL 仍逐行可解析。

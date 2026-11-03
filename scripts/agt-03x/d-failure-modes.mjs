@@ -86,13 +86,11 @@ function evidenceStrings(text, structured) {
 }
 
 function scanEvidenceDirs() {
-  // Evidence plus the engineering docs that quote it: a real message id leaks into
-  // a write-up as easily as into a JSONL (it did once - see docs/evidence README §8).
-  const targets = [
-    join(ROOT, "poc", "evidence"),
-    join(ROOT, "docs", "evidence"),
-    join(ROOT, "docs", "engineering"),
-  ];
+  // Whole `docs/` and `poc/` trees: a real message id leaks into a write-up as
+  // easily as into a JSONL (it did twice - see docs/evidence README §8). `tests/`
+  // is deliberately out of scope: synthetic fixtures there would turn this scan
+  // into noise. Ellipsis masks (`chat_id=0f3b9e…a9b6`) stay allowed.
+  const targets = [join(ROOT, "docs"), join(ROOT, "poc")];
   const hits = [];
   let scanned = 0;
   const walk = (dir) => {

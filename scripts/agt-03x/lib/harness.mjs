@@ -80,8 +80,9 @@ export const SECRET_SCAN_PATTERNS = Object.freeze([
   { name: "feishu_union_id", pattern: /\bon_[A-Za-z0-9_-]{6,}/ },
   // `wm_local_*` / `wmfixture_*` are the documented synthetic fixture namespace.
   { name: "wecom_message_id", pattern: /\bwm(?!(?:_)?(?:local|fixture))[A-Za-z0-9]{8,}/ },
-  // Masks such as `chat_id=0f3b9e…a9b6` are the sanctioned projection; a full id is not.
-  { name: "wecom_chat_id", pattern: /\b(?:chatid|chat_id)=(?![A-Za-z0-9_-]*…)[A-Za-z0-9_-]{4,}/i },
+  // Masks such as `chat_id=0f3b9e…a9b6` (or the ASCII `...` form that generated
+  // evidence must use) are the sanctioned projection; an untruncated id is not.
+  { name: "wecom_chat_id", pattern: /\b(?:chatid|chat_id)=(?![A-Za-z0-9_-]*(?:…|\.\.\.))[A-Za-z0-9_-]{4,}/i },
   { name: "bearer", pattern: /Bearer\s+[A-Za-z0-9._-]{20,}/ },
   { name: "app_secret", pattern: /app_?secret\s*[=:]\s*[A-Za-z0-9]{8,}/i },
   // Mixed-case 32+ character tokens (base64url secrets). Requires a digit, rejects
