@@ -95,4 +95,6 @@ node --env-file-if-exists=.env scripts/agt-033/live-failure-probe.mjs
   `retryable=false`；最终 `research=completed` / `delivery=partial`（total=2/sent=1/failed=1）；
 - 原始证据：
   [`agt-033-live-final-head.jsonl`](agt-033-live-final-head.jsonl)。
-  personal-only 模式下 checks 的 `groupSent` 是占位（没有群目标），不是群发送证据。
+  personal-only 模式没有群目标，修正后 `checks.groupSent=null`。首次落盘误写为 true，
+  已在不重发消息的前提下仅修正该元数据；原文件 SHA-256 见 JSONL 的
+  `correction.originalSha256`，发送事实未变。

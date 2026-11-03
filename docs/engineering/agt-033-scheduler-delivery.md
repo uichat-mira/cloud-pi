@@ -287,7 +287,10 @@ AGT_033_CODE_COMMIT=$(git rev-parse HEAD) \
   `research=completed` / `delivery=partial`、counts total=2 / sent=1 / failed=1；
 - 脱敏证据：
   [`poc/evidence/agt-033-live-final-head.jsonl`](../../poc/evidence/agt-033-live-final-head.jsonl)。
-  personal-only 的 checks 中 `groupSent` 是模式占位（无群目标），不作为群发送证据。
+  personal-only 模式没有群目标，修正后 `checks.groupSent=null`（不再是 true）。该字段在
+  首次落盘时误写为 true，已在**不重发消息**的前提下仅修正这一元数据，并把原文件
+  SHA-256 记录在 JSONL 的 `correction.originalSha256`，发送事实（messageId/attempts/
+  sentAt/计数）未变。
 
 Live 研究 run 的 runtime 仍是确定性 fixture；真实模型/联网研究触发投递不在本卡 Live
 证据内。

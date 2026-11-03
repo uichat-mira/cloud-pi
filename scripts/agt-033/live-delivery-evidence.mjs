@@ -346,19 +346,21 @@ async function main() {
     const writeEnabled = !dryRun;
     const checks = {
       personalSent,
-      groupSent,
+      // In personal-only mode there is no group target at all; null (not true)
+      // keeps checks from contradicting `groupTarget: null`.
+      groupSent: personalOnly ? null : groupSent,
       oneMessagePerRealDestination: realSendCount === expectedRealSends,
       idempotentReplay,
       failureIsolation,
     };
-    const verified = Object.values(checks).every(Boolean);
+    const verified = Object.values(checks).every((value) => value === true || value === null);
     const entry = {
       evidence: "agt-033-live-delivery",
       generatedAt: new Date().toISOString(),
       node: process.version,
       sdk: "@larksuiteoapi/node-sdk@1.76.0 im.message.create",
       codeCommit,
-      mode: personalOnly ? "personal-only-final-head" : "personal-and-group",
+      mode: personalOnly ? "personal-only" : "personal-and-group",
       transport: {
         dedicatedSendClient: diagnostics.dedicatedSendClient,
         sendTimeoutMs: diagnostics.sendTimeoutMs,
