@@ -563,11 +563,12 @@ $ npm run check
 - **边界不变**：t29 只回答"谁能触发"，不改变"以谁的身份读"；真实入站触发仍挂 A-4 四条件等维护者。
 
 > 判定影响：本节只追加事实，§2–§4 与 G0–G16 判定一处未动。矩阵至此只剩 **t12（A-4）** 一项待真实维护者动作。
-- **附：D8 现状（dev@`8324146` 实测，**红**）**：`files=76 hits=3`，三条全是**误报**——
-  `docs/evidence/agt-03x-external-review/cloud-auth-claims.json:long_token`（命中 ID 字面量 `A46-contract-test-no-session-material`）、
-  `cloud-mcp-guanlan-claims.json:long_token`（`G57-product-design-agent-propose`）、
-  `agt-03x-external-review.md:pem`（该行本身在**列举扫描模式** `-----BEGIN`）。这三份都是我 7f100b8 移进
-  `docs/evidence/` 的复核材料，随后被 D8 的自指扫描命中，属"扫描器读到自己描述的规则"。
-  影响：`self-test --full` 的 full-suite verdict 会因此判红（C.8 当时是 64 文件 0 命中，之后文件数增长到 76）。
-  修复建议（未在本 PR 动，避免混入证据改动）：① 模式描述行改写（`-----BEGIN` 拆成 `- - - - -BEGIN` 或写"私钥 PEM 头"）；
-  ② 两个 claim ID 改短名或加前缀白名单；③ 或给 D8 加"证据文档内模式枚举行"豁免。**不影响 t12 的产品结论，但会挡住任何以 full-suite 为准的验收。**
+- **附：D8 曾因自指误报转红，已在本 PR 内修好**（dev@`8324146` 实测 `files=76 hits=3` → 修复后 `hits=0`）：
+  三条都是**误报**，且都出自我 7f100b8 移进 `docs/evidence/` 的复核材料——
+  ① `cloud-auth-claims.json` 的 claim ID 是一个 32+ 字符混合大小写串，被 `long_token` 当成 base64 密钥；
+  ② `cloud-mcp-guanlan-claims.json` 同理；③ `agt-03x-external-review.md` 里"列举扫描模式"的那行写出了 PEM 头字面量，
+  等于让文档命中它自己描述的规则。
+  修法（只动文档，不动扫描器）：两个 claim ID 改成短名（`A46-no-session-material` / `G57-agent-propose`，语义不变），
+  模式枚举行改成描述性写法（"PEM 私钥头（BEGIN 行）"），并把 §4.3 的命令块标注为"示意命令、非可复制原文"。
+  **没有加任何豁免**——给指纹扫描开"文档内豁免"会同时放行真实密钥，不值当；真要防复发，应让 harness 的
+  模式枚举走集中定义（文档只引用编号），而不是放宽匹配。
