@@ -38,7 +38,19 @@ node scripts/feishu-live-poc.mjs --timeout-ms 3000
 与 `start_failed`（仅字段名），没有 secret。该失败只证明配置校验 fail closed，
 **不证明**真实链路。
 
-## 3. 执行 Live 的最小步骤
+## 3. Feishu API 可达性负向探测
+
+用**非真实**的 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`（仅本地临时环境，未写入仓库）加载真实
+模型配置后运行 Live 驱动，确认官方 SDK 真实到达飞书并 fail closed：
+
+```text
+exit 1
+feishu live start failed: failed to get tenant_access_token, code: 10003, msg: invalid param
+```
+
+这只证明网络、SDK 与 token 路径真实可达，并证明无效凭证不会继续启动；它不是 Live 成功证据。
+
+## 4. 执行 Live 的最小步骤
 
 1. 使用**已有**飞书机器人应用（不新建），注入进程环境：
 
