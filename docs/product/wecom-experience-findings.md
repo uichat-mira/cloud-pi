@@ -7,6 +7,7 @@
 > 不改代码、不部署、不占用真实长连接、不发真实企业微信消息（长连接由 pi-dev 持有）。
 > 判定口径见 [wecom-experience-rubric.md](wecom-experience-rubric.md) §0。
 > **裁决结果（2026-11-04，lead，已锁定）**：F01–F09、F11–F13 **accept**；F10 由 D2 覆盖（静默）。D1–D7 见 rubric §11。
+> **基线变化（2026-11-04 后续）**：dev 已合并 #31（WeCom 投递接线，`c15d0ef`）与 #35（两段式 ack，`c0ce277`）。F05/F09 中"未实现/未接线"是评审时（`dev@ade8a36`）状态；当前代码已具备，但真实体验未验证。新风险：默认每条消息先回 `已收到，正在处理…`（A3 简单问答不应 ack）。
 
 ## 0. 评审范围与证据等级（先看这里）
 
@@ -187,19 +188,23 @@ F04-j 按 D7 **不展示 runId**，不得折中成"运行记录"。
 
 ---
 
-### F05 · 长任务没有用户可见 ack（严重度：**high**）
+### F05 · 长任务 ack：评审时无 ack；dev #35 已实现两段式（待验收，严重度：**high**）
 
-**证据（代码事实）**：`handleEvent` 同步返回，不 await 模型（正确）；但**用户可见的消息只有最终回复**
+**评审时的代码事实（`dev@ade8a36`）**：`handleEvent` 同步返回，不 await 模型（正确）；但**用户可见的消息只有最终回复**
 ——`runOne` 在 `runTurn` 完成后才 `sendSegments`（[channel.mjs:229-303](../../src/channels/wecom/channel.mjs)）。
 D5 已裁决聊天里暂不开放 `/research`；但任何"要跑一会儿"的请求（以及未来重开的研究入口）同理，期间用户只能干等。
-群内两段式 ack 属于 t27，**未实现**（[agt-037:96](../engineering/agt-037-unified-runtime.md)）。
 平台单条流式 10 分钟上限、`req_id` 短时效，决定了长任务不能只等最后一条
 （[onepager:33-35](../research/wecom-channel/v1-boundaries-onepager.md)、[group-and-proactive:111](../research/wecom-channel/group-and-proactive-evidence.md)）。
 
-**判定**：`fail`（A2/A4）。
+**后续变化（2026-11-04，dev #35 `c0ce277`）**：两段式已入 dev——每条被接受的消息先回固定 ack
+（默认 `已收到，正在处理…`），终稿用 `aibot_send_msg` push。A2"没有 ack"不再成立；
+新问题是 **A3**：简单问答也会收到 ack + 终稿两条消息，且 ack 文案是工程口吻。
 
-**用户感受**：发完一个要跑一会儿的请求后 30 秒没有任何动静，用户会怀疑消息没发出去、机器人掉线，
+**判定**：评审时 `fail`（A2/A4）；dev #35 后 **A2 结构 pass、A3 fail（代码事实）**；真实时延与文案未验证。
+
+**用户感受**：评审时——发完一个要跑一会儿的请求后 30 秒没有任何动静，用户会怀疑消息没发出去、机器人掉线，
 然后重复发送——重复消息又会被去重/排队，体验更糟。
+现在——发个 `Hi` 先收到"已收到，正在处理…"再收到正文，像工单系统；简单问题被拆成两条。
 
 **期望**：≤ 2 s 内先回一句 ack，终稿另发：
 
@@ -209,14 +214,14 @@ Mira：收到，这个要跑一会儿。跑完我直接发结论，中间不用�
 （约 40 s 后）Mira：3 条要点：…
 ```
 
-**具体改法**：t27 落地时，ack 文案由通道层固定发出（不经过模型），建议：
-- 单聊：`收到，我去查一下，大概 30 秒。`
-- 群聊：`收到，查完发这里。`
-- 研究：`收到，这个要跑一会儿。跑完我直接发结论，中间不用等。`
+**具体改法**（dev #35 后）：
+- **简单问答不 ack**（A3）：预计 < 8 s 的回复只发终稿；否则 `Hi` 会变成两条消息。
+- 长任务 ack 由通道层固定发出（不经过模型）：`收到，这个要跑一会儿。跑完我直接发结论，中间不用等。`
+- 不要用 `已收到，正在处理…` 这种工单腔；ack 与终稿用 `requestId` 关联，不重复内容。
 
-**来源**：[channel.mjs:229-303](../../src/channels/wecom/channel.mjs)、[agt-037:96](../engineering/agt-037-unified-runtime.md)、
+**来源**：[channel.mjs:229-303](../../src/channels/wecom/channel.mjs)、dev #35 `c0ce277`、
 [onepager:33-35](../research/wecom-channel/v1-boundaries-onepager.md)。
-**建议**：accept（进 t27）；本卡只给文案，不改代码。
+**建议**：accept；t31 按 A3 收紧（简单问答不 ack），并替换默认 ack 文案。
 
 ---
 
@@ -303,10 +308,11 @@ Mira：收到，这个要跑一会儿。跑完我直接发结论，中间不用�
 
 **证据**：通道层主动推送真实可用（4 组对照 `errcode 0`，[group:62-69](../research/wecom-channel/group-and-proactive-evidence.md)），
 伪造目标 `93006`（[group:81-85](../research/wecom-channel/group-and-proactive-evidence.md)）；
-但**调度投递执行器只发飞书**，企业微信目标被 `unsupported_target_type` 拒绝（[agt-036:228-231](../engineering/agt-036-wecom-channel.md)），
-t25 未完成（verification-matrix G1）。**没有频率、时段、内容门槛、退订话术的任何设计**。
+评审时调度投递执行器只发飞书（[agt-036:228-231](../engineering/agt-036-wecom-channel.md)），
+**dev #31 `c15d0ef` 已把 WeCom sender 接到 delivery coordinator**，但真实定时投递 live 未验证；
+频率、时段、内容门槛、退订话术仍无产品设计（t25 任务未完成，verification-matrix G1）。
 
-**判定**：`fail（缺位）`——不是文案写错，是压根没有。
+**判定**：`fail（设计缺位）`——投递代码已具备，但产品分寸与话术仍为零，体验未验证。
 
 **用户感受（上线后最可能翻车的点）**：早上 7 点被"日报"吵醒；一天推 8 条"没有新增"；
 想关掉却不知道回什么；在群里推个人任务，全群围观。
@@ -328,7 +334,7 @@ t25 未完成（verification-matrix G1）。**没有频率、时段、内容门�
 | `/unmute` | `推送恢复了。` |
 
 **来源**：[group:62-69/81-85](../research/wecom-channel/group-and-proactive-evidence.md)、[agt-036:228-231](../engineering/agt-036-wecom-channel.md)、
-verification-matrix §4 G1。
+dev #31 `c15d0ef`、verification-matrix §4 G1。
 **建议**：accept（rubric §6 + 推送模板）；D4 已裁决退订命令，**需开新卡**，且仅对已授权用户生效。
 
 ---
@@ -416,8 +422,8 @@ n=2，都是简单短文本。rubric A1 的 p95 ≤ 8 s **未验证**。
 ## 3. 本次评审不能证明什么
 
 - **群内真实模型回复原文**：没有留档，只有"通用助手"结论；F03 是结构判定，不是逐字判定。
-- **研究/长任务体验**：t27 未实现，ack 与终稿都没有真实输出。
-- **主动推送体验**：t25 未接线，只有通道层 4 组对照。
+- **研究/长任务体验**：dev #35 已有两段式代码，但 ack/终稿的真实输出与时机未验证。
+- **主动推送体验**：dev #31 已接线，但真实定时投递未验证；目前只有通道层 4 组对照。
 - **`/research` 在群里的行为**：D5 已裁决聊天里**暂不开放**；当前命令仍会走到"研究功能未启用"文案，属过渡态，不评体验。
 - **延迟 p50/p95**：n=2。
 - **24 h 窗口、限速错误码、改名后的 @**：未验证（[onepager:48-56](../research/wecom-channel/v1-boundaries-onepager.md)）。
@@ -453,7 +459,7 @@ n=2，都是简单短文本。rubric A1 的 p95 ≤ 8 s **未验证**。
 | F02 `pong 🏓` 偶然正例 | accept | 保留"偶然正例、不作达标证据"；T7 纳入验收 | 提示词 + t31 清单 |
 | F03 群聊无独立人设 | accept | `chatType` 选两套提示词 | pi-dev |
 | F04 文案（e/f/g/h/j） | accept | 4 条 fail 必须替换；错误码只进日志；runId 不展示（D7） | pi-dev |
-| F05 无 ack | accept | 进 t27 | t27 |
+| F05 无 ack | accept | dev #35 已实现两段式；t31 按 A3 收紧（简单问答不 ack） | t31 |
 | F06 长度无约束 | accept | 提示词预算 + 群聊段数收紧 | pi-dev |
 | F07 群礼仪缺失 | accept | 群提示词 + 正/反例验收（D1） | pi-dev |
 | F08 身份披露缺失 | accept | 提示词；t29 前保守口径 | pi-dev |
