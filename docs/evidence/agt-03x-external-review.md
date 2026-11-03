@@ -14,7 +14,7 @@
 
 - **不改任何代码、不合并、不关闭 Issue**。本轮只读：`git clone --depth 1 -b <head>` 到仓库外的临时目录，逐条比对文档里的 `path:line`，并独立重跑文档声称已跑过的命令。
 - 六项检查：①Draft / 目标分支 / Issue 关联 / dsh badge；②变更面是否越界；③`file:line` 是否真实（每份文档抽 ≥10 条，实际 56 与 58 条）；④证据是否脱敏；⑤CI 宣称与实际是否一致；⑥跨仓库断言（`consumer_id` / `audience` / `scope`）两侧是否一致。
-- 「可复核」的含义：本文每条判定都附命令或行号，第三方按 §4 重跑即可得到同样结果。复核脚本与检查清单随本次提交入库（`scripts/review/file-line-check.mjs`、`scripts/review/*-claims.json`），**不被任何产品代码或测试引用**。
+- 「可复核」的含义：本文每条判定都附命令或行号，第三方按 §4 重跑即可得到同样结果。复核脚本与检查清单作为**证据附件**放在 `docs/evidence/agt-03x-external-review/`（`file-line-check.mjs` 与两份 `*-claims.json`）：它们是只读的核对材料，不是产品代码，不被任何 `npm` 脚本、测试或产品模块引用；删掉它们不影响本文任何判定（§3 已逐条引出实际行内容）。
 
 ## 1. 判定汇总
 
@@ -127,9 +127,11 @@
 git clone --depth 1 -b feat/gln-013-guanlan-consumer-credential https://github.com/uichat-mira/cloud-auth.git
 git clone --depth 1 -b feat/gln-014-real-token-mcp            https://github.com/uichat-mira/cloud-mcp-guanlan.git
 
-node scripts/review/file-line-check.mjs <cloud-auth checkout>         scripts/review/cloud-auth-claims.json
+ATT=docs/evidence/agt-03x-external-review
+
+node $ATT/file-line-check.mjs <cloud-auth checkout>         $ATT/cloud-auth-claims.json
 # → {"summary":{"total":56,"pass":55,"fail":1}}   ← 1 条为 F/§2.3 所述的锚点口径问题，人工复核成立
-node scripts/review/file-line-check.mjs <cloud-mcp-guanlan checkout>  scripts/review/cloud-mcp-guanlan-claims.json
+node $ATT/file-line-check.mjs <cloud-mcp-guanlan checkout>  $ATT/cloud-mcp-guanlan-claims.json
 # → {"summary":{"total":58,"pass":52,"fail":6}}   ← 6 条为正则过窄，逐条人工核对位置与含义均成立
 ```
 
