@@ -158,6 +158,34 @@ export async function main({
   }
 
   if (parsed.check) {
+    // Offline validation of the WeCom startup gate: an operator must learn that
+    // external tools are enabled without an explicit session allowlist here, not
+    // from a failed production start.
+    if (config.channels?.enabled?.includes("wecom")) {
+      try {
+        const { loadWecomConfig } = await import("../channels/wecom/config.mjs");
+        const { assertWecomSessionAuthorization } = await import("../channels/wecom/authorization.mjs");
+        const wecomConfig = loadWecomConfig(effective.env);
+        const authorization = assertWecomSessionAuthorization({ env: effective.env, config: wecomConfig });
+        log({
+          level: "info",
+          event: "wecom_session_authorization",
+          enforced: authorization.enforced,
+          sources: authorization.sources,
+          allowedUserCount: authorization.allowedUserCount,
+          allowedChatCount: authorization.allowedChatCount,
+        });
+      } catch (error) {
+        log({
+          level: "error",
+          event: "cloud_agent_config_invalid",
+          code: String(error?.code ?? error?.name ?? "error"),
+          message: String(error?.message ?? error),
+          fields: Array.isArray(error?.fields) ? error.fields : undefined,
+        });
+        return { code: exitCodeFor(error) };
+      }
+    }
     log({
       level: "info",
       event: "cloud_agent_config_ok",

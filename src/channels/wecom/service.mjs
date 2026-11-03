@@ -8,6 +8,7 @@
  */
 import { join } from "node:path";
 import { createWecomChannel } from "./channel.mjs";
+import { assertWecomSessionAuthorization } from "./authorization.mjs";
 import { describeWecomConfig, loadWecomConfig } from "./config.mjs";
 import { createWecomDedupeStore } from "./dedupe.mjs";
 import { createInstanceLock } from "./instance.mjs";
@@ -49,6 +50,19 @@ export function createWecomService({
   onOutcome,
 } = {}) {
   const config = wecomConfig ?? loadWecomConfig(env);
+  // Fail-closed gate (V1 authorization boundary): with an external tool service
+  // enabled, an implicit "anyone may talk to the bot" policy would let any third
+  // party trigger a read under the maintainer-delegated identity. Refuse to build
+  // the channel instead; the entry maps `wecom_config_error` to exit 2.
+  const authorization = assertWecomSessionAuthorization({ env, config });
+  log({
+    level: "info",
+    event: "wecom_session_authorization",
+    enforced: authorization.enforced,
+    sources: authorization.sources,
+    allowedUserCount: authorization.allowedUserCount,
+    allowedChatCount: authorization.allowedChatCount,
+  });
   const runner = createWecomAgentRunner({ env, cwd, config: modelConfig, createRuntime, generateRunId });
   const sessions = createKnownSessionStore({ now });
   const dedupe = createWecomDedupeStore({ now });
@@ -73,6 +87,8 @@ export function createWecomService({
       allowedUserIds: config.allowedUserIds,
       allowedChatIds: config.allowedChatIds,
     },
+    // Empty by default: a rejection is silent, so nobody can probe the allowlist.
+    deniedReply: config.deniedReply,
     segment: { maxBytes: config.replyMaxBytes },
     dedupe,
     log,
