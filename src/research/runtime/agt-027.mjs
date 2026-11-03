@@ -152,6 +152,14 @@ export function createAgt027RuntimePort({ module, env = process.env } = {}) {
                 `mcp_server_unavailable: ${health.reason}${Number.isFinite(health.status) ? ` (HTTP ${health.status})` : ""}`,
               );
               error.code = "mcp_server_unavailable";
+              // The model run itself completed, but this rule fails it. Carry the
+              // record with a failed terminal status so the run store and the
+              // management API cannot report "succeeded" for it.
+              error.runRecord = {
+                ...record,
+                status: "failed",
+                error: { code: "mcp_server_unavailable", message: error.message },
+              };
               throw error;
             }
           }

@@ -19,6 +19,7 @@ import { createWecomDedupeStore } from "./dedupe.mjs";
 import { normalizeWecomMessageEvent } from "./events.mjs";
 import { decideWecomRoute } from "./policy.mjs";
 import { splitForSend } from "./text.mjs";
+import { sanitizeModelReply } from "../../redaction.mjs";
 
 export const WECOM_STOP_COMMAND = "/stop";
 export const WECOM_RESEARCH_COMMAND = "/research";
@@ -282,7 +283,31 @@ export function createWecomChannel({
         kind === "research" && typeof record?.runId === "string" && record.runId.length > 0
           ? `${text}\n\nrunId: ${record.runId}`
           : text;
-      const sent = await sendSegments(event.frame, answer);
+      // A model that could not use a tool sometimes writes the invocation syntax as
+      // prose. It must never reach the user: replace it with a human sentence and
+      // record the turn as failed, so the run trace matches what the user saw.
+      const { text: outbound, leaked } = sanitizeModelReply(answer);
+      if (leaked) {
+        log({ level: "warn", event: "wecom_reply_pseudo_tool_text", action: "replaced" });
+      }
+      const sent = await sendSegments(event.frame, outbound);
+      if (leaked) {
+        return emit({
+          action: "failed",
+          reason: "pseudo_tool_text",
+          phase: "final",
+          kind,
+          status: "failed",
+          runId: typeof record?.runId === "string" ? record.runId : undefined,
+          durationMs: Date.now() - started,
+          segments: sent.total,
+          segmentsDelivered: sent.delivered,
+          replyDelivered: sent.delivered > 0,
+          replyMessageId: sent.replyMessageId,
+          platformErrcode: sent.errcode,
+          ...baseOutcome(event),
+        });
+      }
       return emit({
         action: "replied",
         kind,

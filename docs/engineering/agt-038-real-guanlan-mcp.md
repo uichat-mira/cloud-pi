@@ -111,13 +111,71 @@ run: status=succeeded  durationMs=9926  usage{input:596,output:364}
 4. **`dev` 上两条 Windows-only 既有失败**（`resolveRunsRoot` 的 POSIX 路径、`REPO_ROOT` 跨盘
    `relative`）与本卡无关，修复在另一分支；Linux CI 不受影响。
 5. **模型在无工具时会输出伪工具标记**（如 `||DSML|| invoke bash`）：本卡用 `mcp_server_unavailable`
-   把这种运行判为失败，但"模型自己编造工具调用文本"属于模型行为，长期需在提示词/供应商层面收敛。
+   把这种运行判为失败；t33 起通道出口会把它替换成一句人话并把该轮记为失败（见 §6.5(3)）。
+   但"模型自己编造工具调用文本"属于模型行为，长期仍需在提示词/供应商层面收敛。
+
+## 6.5 复审修复（t33）
+
+独立复审在真实链路上复现了三类问题；三项都在**不改变对外契约**的前提下修复（只做加法与语义修正）。
+
+### (1) `Next cursor` 编码泄漏（隐私）
+
+- **改前**：`guanlan_news_recent` 返回 `Next cursor: base64url({"v":1,"a":"<account uuid>","c":"<consumer uuid>"})`。
+  运行时只对工具结果做 `redactSecrets()`，证据脚本只对**明文** UUID 做 `<uuid>` 掩码。base64url 字符串
+  原样进入 `run.toolCalls[].resultPreview` 与证据文件，**可逆**还原出 account/consumer UUID。
+- **改后**：新增 `src/redaction.mjs#redactOpaqueHandles()`，做**结构化**判定而不是加一条 base64 正则：
+  逐 token 解码 → 必须是 JSON 对象且其中含 UUID → 才判为句柄；命中后**丢弃载荷**，只留
+  `<handle len=<原长度> sha=<token 的 sha256 前 8 位>>`。长度保留"有没有游标"的可观测性，摘要保留
+  两次观测可关联，但都不可逆。明文 UUID 走 `id:<sha8>`。接线点：`src/runtime.mjs`
+  （`inputSummary` / `resultPreview` / `text` 三处）、`scripts/agt-038/live-mcp.mjs`（证据与 MCP 日志尾部）。
+  非句柄文本（普通中文、数字、无 UUID 的 base64）原样保留。
+- **测试**：`tests/agt-038-t33-verify.test.mjs` 用含两个真 UUID 的 `Next cursor` 断言：输出里既不含原
+  UUID、也不含可解码回 UUID 的字符串，且保留 `Next cursor:` 前缀与摘要形态；另断言摘要稳定、不同句柄
+  不碰撞、无 UUID 的 base64 不被误伤。
+
+### (2) fail-closed 运行仍显示成功（一致性）
+
+- **改前**：Guanlan 判定（`mcp_server_unavailable`）发生在 `runtime.run()` **返回之后**，抛出的错误被
+  研究执行器捕获记入 `errors`，但 `record.runtime.status` 仍取 `runtimeResult.status === "succeeded"`，
+  管理 API 与 Trace 会呈现"成功 + 附一条错误"。
+- **改后**：`src/research/runtime/agt-027.mjs` 在 fail-closed 时把已完成的 record 以
+  `status:"failed"` 挂在 `error.runRecord` 上抛出；`src/research/execute.mjs` 捕获后用它构造
+  `runtimeResult`（`status: RUN_STATUS.FAILED`），于是 `resolveRunStatus` 判 `failed`，
+  `record.runtime.status` 也是 `failed`。新增错误码 `ERROR_CODE.MCP_SERVER_UNAVAILABLE`
+  （`mcp_server_unavailable`），不再退化成 `model_error`。
+- **测试**：`tests/research-execute.test.mjs` 的 "fail-closed MCP verdict after the run → persisted as
+  failed, not succeeded"：端口返回 `status:"succeeded"` 的 record 并抛 fail-closed 错误后，落盘的
+  `run.json`（即 `GET /v1/runs/<id>` 的数据源）为 `failed`，`runtime.status === "failed"`，
+  `statusHistory` 末项为 `failed`，错误码可查。
+
+### (3) 通道出口不得投递伪工具文本
+
+- **改前**：模型无法调用工具时会写出 `<||DSML|| invoke …>` 之类的文本，WeCom/Feishu 通道原样发给用户。
+- **改后**：`src/redaction.mjs#sanitizeModelReply()` 在**通道出口**判定并替换成一句人话
+  （"这一轮我没能拿到可用的工具结果，所以先不给结论。…"），并把该轮 outcome 记为
+  `action:"failed"`, `reason:"pseudo_tool_text"`, `status:"failed"`，使 run 记录与实际投递一致。
+- **测试**：通道测试断言用户收到的就是那句人话（不含 `DSML`），同时 outcome 为失败并带 `runId`。
+
+### (4) `live-mcp.mjs` 参数校验
+
+- **改前**：只解析 `--mode=x`，`--mode expired`（空格）被静默丢弃 → 实际以 `happy` 运行，
+  负例会被"验证通过"。
+- **改后**：只接受 `--mode=<value>`；出现位置参数或未知 mode 时输出 `phase:"usage"` 的 JSON 并以
+  **exit 2** 退出，不连接、不调模型。
+- **测试**：`--mode expired` 与 `--mode=nonsense` 都断言 exit 2 且 reason 分别为
+  `unexpected_positional` / `unknown_mode`。
+
+### (5) probe 负例诊断码
+
+- **改前**：连接失败只有 `error.code`（`mcp_http_error` / 超时），401 与网络不可达难以区分。
+- **改后**：`scripts/agt-038/probe-mcp.mjs` 记录 HTTP 观测序列，失败时附
+  `error.diagnostic = { httpStatus, transportCode, attempts }`，成功时附缺失工具清单。
 
 ## 7. 验证命令
 
 ```bash
-npm test                     # 全仓 660/660；本卡新增 18 条（15 单测 + 3 集成）
-npm run test:mcp             # 仅 AGT-038
+npm test                     # 全仓 669/669（本卡新增 6 条：3 句柄脱敏 + 1 伪工具 + 2 参数校验）
+npm run test:mcp             # 仅 AGT-038：26/26
 npm run mcp:probe            # 真实端点：连接 + tools/list（不调模型）
 npm run mcp:live             # 真实模型 + 真实 MCP：--mode=happy|expired|forged|audience-mismatch
 ```

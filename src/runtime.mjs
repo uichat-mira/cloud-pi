@@ -24,6 +24,7 @@ import {
 import { classifyError, RuntimeError } from "./errors.mjs";
 import { CONFIG_KEYS, describeConfig, loadConfig, normalizeConfig, redactSecrets } from "./config.mjs";
 import { createModelRuntime } from "./provider.mjs";
+import { redactOpaqueHandles } from "./redaction.mjs";
 
 const RESULT_PREVIEW_CHARS = 2_000;
 /** Enough to see which parameters a tool was called with, without whole documents. */
@@ -76,7 +77,7 @@ function createRunGuard({ capture, allowedTools, maxToolCalls, onEvent, secrets 
         requestedAt: new Date().toISOString(),
         // Sanitized argument summary: enough to audit a call, never a secret and
         // never a whole document (AGT-038 wants the call traceable in the run).
-        inputSummary: redactSecrets(safeJson(event.input), secrets).slice(0, INPUT_PREVIEW_CHARS),
+        inputSummary: redactOpaqueHandles(redactSecrets(safeJson(event.input), secrets)).slice(0, INPUT_PREVIEW_CHARS),
       };
       capture.records.set(event.toolCallId, record);
       capture.order.push(record);
@@ -111,7 +112,10 @@ function createRunGuard({ capture, allowedTools, maxToolCalls, onEvent, secrets 
       record.status = event.isError ? "error" : "ok";
       record.error = Boolean(event.isError);
       if (typeof record.startedAt === "number") record.durationMs = Date.now() - record.startedAt;
-      record.resultPreview = redactSecrets(textOfContent(event.content), secrets).slice(0, RESULT_PREVIEW_CHARS);
+      record.resultPreview = redactOpaqueHandles(redactSecrets(textOfContent(event.content), secrets)).slice(
+        0,
+        RESULT_PREVIEW_CHARS,
+      );
       emit(onEvent, {
         type: "tool_result",
         tool: event.toolName,
@@ -508,7 +512,7 @@ function buildRunRecord({ runId, config, capture, session, promptError, timedOut
     });
   }
 
-  const text = redactSecrets(textOfContent(lastAssistant?.content ?? []), secrets);
+  const text = redactOpaqueHandles(redactSecrets(textOfContent(lastAssistant?.content ?? []), secrets));
   const toolCalls = capture.order.map((record) => ({
     name: record.name,
     toolCallId: record.id,

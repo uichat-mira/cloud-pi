@@ -309,6 +309,41 @@ test("runtime failure → failed with no report", async (t) => {
   assert.equal(run.paths.sources, "sources.json");
 });
 
+test("fail-closed MCP verdict after the run → persisted as failed, not succeeded", async (t) => {
+  const rootDir = await tempRoot(t);
+  // The port models the real fail-closed rule: the model run finished (status
+  // "succeeded"), then the Guanlan verdict failed the turn. The record must not
+  // be reported as a success to the run store or the management API.
+  const port = {
+    portVersion: RUNTIME_PORT_VERSION,
+    async runAgent() {
+      const error = new Error("mcp_server_unavailable: credential rejected (HTTP 401)");
+      error.code = ERROR_CODE.MCP_SERVER_UNAVAILABLE;
+      error.runRecord = {
+        status: "succeeded",
+        text: "根据我的知识，最近没有新闻。",
+        usage: { ...USAGE, source: "provider" },
+        toolCalls: [],
+      };
+      throw error;
+    },
+  };
+  const record = await executeResearch(
+    { topic: "fail closed" },
+    { runtimePort: port, toolLayer: fixtureToolLayer(), rootDir },
+  );
+  assert.equal(record.status, RUN_STATUS.FAILED);
+  assert.equal(record.runtime.status, RUN_STATUS.FAILED);
+  assert.equal(record.runtime.error.code, ERROR_CODE.MCP_SERVER_UNAVAILABLE);
+  assert.equal(record.paths.report, null);
+  assert.ok(record.errors.some((entry) => entry.code === ERROR_CODE.MCP_SERVER_UNAVAILABLE));
+  // The same record the management API projects: status is failure, not success.
+  const { run } = await readResearchRun(record.runId, { rootDir });
+  assert.equal(run.status, RUN_STATUS.FAILED);
+  assert.equal(run.runtime.status, RUN_STATUS.FAILED);
+  assert.equal(run.statusHistory.at(-1).status, RUN_STATUS.FAILED);
+});
+
 test("completed runtime without a report body → failed with model_error", async (t) => {
   const rootDir = await tempRoot(t);
   const port = scriptedPort(async ({ toolCalls }) => ({

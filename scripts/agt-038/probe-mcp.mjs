@@ -40,22 +40,27 @@ function logTail() {
   }
 }
 
+/** Last transport observations, so a failure can name its cause. */
+const httpTrace = [];
 try {
   const config = loadGuanlanMcpConfig(process.env);
   const traceFetch = async (input, init) => {
     const startedAt = Date.now();
     try {
       const response = await fetch(input, init);
+      httpTrace.push({ status: response.status, ms: Date.now() - startedAt });
       process.stderr.write(
         `${JSON.stringify({ ev: "mcp_http", url: String(input).slice(0, 120), status: response.status, ms: Date.now() - startedAt })}\n`,
       );
       return response;
     } catch (error) {
+      const code = error?.cause?.code ?? error?.code ?? null;
+      httpTrace.push({ status: null, code, message: String(error?.message ?? error).slice(0, 200), ms: Date.now() - startedAt });
       process.stderr.write(
         `${JSON.stringify({
           ev: "mcp_http_error",
           url: String(input).slice(0, 120),
-          code: error?.cause?.code ?? error?.code ?? null,
+          code,
           message: String(error?.message ?? error).slice(0, 200),
           ms: Date.now() - startedAt,
         })}\n`,
@@ -112,11 +117,29 @@ try {
   evidence.waitedMs = Date.now() - startedAt;
   evidence.credential = binding.credentials.describe();
   evidence.ok = evidence.expected.every((name) => evidence.tools.includes(name));
+  evidence.diagnostic = {
+    httpStatus: httpTrace.findLast((entry) => entry.status !== null)?.status ?? null,
+    transportCode: httpTrace.findLast((entry) => entry.code)?.code ?? null,
+    attempts: httpTrace.length,
+    missing: evidence.expected.filter((name) => !evidence.tools.includes(name)),
+  };
   evidence.mcpLogTail = logTail();
   exitCode = evidence.ok ? 0 : 1;
   evidence.exitCode = exitCode;
 } catch (error) {
-  evidence.error = { code: error?.code ?? "error", message: String(error?.message ?? error).slice(0, 400) };
+  const last = httpTrace.findLast((entry) => entry.status !== null);
+  const lastTransport = httpTrace.findLast((entry) => entry.code);
+  evidence.error = {
+    code: error?.code ?? "error",
+    message: String(error?.message ?? error).slice(0, 400),
+    // 401/403 and a transport verdict are different diagnoses; name them so a
+    // negative probe is actionable instead of a generic "no tools".
+    diagnostic: {
+      httpStatus: last?.status ?? null,
+      transportCode: lastTransport?.code ?? null,
+      attempts: httpTrace.length,
+    },
+  };
   evidence.mcpLogTail = logTail();
   exitCode = 1;
   evidence.exitCode = 1;

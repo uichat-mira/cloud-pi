@@ -53,6 +53,11 @@ export const ERROR_CODE = Object.freeze({
   EXTRACT_FAILED: "extract_failed",
   BUDGET_EXCEEDED: "budget_exceeded",
   RUNTIME_UNAVAILABLE: "runtime_unavailable",
+  /**
+   * AGT-038: Guanlan was enabled, no MCP tool succeeded and the transport verdict
+   * was unhealthy — a fail-closed run, not a model failure.
+   */
+  MCP_SERVER_UNAVAILABLE: "mcp_server_unavailable",
   MODEL_ERROR: "model_error",
   CONFIG_ERROR: "config_error",
   INTERNAL_ERROR: "internal_error",

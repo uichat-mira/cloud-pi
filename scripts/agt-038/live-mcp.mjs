@@ -19,17 +19,51 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createAgentRuntime } from "../../src/runtime.mjs";
 import { generateRunId } from "../../src/research/execute.mjs";
 import { createGuanlanMcpBinding, loadGuanlanMcpConfig } from "../../src/mcp/guanlan.mjs";
+import { redactOpaqueHandles } from "../../src/redaction.mjs";
 
-const args = new Map(
-  process.argv
-    .slice(2)
-    .filter((arg) => arg.startsWith("--"))
-    .map((arg) => {
-      const [key, ...rest] = arg.slice(2).split("=");
-      return [key, rest.join("=") || "true"];
-    }),
-);
+const MODES = Object.freeze(["happy", "expired", "forged", "audience-mismatch", "wrong-audience"]);
+
+/**
+ * Accept `--mode=<value>` only, and refuse anything else.
+ *
+ * The earlier parser silently dropped non-`--` arguments, so `--mode expired`
+ * fell through to `happy` and "verified" a successful run for a negative mode.
+ * A spaced flag is now a usage error instead of a different test.
+ */
+function parseArgs(argv) {
+  const values = new Map();
+  const positionals = [];
+  for (const arg of argv) {
+    if (!arg.startsWith("--")) {
+      positionals.push(arg);
+      continue;
+    }
+    const body = arg.slice(2);
+    const separator = body.indexOf("=");
+    if (separator === -1) {
+      values.set(body, "true");
+      continue;
+    }
+    values.set(body.slice(0, separator), body.slice(separator + 1) || "true");
+  }
+  return { values, positionals };
+}
+
+const { values: args, positionals } = parseArgs(process.argv.slice(2));
 const mode = args.get("mode") ?? "happy";
+if (positionals.length > 0 || !MODES.includes(mode)) {
+  const usageError = {
+    event: "agt038_live_mcp",
+    ok: false,
+    phase: "usage",
+    reason: positionals.length > 0 ? "unexpected_positional" : "unknown_mode",
+    argument: positionals[0] ?? mode,
+    allowed: MODES,
+    syntax: "node scripts/agt-038/live-mcp.mjs --mode=<happy|expired|forged|audience-mismatch|wrong-audience>",
+  };
+  process.stdout.write(`${JSON.stringify(usageError)}\n`);
+  process.exit(2);
+}
 const TMP = `${process.env.TEMP}\\gln013-t23`;
 const MCP_LOG = `${TMP}\\t9-mcp.log`;
 
@@ -78,10 +112,11 @@ function expiredTokenFile(path) {
 
 /** Keep evidence free of credentials and of raw account/consumer identifiers. */
 function sanitize(value) {
-  return String(value)
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-    .replace(/[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>")
-    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "<uuid>");
+  return redactOpaqueHandles(
+    String(value)
+      .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
+      .replace(/[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>"),
+  );
 }
 
 /** A forged JWT: right claims, signature nothing Cloud Auth ever produced. */
@@ -106,13 +141,15 @@ function forgedTokenFile(path) {
 function sanitizeLogTail() {
   const text = readFileSafe(MCP_LOG);
   if (!text) return null;
-  return text
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .slice(-12)
-    .join("\n")
-    .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-    .replace(/[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>");
+  return redactOpaqueHandles(
+    text
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-12)
+      .join("\n")
+      .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
+      .replace(/[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>"),
+  );
 }
 
 try {
