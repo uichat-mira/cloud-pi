@@ -37,8 +37,9 @@ export class WecomTransportError extends Error {
 function withTimeout(promise, timeoutMs, code) {
   let timer;
   const timeout = new Promise((_, reject) => {
+    // Deliberately not unref'd: this timer is what turns a silent peer into a
+    // bounded failure, so it must keep the event loop alive until it fires.
     timer = setTimeout(() => reject(new WecomTransportError(code, `timed out after ${timeoutMs}ms`)), timeoutMs);
-    timer.unref?.();
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

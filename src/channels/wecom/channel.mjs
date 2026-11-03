@@ -375,8 +375,9 @@ export function createWecomChannel({
     const drained = await Promise.race([
       whenIdle().then(() => true),
       new Promise((resolve) => {
+        // Not unref'd: shutdown must observe the bounded drain rather than exit
+        // while a run is still unwinding.
         timer = setTimeout(() => resolve(false), timeoutMs);
-        timer.unref?.();
       }),
     ]);
     if (timer) clearTimeout(timer);
