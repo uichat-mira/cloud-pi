@@ -18,9 +18,8 @@
  *   --timeout-ms N                    overall wait (default 180000)
  *   --evidence PATH                   JSONL evidence file
  */
-import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FEISHU_CONFIG_KEYS, maskId } from "../src/channels/feishu/config.mjs";
 import { startFeishuService } from "../src/channels/feishu/service.mjs";
@@ -64,7 +63,23 @@ function packageVersion(relativePath) {
 
 function gitHead() {
   try {
-    return execFileSync("git", ["-C", ROOT, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    let gitDir = join(ROOT, ".git");
+    if (statSync(gitDir).isFile()) {
+      const pointer = readFileSync(gitDir, "utf8").trim();
+      const match = /^gitdir:\s*(.+)$/.exec(pointer);
+      if (!match) return null;
+      gitDir = resolve(ROOT, match[1]);
+    }
+    const head = readFileSync(join(gitDir, "HEAD"), "utf8").trim();
+    if (!head.startsWith("ref: ")) return head;
+    const ref = head.slice(5);
+    try {
+      return readFileSync(join(gitDir, ref), "utf8").trim();
+    } catch {
+      const packed = readFileSync(join(gitDir, "packed-refs"), "utf8");
+      const line = packed.split("\n").find((entry) => entry.endsWith(` ${ref}`));
+      return line ? line.split(" ")[0] : null;
+    }
   } catch {
     return null;
   }

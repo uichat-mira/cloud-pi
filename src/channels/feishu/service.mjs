@@ -66,13 +66,14 @@ export async function startFeishuService({
         botOpenId: started.botOpenId ? maskId(started.botOpenId) : undefined,
       },
       async stop({ timeoutMs = 5_000 } = {}) {
+        let drained;
         try {
           transport.stop();
         } finally {
-          const drained = await channel.stopAll({ timeoutMs });
+          drained = await channel.stopAll({ timeoutMs });
           await agent.dispose();
-          return drained;
         }
+        return drained;
       },
     };
   } catch (error) {
