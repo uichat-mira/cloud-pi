@@ -23,7 +23,6 @@ import {
   DELIVERY_ERROR,
   DELIVERY_KIND,
   DELIVERY_LIMITS,
-  DELIVERY_RUN_STATUS,
   DELIVERY_STATUS,
   DeliveryError,
   buildDeliveryKey,
@@ -345,7 +344,6 @@ export function createDeliveryCoordinator({
         logger.warn?.(`delivery: ${runId} has no report although expected (${plan.kind})`);
         return {
           ...baseSummary(input, { reason: "report_missing", records }),
-          deliveryStatus: DELIVERY_RUN_STATUS.FAILED,
           reportReadError: readError ? String(readError.message ?? readError) : null,
         };
       }
