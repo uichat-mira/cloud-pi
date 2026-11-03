@@ -18,7 +18,11 @@
  * never message text, topic, raw ids or credentials.
  *
  *   node --env-file-if-exists=.env scripts/agt-033/live-delivery-evidence.mjs \
- *     [--wait-dm-seconds 240] [--append]
+ *     [--wait-dm-seconds 240] [--append] [--personal-only]
+ *
+ * `--personal-only` is the maintainer-approved final-head re-check: one real
+ * personal message, no group message. It writes
+ * `poc/evidence/agt-033-live-final-head.jsonl` by default.
  *
  * Exit code 0 means every required check below passed; otherwise the evidence
  * line is still written with `verified:false` and the process fails.
@@ -43,7 +47,17 @@ function argValue(name, fallback) {
 const waitDmSeconds = Number(argValue("--wait-dm-seconds", "240"));
 const append = args.includes("--append");
 const dryRun = args.includes("--dry-run");
-const outPath = argValue("--out", join(repoRoot, "poc", "evidence", "agt-033-live-delivery.jsonl"));
+const personalOnly = args.includes("--personal-only");
+const codeCommit = (process.env.AGT_033_CODE_COMMIT ?? "uncommitted").trim();
+const outPath = argValue(
+  "--out",
+  join(
+    repoRoot,
+    "poc",
+    "evidence",
+    personalOnly ? "agt-033-live-final-head.jsonl" : "agt-033-live-delivery.jsonl",
+  ),
+);
 const stateRoot = join(repoRoot, ".work", "agt-033", `live-${Date.now()}`);
 
 const REPORT_TEXT = [
@@ -89,11 +103,11 @@ function sanitize(text, secrets = []) {
 
 async function main() {
   const config = loadFeishuConfig(process.env);
-  if (!config.allowedChatIds.length) {
+  if (!personalOnly && !config.allowedChatIds.length) {
     throw new Error("FEISHU_ALLOWED_CHAT_IDS is empty; no authorized test group is configured");
   }
-  const groupChatId = config.allowedChatIds[0];
-  const secrets = [config.appSecret, groupChatId];
+  const groupChatId = personalOnly ? undefined : config.allowedChatIds[0];
+  const secrets = [config.appSecret, groupChatId].filter(Boolean);
 
   let personalOpenId = (process.env.FEISHU_TEST_OPEN_ID ?? "").trim();
   let personalSource = "env:FEISHU_TEST_OPEN_ID";
@@ -114,6 +128,16 @@ async function main() {
       pendingPrivate?.resolve?.(event.senderOpenId);
     },
   });
+
+  const diagnostics = transport.diagnostics();
+  if (personalOnly && !diagnostics.dedicatedSendClient) {
+    throw new Error("personal-only live check requires the dedicated send client");
+  }
+  if (diagnostics.sharedDefaultsTimeout !== 0) {
+    throw new Error(
+      `shared httpInstance.defaults.timeout must stay 0, got ${String(diagnostics.sharedDefaultsTimeout)}`,
+    );
+  }
 
   const sendLog = [];
   async function sendMessage(request) {
@@ -153,7 +177,7 @@ async function main() {
       pendingPrivate = { resolve: resolveCapture };
       await transport.start();
       transportStarted = true;
-      console.log("等待维护者私聊：请用要作为个人目标的飞书账号给 Mira 机器人发任意一条私聊消息（无需 @）。");
+      console.log("READY: 等待维护者私聊；请用要作为个人目标的飞书账号给 Mira 机器人发任意一条私聊消息（无需 @）。");
       dmTimer = setTimeout(
         () => rejectCapture(new Error(`no private Feishu message received within ${waitDmSeconds}s`)),
         waitDmSeconds * 1000,
@@ -181,7 +205,7 @@ async function main() {
     // Sending via im.message.create does not require the long connection; it is
     // started above only when the personal open_id must be captured from a DM.
 
-    console.log(`测试群目标：${maskId(groupChatId)}（唯一授权群）`);
+    if (!personalOnly) console.log(`测试群目标：${maskId(groupChatId)}（唯一授权群）`);
     const runsDir = join(stateRoot, "runs");
     await mkdir(stateRoot, { recursive: true });
 
@@ -203,7 +227,7 @@ async function main() {
     const scheduleId = `live-${Date.now()}`;
     const deliveryTargets = [
       { type: "open_id", id: personalOpenId, label: "维护者私聊" },
-      { type: "chat_id", id: groupChatId, label: "测试群" },
+      ...(personalOnly ? [] : [{ type: "chat_id", id: groupChatId, label: "测试群" }]),
     ];
     await delivering.scheduler.createSchedule({
       scheduleId,
@@ -226,15 +250,22 @@ async function main() {
       (target) => target.destination.type === "chat_id" && target.destination.maskedId === maskId(groupChatId),
     );
     const personalSent = personal?.status === "sent" && Boolean(personal?.messageId);
-    const groupSent = group?.status === "sent" && Boolean(group?.messageId);
+    const groupSent = personalOnly
+      ? true
+      : group?.status === "sent" && Boolean(group?.messageId);
     console.log(`个人投递：${personal?.status ?? "missing"}（attempts=${personal?.attempts ?? 0}）`);
-    console.log(`群投递：${group?.status ?? "missing"}（attempts=${group?.attempts ?? 0}）`);
+    if (!personalOnly) console.log(`群投递：${group?.status ?? "missing"}（attempts=${group?.attempts ?? 0}）`);
     if (!personalSent || !groupSent) {
-      throw new Error(`required live sends not both sent: personal=${personal?.status} group=${group?.status}`);
+      throw new Error(
+        `required live sends missing: personal=${personal?.status} group=${personalOnly ? "skipped" : group?.status}`,
+      );
     }
+    const expectedRealSends = personalOnly ? 1 : 2;
     const realSendCount = sendLog.length;
-    if (realSendCount !== 2) {
-      throw new Error(`expected exactly 2 real messages (one per real destination), sent ${realSendCount}`);
+    if (realSendCount !== expectedRealSends) {
+      throw new Error(
+        `expected exactly ${expectedRealSends} real message(s), sent ${realSendCount}`,
+      );
     }
 
     // Idempotency: duplicate completion callbacks plus a fresh coordinator
@@ -297,17 +328,16 @@ async function main() {
     );
     const failureIsolation =
       bogusTarget?.status === "failed" &&
-      bogusAttempts >= 1 &&
-      bogusAttempts <= 3 &&
+      bogusAttempts === 1 &&
       bogusSendSuccesses === 0 &&
       personalAfter?.status === "sent" &&
       personalAfter?.messageId === personal?.messageId &&
-      groupAfter?.status === "sent" &&
-      groupAfter?.messageId === group?.messageId &&
+      (personalOnly ||
+        (groupAfter?.status === "sent" && groupAfter?.messageId === group?.messageId)) &&
       finalView.researchStatus === "completed" &&
       finalView.deliveryStatus === "partial" &&
-      finalView.counts.total === 3 &&
-      finalView.counts.sent === 2 &&
+      finalView.counts.total === (personalOnly ? 2 : 3) &&
+      finalView.counts.sent === (personalOnly ? 1 : 2) &&
       finalView.counts.failed === 1;
     console.log(
       `失败隔离：不可达目标=${bogusTarget?.status ?? "missing"}（尝试 ${bogusAttempts} 次），"研究=${finalView.researchStatus}，投递=${finalView.deliveryStatus}`,
@@ -317,7 +347,7 @@ async function main() {
     const checks = {
       personalSent,
       groupSent,
-      oneMessagePerRealDestination: realSendCount === 2,
+      oneMessagePerRealDestination: realSendCount === expectedRealSends,
       idempotentReplay,
       failureIsolation,
     };
@@ -327,6 +357,13 @@ async function main() {
       generatedAt: new Date().toISOString(),
       node: process.version,
       sdk: "@larksuiteoapi/node-sdk@1.76.0 im.message.create",
+      codeCommit,
+      mode: personalOnly ? "personal-only-final-head" : "personal-and-group",
+      transport: {
+        dedicatedSendClient: diagnostics.dedicatedSendClient,
+        sendTimeoutMs: diagnostics.sendTimeoutMs,
+        sharedDefaultsTimeoutAfterCreate: diagnostics.sharedDefaultsTimeout,
+      },
       research: {
         runId: trigger.runId,
         scheduleId,
@@ -343,14 +380,16 @@ async function main() {
         messageId: personalAfter?.messageId ?? null,
         sentAt: personalAfter?.sentAt ?? null,
       },
-      groupTarget: {
-        type: "chat_id",
-        maskedId: maskId(groupChatId),
-        status: groupAfter?.status ?? null,
-        attempts: groupAfter?.attempts ?? 0,
-        messageId: groupAfter?.messageId ?? null,
-        sentAt: groupAfter?.sentAt ?? null,
-      },
+      groupTarget: personalOnly
+        ? null
+        : {
+            type: "chat_id",
+            maskedId: maskId(groupChatId),
+            status: groupAfter?.status ?? null,
+            attempts: groupAfter?.attempts ?? 0,
+            messageId: groupAfter?.messageId ?? null,
+            sentAt: groupAfter?.sentAt ?? null,
+          },
       sendCount: {
         realMessages: realSendCount,
         afterDuplicateCallbacks: duplicateCallbackSends,
@@ -361,7 +400,8 @@ async function main() {
         coordinatorRestart: true,
         noAdditionalMessages: idempotentReplay,
         expectedMessageIdsUnchanged:
-          personalAfter?.messageId === personal?.messageId && groupAfter?.messageId === group?.messageId,
+          personalAfter?.messageId === personal?.messageId &&
+          (personalOnly || groupAfter?.messageId === group?.messageId),
       },
       failureIsolation: {
         injectedDestination: { type: "open_id", maskedId: maskId(UNREACHABLE_OPEN_ID) },
@@ -375,7 +415,8 @@ async function main() {
         counts: finalView.counts,
         researchStatusAfter: finalView.researchStatus,
         otherTargetsUnchanged:
-          personalAfter?.messageId === personal?.messageId && groupAfter?.messageId === group?.messageId,
+          personalAfter?.messageId === personal?.messageId &&
+          (personalOnly || groupAfter?.messageId === group?.messageId),
       },
       checks,
       verified,

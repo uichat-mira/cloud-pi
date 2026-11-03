@@ -400,5 +400,11 @@ export function createFeishuTransport({
     send,
     probeBotOpenId,
     getBotOpenId: () => botOpenId,
+    /** Read-only diagnostics for live evidence: isolation + shared defaults. */
+    diagnostics: () => ({
+      dedicatedSendClient: sendingClient !== client,
+      sendTimeoutMs,
+      sharedDefaultsTimeout: client?.httpInstance?.defaults?.timeout ?? null,
+    }),
   };
 }
