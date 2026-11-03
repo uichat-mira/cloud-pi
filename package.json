@@ -23,6 +23,8 @@
     "test:scheduler": "node --test tests/scheduler-t1.test.mjs tests/scheduler-t2.test.mjs tests/scheduler-t3.test.mjs",
     "test:api": "node --test \"tests/agt-034-*.test.mjs\"",
     "api:smoke": "node scripts/agt-034/api-smoke.mjs",
+    "test:targets": "node --test \"tests/agt-035-*.test.mjs\"",
+    "collaboration:evidence": "node scripts/agt-035/live-collaboration-evidence.mjs",
     "scheduler:poc": "node scripts/scheduler-poc-evidence.mjs"
   },
   "dependencies": {
