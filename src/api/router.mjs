@@ -88,13 +88,12 @@ const ROUTES = [
     run: (c, { params }) => c.getRunReport(params.runId),
   },
   {
-    // Conditional closure: no delivery endpoint exists because the current dev
-    // baseline has no AGT-033 delivery contract. This route exists only to
-    // return a stable, documented 404 instead of aliasing a nonexistent state.
+    // The optional reader delegates to AGT-033; this route never writes
+    // or reimplements the delivery store.
     name: "runs.delivery",
     method: "GET",
     pattern: ["v1", "runs", ":runId", "delivery"],
-    run: (c) => c.deliveryNotAvailable(),
+    run: (c, { params }) => c.getRunDelivery(params.runId),
   },
 ];
 

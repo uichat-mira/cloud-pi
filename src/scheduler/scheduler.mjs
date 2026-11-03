@@ -33,6 +33,7 @@ import {
   SchedulerError,
   isTerminalTriggerStatus,
   mapResearchStatusToTriggerStatus,
+  normalizeDeliveryTargets,
 } from "./contracts.mjs";
 import {
   cloneSchedule,
@@ -53,7 +54,7 @@ const DEFAULT_TICK_INTERVAL_MS = 30_000;
  * lifecycle changes go through pause/enable and the scheduler's own state
  * machine, so an API cannot forge a lease or skip a persisted occurrence.
  */
-const UPDATABLE_SCHEDULE_FIELDS = new Set(["name", "timezone", "kind", "cron", "at", "request"]);
+const UPDATABLE_SCHEDULE_FIELDS = new Set(["name", "timezone", "kind", "cron", "at", "request", "deliveryTargets"]);
 const TIMING_FIELDS = ["kind", "timezone", "cron", "at"];
 
 function isPlainObject(value) {
@@ -256,6 +257,24 @@ class Scheduler {
         );
       }
 
+      // Reconciliation replays the last terminal trigger with the currently
+      // persisted targets. A target change after a run could leak an old report
+      // to a newly added recipient; guard until per-trigger snapshots exist.
+      const deliveryTargets = "deliveryTargets" in patch
+        ? normalizeDeliveryTargets(patch.deliveryTargets)
+        : normalizeDeliveryTargets(current.deliveryTargets);
+      const identities = (targets) => targets.map((target) => target.type + ":" + target.id).sort().join("|");
+      if (
+        "deliveryTargets" in patch &&
+        identities(deliveryTargets) !== identities(normalizeDeliveryTargets(current.deliveryTargets)) &&
+        (current.stats?.triggers ?? 0) > 0
+      ) {
+        throw new SchedulerError(
+          SCHEDULER_ERROR.CONFLICT,
+          "delivery recipient identities cannot change after a trigger; create a new schedule",
+        );
+      }
+
       const timingChanged = TIMING_FIELDS.some((field) => field in patch);
       if (current.status === SCHEDULE_STATUS.COMPLETED && !timingChanged) {
         throw new SchedulerError(
@@ -302,6 +321,7 @@ class Scheduler {
       const candidate = cloneSchedule(current);
       candidate.name = "name" in patch ? name : current.name;
       candidate.request = request;
+      candidate.deliveryTargets = [...deliveryTargets];
 
       if (timingChanged) {
         const input = {
@@ -310,6 +330,7 @@ class Scheduler {
           timezone: "timezone" in patch ? patch.timezone : current.timezone,
           request,
           name,
+          deliveryTargets,
         };
         if (nextKind === SCHEDULE_KIND.ONCE) input.at = "at" in patch ? patch.at : current.onceAt;
         else input.cron = "cron" in patch ? patch.cron : current.cron;

@@ -130,8 +130,8 @@ function projectActiveTrigger(activeTrigger) {
  * Project one schedule. `includeTriggers` is bounded so a list response stays
  * small; detail responses include the most recent audit entries only.
  *
- * There is deliberately no `deliveryTargets` / delivery field: the current dev
- * baseline does not contain the AGT-033 delivery contract (see the design note).
+ * Trusted local management clients receive configured targets for edits.
+ * Delivery status diagnostics expose masked recipient IDs instead.
  */
 export function toScheduleView(schedule, { includeTriggers = false } = {}) {
   if (!isObject(schedule)) return null;
@@ -145,6 +145,13 @@ export function toScheduleView(schedule, { includeTriggers = false } = {}) {
     onceAt: typeof schedule.onceAt === "string" ? schedule.onceAt : null,
     onceAtUtc: typeof schedule.onceAtUtc === "string" ? schedule.onceAtUtc : null,
     request: projectRequest(schedule.request),
+    deliveryTargets: Array.isArray(schedule.deliveryTargets)
+      ? schedule.deliveryTargets.map((target) => ({
+          type: target.type,
+          id: target.id,
+          ...(typeof target.label === "string" ? { label: target.label } : {}),
+        }))
+      : [],
     status: schedule.status,
     missedRunPolicy: schedule.missedRunPolicy,
     createdAt: schedule.createdAt,
@@ -287,5 +294,49 @@ export function toReportView(run, report, sources) {
     sourcesSummary: projectSourcesSummary(run.sourcesSummary),
     sources: bounded.map(toSourceView).filter(Boolean),
     sourcesTruncated: list.length > bounded.length,
+  };
+}
+
+/** Read-only projection of AGT-033 results: no raw recipient IDs,
+ * persisted delivery keys or untrusted error message text. */
+export function toDeliveryView(delivery, { runId, researchStatus } = {}) {
+  if (!delivery) {
+    return {
+      runId,
+      researchStatus: researchStatus ?? null,
+      triggerStatus: null,
+      deliveryStatus: "none",
+      counts: { total: 0, sent: 0, failed: 0, pending: 0 },
+      targets: [],
+    };
+  }
+  const targets = Array.isArray(delivery.targets) ? delivery.targets : [];
+  return {
+    runId,
+    researchStatus: researchStatus ?? null,
+    triggerStatus: typeof delivery.triggerStatus === "string" ? delivery.triggerStatus : null,
+    deliveryStatus: delivery.deliveryStatus,
+    counts: Object.fromEntries(
+      ["total", "sent", "failed", "pending"].map((key) => [
+        key, Number.isSafeInteger(delivery.counts?.[key]) ? delivery.counts[key] : 0,
+      ]),
+    ),
+    targets: targets.slice(0, 10).map((target) => ({
+      destination: {
+        type: target.destination?.type ?? "unknown",
+        maskedId: target.destination?.maskedId ?? "",
+      },
+      status: target.status,
+      attempts: Number.isSafeInteger(target.attempts) ? target.attempts : 0,
+      deliveryKind: target.deliveryKind,
+      sentAt: target.sentAt ?? null,
+      messageId: target.messageId ?? null,
+      lastError: target.lastError ? {
+        code: typeof target.lastError.code === "string" ? target.lastError.code : "internal_error",
+        retryable: target.lastError.retryable === true,
+        feishuCode: typeof target.lastError.feishuCode === "number" ? target.lastError.feishuCode : null,
+        at: target.lastError.at ?? null,
+      } : null,
+    })),
   };
 }

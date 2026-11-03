@@ -177,7 +177,7 @@ test("T1 schedule schema errors map to invalid_request", async (t) => {
   assert.equal(errorOf(badEnabled).code, "invalid_request");
 });
 
-test("T1 create returns 201 with Location and no internal/delivery fields", async (t) => {
+test("T1 create returns 201 with Location, public target config and no internal fields", async (t) => {
   const clock = createFakeClock("2026-11-03T00:00:00Z");
   const harness = await startApiHarness(t, { clock, port: completedPort() });
   const created = await harness.request("POST", "/v1/schedules", {
@@ -195,7 +195,7 @@ test("T1 create returns 201 with Location and no internal/delivery fields", asyn
   assert.equal(schedule.nextRunAt, "2026-11-03T01:00:00.000Z");
   assert.equal(schedule.request.topic, baseRequest().topic);
   assert.ok(!("paths" in schedule));
-  assert.ok(!("deliveryTargets" in schedule));
+  assert.deepEqual(schedule.deliveryTargets, []);
   assert.ok(!("delivery" in schedule));
   assert.ok(!("stateDir" in created.body.data));
 
@@ -212,13 +212,13 @@ test("T1 create returns 201 with Location and no internal/delivery fields", asyn
   assert.ok(Array.isArray(detail.body.data.schedule.recentTriggers));
 });
 
-test("T1 delivery remains a documented conditional closure, never a state endpoint", async (t) => {
+test("T1 delivery fails explicitly without an AGT-033 delivering scheduler", async (t) => {
   const clock = createFakeClock("2026-11-03T00:00:00Z");
   const harness = await startApiHarness(t, { clock, port: completedPort() });
   const delivery = await harness.request("GET", "/v1/runs/r-20261103T000000-abcdef/delivery");
   assert.equal(delivery.status, 404);
   assert.equal(errorOf(delivery).code, "not_found");
-  assert.match(errorOf(delivery).message, /AGT-033 delivery contract is not part of the current dev source/);
+  assert.match(errorOf(delivery).message, /delivery status reader is not configured/);
   assert.equal(delivery.body.data, undefined);
 });
 

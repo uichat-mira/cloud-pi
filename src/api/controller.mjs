@@ -12,10 +12,10 @@
  */
 import { listResearchRuns, readResearchRun } from "../research/index.mjs";
 import { API_ERROR, ApiError } from "./contracts.mjs";
-import { toReportView, toRunView, toScheduleView, toTriggerView } from "./views.mjs";
+import { toDeliveryView, toReportView, toRunView, toScheduleView, toTriggerView } from "./views.mjs";
 
 export const DELIVERY_UNAVAILABLE_MESSAGE =
-  "delivery status is not available in this baseline: the AGT-033 delivery contract is not part of the current dev source";
+  "delivery status reader is not configured; use the AGT-033 delivering scheduler composition root";
 
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -41,7 +41,9 @@ function parseRunLimit(raw) {
  * @param {() => Date} [options.now]
  * @param {object} [options.logger]
  */
-export function createApiController({ scheduler, runsDir, env = process.env, now = () => new Date(), logger = {} } = {}) {
+export function createApiController({
+  scheduler, getRunDelivery, runsDir, env = process.env, now = () => new Date(), logger = {},
+} = {}) {
   if (!scheduler || typeof scheduler.listSchedules !== "function") {
     throw new TypeError("createApiController requires a scheduler instance");
   }
@@ -84,10 +86,8 @@ export function createApiController({ scheduler, runsDir, env = process.env, now
             : null,
         },
         capabilities: {
-          // Conditional closure: the AGT-033 delivery contract is not in this
-          // baseline, so no delivery endpoint or stored delivery state exists.
-          deliveryStatus: false,
-          deliveryReason: DELIVERY_UNAVAILABLE_MESSAGE,
+          deliveryStatus: typeof getRunDelivery === "function",
+          deliveryReason: typeof getRunDelivery === "function" ? null : DELIVERY_UNAVAILABLE_MESSAGE,
           publicListener: false,
           authentication: "none (loopback-only local API; Cloud Auth delegation is a later card)",
         },
@@ -240,8 +240,14 @@ export function createApiController({ scheduler, runsDir, env = process.env, now
       return { report: toReportView(run, report, sources) };
     },
 
-    deliveryNotAvailable() {
-      throw new ApiError(API_ERROR.NOT_FOUND, DELIVERY_UNAVAILABLE_MESSAGE);
+    async getRunDelivery(runId) {
+      if (typeof getRunDelivery !== "function") {
+        throw new ApiError(API_ERROR.NOT_FOUND, DELIVERY_UNAVAILABLE_MESSAGE);
+      }
+      // Establish the Research fact first; a nonexistent run is not "none".
+      const { run } = await readResearchRun(runId, researchReadOptions);
+      const delivery = await getRunDelivery(runId);
+      return { delivery: toDeliveryView(delivery, { runId, researchStatus: run.status }) };
     },
 
     logger,

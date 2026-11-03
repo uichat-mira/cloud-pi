@@ -38,5 +38,5 @@ export {
 export { formatListenAddress, normalizeApiHost, normalizeApiPort } from "./policy.mjs";
 export { createApiController } from "./controller.mjs";
 export { createApiRouter, mapApiError } from "./router.mjs";
-export { toReportView, toRunView, toScheduleView, toSourceView, toTriggerView } from "./views.mjs";
+export { toDeliveryView, toReportView, toRunView, toScheduleView, toSourceView, toTriggerView } from "./views.mjs";
 export { createManagementApi } from "./server.mjs";

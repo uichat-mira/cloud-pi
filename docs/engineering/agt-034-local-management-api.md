@@ -34,26 +34,34 @@ HTTP facade that:
 It is a local development/internal boundary. Rebinding it to `0.0.0.0`, `::`,
 a LAN address or a hostname is refused before a socket exists.
 
-## 2. Conditional delivery closure (read this before reviewing endpoints)
+## 2. AGT-033 integration at acceptance
 
-Issue #16 says delivery detail is exposed **only if AGT-033 is already present
-in the implementation baseline**. It is not: `origin/dev` at `fad03f8` contains
-no `src/delivery/`, no `deliveryTargets` schedule contract and no delivery
-store. AGT-033's Draft PR is separate and unmerged.
+This Draft was initially based on dev before AGT-033 existed. At acceptance,
+AGT-033 PR #18 has entered dev, so Issue #16 now requires the delivery
+read path. This repair consumes the existing AGT-033 public composition root,
+not a duplicated delivery store or state machine.
 
-This card therefore:
+Create a delivering scheduler with createDeliveringScheduler(), and pass it
+through the deliveringScheduler option to createManagementApi(). The API
+delegates schedule operations to the same scheduler and delivery reads to
+getRunDelivery(). Its status endpoint reports deliveryStatus=true only when
+this composition root is supplied. A legacy caller passing a standalone
+Scheduler still gets deliveryStatus=false and a documented 404.
 
-- does **not** copy AGT-033 code, contract or state;
-- does **not** implement `/v1/runs/:runId/delivery`, a delivery store or a
-  `deliveryTargets` field;
-- returns a stable documented `404 not_found` for the delivery route with an
-  explicit reason, and reports `capabilities.deliveryStatus: false` in
-  `/v1/status`;
-- does not stack on the AGT-033 branch.
+The API projects validated deliveryTargets for trusted loopback callers,
+allowing creation and PATCH edits before the first trigger. After any trigger,
+recipient identity changes fail with 409 conflict: the delivery startup
+reconciliation currently replays a terminal run using the schedule current
+recipient list. Otherwise a new recipient could unexpectedly receive an
+old report. Editing labels or reordering the same identities remains allowed;
+create a new schedule for a recipient change after execution until an
+immutable per-trigger target snapshot contract exists.
 
-When AGT-033 lands, a follow-up card can add the delivery read route and the
-`deliveryTargets` write field against its final contract. Until then, absence is
-intentional and visible to a console, not a silently missing field.
+GET /v1/runs/:runId/delivery checks that the Research run exists, calls the
+AGT-033 read method, and projects the research status alongside masked
+recipient IDs, per-destination delivery status, counts, attempts and message
+IDs. Raw delivery keys, raw recipient IDs and raw error messages are never
+returned in delivery diagnostics.
 
 ## 3. Ownership and module layout
 
@@ -107,7 +115,7 @@ untouched. No status machine, timer, lease or dedupe rule was rewritten.
 | GET | `/v1/runs` | list runs (`limit`, optional `scheduleId`) | 200 |
 | GET | `/v1/runs/:runId` | run detail | 200 |
 | GET | `/v1/runs/:runId/report` | report text + bounded source ledger | 200 |
-| GET | `/v1/runs/:runId/delivery` | conditional closure: documented 404 | 404 |
+| GET | /v1/runs/:runId/delivery | read AGT-033 delivery when configured | 200 / 404 |
 
 Notes:
 
@@ -203,7 +211,7 @@ Never returned: absolute state/run paths, `paths` object, transcript, raw
 environment, API keys, Feishu credentials, Cloud Session, Authorization headers,
 model base URL, request headers, HTTP bodies, full internal errors/stacks.
 
-Returned for a schedule: id, name, kind, timezone, cron/once, reviewed research
+Returned for a schedule (trusted loopback caller): validated deliveryTargets plus id, name, kind, timezone, cron/once, reviewed research
 request (`topic`, `goal`, `timeRange`, limits), status, next/completed times,
 `lastRun`, `activeTrigger`, stats and bounded recent triggers.
 
@@ -222,10 +230,11 @@ appear in responses or captured logs.
 
 ### update
 
-Accepted fields only: `name`, `timezone`, `kind`, `cron`, `at`, `request`.
-Unknown, internal and lifecycle fields (`scheduleId`, `status`, `enabled`,
-`triggers`, `activeTrigger`, `nextRunAt`, `stats`, `lastRun`, delivery fields)
-are `invalid_request`. An empty patch is refused.
+Accepted fields only: name, timezone, kind, cron, at, request and
+deliveryTargets. The latter is validated by AGT-033 and may be changed only
+before the first trigger (or reordered/relabelled without changing recipient
+identities). Unknown, identity, lifecycle, lease and internal state fields are
+invalid_request. An empty patch is refused.
 
 - **In-flight fail closed:** if the schedule has a persisted `activeTrigger` or
   a live execution controller, update returns `conflict`. Writing a definition
@@ -378,7 +387,7 @@ values. Ports are ephemeral and differ per run.
   trusted. Do not expose this listener through a proxy/public bind.
 - **No public listener, TLS, CORS, rate limiting or hardening.** Only the 64 KiB
   body cap, list limit and scheduler's own concurrency limit apply.
-- **No delivery endpoint/state.** Conditional closure described in §2.
+- **Delivery read is sourced from AGT-033** when the delivering scheduler is configured; otherwise deliveryStatus=false and a documented 404.
 - **No real model/network live run** in this card's evidence. The smoke/API
   integration uses the repository's deterministic runtime/tool fixture; the real
   AGT-028 executor and run store are exercised, but not a live provider.
@@ -394,4 +403,16 @@ values. Ports are ephemeral and differ per run.
 - **`GET /v1/status` scans the run directory** to count runs. Fine for the local
   POC; a future production store should provide a bounded summary query.
 - **No browser console**, UI route or Cloud Auth page.
-- **No merge, Issue closure or deployment.** The PR is a Draft to `dev`.
+- **No deployment.** Merge and closure require separate maintainer acceptance.
+
+
+## Acceptance integration evidence (2026-11-03)
+
+AGT-032 and AGT-033 were merged into dev before the AGT-034 acceptance
+review. The focused agt-034-delivery-integration.test.mjs executes real
+loopback HTTP, Scheduler, Research executor/run store and Delivery
+coordinator/store, with deterministic model/tool and outbound Feishu
+network boundaries. It verifies recipient editing before execution,
+rejection of recipient-identity changes after execution, masked delivery
+reads, missing-run 404 and restart idempotency. It is not a live provider
+or deployed production test.

@@ -84,8 +84,15 @@ export function createManagementApi(options = {}) {
     : API_LIMITS.defaultShutdownTimeoutMs;
   const logger = options.logger ?? {};
 
+  const delivering = options.deliveringScheduler ?? null;
+  if (delivering && options.scheduler && options.scheduler !== delivering.scheduler) {
+    throw new TypeError("scheduler must match deliveringScheduler.scheduler");
+  }
   const controller = createApiController({
-    scheduler: options.scheduler,
+    scheduler: delivering?.scheduler ?? options.scheduler,
+    getRunDelivery: typeof delivering?.getRunDelivery === "function"
+      ? (runId) => delivering.getRunDelivery(runId)
+      : null,
     runsDir: options.runsDir,
     env: options.env,
     now: options.now,
