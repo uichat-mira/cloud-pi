@@ -23,7 +23,10 @@ const CASES = [
   { name: "preflight", argv: ["scripts/agt-03x/preflight.mjs"], expectExit: 3, expect: /结论：blocker/ },
   { name: "preflight/json", argv: ["scripts/agt-03x/preflight.mjs", "--json"], expectExit: 3, expect: /"verdict":\s*"blocker"/ },
   { name: "A/offline", argv: ["scripts/agt-03x/a-wecom-live-reply.mjs", "--offline"], expectExit: 3, expect: /"check":"self-test","status":"pass"/ },
-  { name: "A/real-no-creds", argv: ["scripts/agt-03x/a-wecom-live-reply.mjs"], expectExit: 3, expect: /"check":"capability","status":"blocker"/ },
+  // The WeCom driver now exists (`npm run wecom:live`), so the capability gate no
+  // longer fires and the first fail-closed reason is the credential checklist.
+  // Either gate is an acceptable blocker; what must never happen is exit 0.
+  { name: "A/real-no-creds", argv: ["scripts/agt-03x/a-wecom-live-reply.mjs"], expectExit: 3, expect: /"check":"(?:capability|pre-P\d+)","status":"blocker"/ },
   { name: "B/offline", argv: ["scripts/agt-03x/b-scheduled-research-delivery.mjs", "--offline"], expectExit: 3, expect: /7\/7 bundled cases matched/ },
   { name: "B/real-no-creds", argv: ["scripts/agt-03x/b-scheduled-research-delivery.mjs"], expectExit: 3, expect: /"check":"api","status":"blocker"/ },
   { name: "C/offline", argv: ["scripts/agt-03x/c-feishu-regression.mjs"], expectExit: 3, expect: /"check":"C1","status":"pass"/ },

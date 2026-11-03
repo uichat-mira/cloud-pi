@@ -58,7 +58,7 @@
 
 ### 2.4 脱敏
 
-对三份交付做了严格模式扫描（`eyJ` 开头的 JWT、`sk-` 长串、`-----BEGIN`、`Bearer ` 后接 20+ 字符、`ou_`/`oc_`/`om_`/`on_`/`cli_` 长值、完整 UUID）：**零命中**。
+对三份交付做了严格模式扫描（`eyJ` 开头的 JWT、`sk-` 长串、PEM 私钥头（BEGIN 行）、`Bearer ` 后接 20+ 字符、`ou_`/`oc_`/`om_`/`on_`/`cli_` 长值、完整 UUID）：**零命中**。
 
 - #27 新增的探针在**运行时**用 `generateKeyPair("EdDSA", { crv: "Ed25519" })` 生成密钥对（`scripts/gln-014-contract-probe.mjs:130`），仓库内没有私钥材料；打印的 `account-probe` / `consumer-probe` 是合成标识。
 - #134、#21 均只含文档，无任何标识或密钥。
@@ -148,9 +148,12 @@ node $ATT/file-line-check.mjs <cloud-mcp-guanlan checkout>  $ATT/cloud-mcp-guanl
 ### 4.3 脱敏扫描
 
 ```bash
-node -e "…eyJ|sk-|-----BEGIN|ou_|oc_|cli_|Bearer+20… 严格模式扫描三份交付…"
+node -e "…JWT / sk- / PEM 私钥头 / ou_ / oc_ / cli_ / Bearer+20 严格模式扫描三份交付…"
 # → 三份均 CLEAN
 ```
+
+> 上面是**示意命令**（不是可直接复制的原文）：扫描模式中的 PEM 私钥头用文字描述，
+> 以免这段文档被自己的指纹扫描命中。
 
 ### 4.4 CI 与元数据
 

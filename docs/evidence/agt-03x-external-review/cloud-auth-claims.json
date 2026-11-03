@@ -336,7 +336,7 @@
     "re": "introspect"
   },
   {
-    "id": "A46-contract-test-no-session-material",
+    "id": "A46-no-session-material",
     "file": "apps/api/tests/contract/service-credential-issuance-contract.test.ts",
     "from": 42,
     "to": 42,
