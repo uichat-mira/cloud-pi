@@ -1,7 +1,7 @@
 # AGT-03x 验收执行包离线自测（真实执行输出，非手写）
 
-生成时间：2026-11-03T18:03:13.585Z
-HEAD：f52eb68915f5b7e5747d7fcb42eb7936375cf309
+生成时间：2026-11-03T18:08:57.524Z
+HEAD：a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056
 Node：v24.9.0 / win32
 
 说明：离线场景的预期退出码是 3（blocker），因为缺凭证时脚本必须 fail-closed；
@@ -9,24 +9,24 @@ Node：v24.9.0 / win32
 
 | 用例 | 期望退出码 | 实际退出码 | 结果 | 耗时(ms) |
 | --- | --- | --- | --- | --- |
-| preflight | 3 | 3 | pass | 95 |
+| preflight | 3 | 3 | pass | 100 |
 | preflight/json | 3 | 3 | pass | 96 |
-| A/offline | 3 | 3 | pass | 98 |
-| A/real-no-creds | 3 | 3 | pass | 102 |
-| B/offline | 3 | 3 | pass | 102 |
-| B/real-no-creds | 3 | 3 | pass | 104 |
-| C/offline | 3 | 3 | pass | 5990 |
-| C/all-suites-pass | 3 | 3 | pass | 6045 |
-| D/offline | 3 | 3 | pass | 5458 |
-| D/wecom-absent | 3 | 3 | pass | 5530 |
-| C/full | 3 | 3 | pass | 33572 |
+| A/offline | 3 | 3 | pass | 100 |
+| A/real-no-creds | 3 | 3 | pass | 98 |
+| B/offline | 3 | 3 | pass | 103 |
+| B/real-no-creds | 3 | 3 | pass | 102 |
+| C/offline | 3 | 3 | pass | 6034 |
+| C/all-suites-pass | 3 | 3 | pass | 5969 |
+| D/offline | 3 | 3 | pass | 5570 |
+| D/wecom-absent | 3 | 3 | pass | 5610 |
+| C/full | 3 | 3 | pass | 33349 |
 
 ## preflight
 
 命令：`node scripts/agt-03x/preflight.mjs`
 
 ```
-前置清单（2026-11-03T18:02:16.434Z，head f52eb68915f5b7e5747d7fcb42eb7936375cf309）
+前置清单（2026-11-03T18:08:00.435Z，head a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056）
 
 [ ] P1 企业微信机器人已创建（API 模式 + 长连接），WECOM_BOT_ID/SECRET 已注入
       原因：missing env: WECOM_BOT_ID, WECOM_SECRET
@@ -62,8 +62,8 @@ Node：v24.9.0 / win32
 
 ```
 {
-  "at": "2026-11-03T18:02:16.531Z",
-  "head": "f52eb68915f5b7e5747d7fcb42eb7936375cf309",
+  "at": "2026-11-03T18:08:00.535Z",
+  "head": "a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056",
   "scenario": null,
   "verdict": "blocker",
   "unmet": [
@@ -189,16 +189,16 @@ Node：v24.9.0 / win32
 命令：`node scripts/agt-03x/a-wecom-live-reply.mjs --offline`
 
 ```
-{"scenario":"A","at":"2026-11-03T18:02:16.664Z","event":"start","mode":"offline","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309","tools":{"exposed":[]}}
-{"scenario":"A","at":"2026-11-03T18:02:16.668Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
-{"scenario":"A","at":"2026-11-03T18:02:16.668Z","event":"self-test","status":"pass","detail":"fixture provider -> fail expect=fail actual=fail"}
-{"scenario":"A","at":"2026-11-03T18:02:16.668Z","event":"self-test","status":"pass","detail":"missing ingress -> blocker expect=blocker actual=blocker"}
-{"scenario":"A","at":"2026-11-03T18:02:16.669Z","event":"self-test","status":"pass","detail":"reply not accepted -> fail expect=fail actual=fail"}
-{"scenario":"A","at":"2026-11-03T18:02:16.669Z","event":"self-test","status":"pass","detail":"tool outside whitelist -> fail expect=fail actual=fail"}
-{"scenario":"A","at":"2026-11-03T18:02:16.669Z","event":"self-test","status":"pass","detail":"no API readback -> blocker expect=blocker actual=blocker"}
-{"scenario":"A","at":"2026-11-03T18:02:16.669Z","check":"self-test","status":"pass","detail":"6/6 bundled cases matched","mode":"offline"}
-{"scenario":"A","at":"2026-11-03T18:02:16.669Z","check":"A1-A5","status":"blocker","detail":"offline self-test only; no real WeCom evidence was collected","mode":"offline"}
-{"scenario":"A","at":"2026-11-03T18:02:16.670Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T18:08:00.670Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T18:08:00.674Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
+{"scenario":"A","at":"2026-11-03T18:08:00.674Z","event":"self-test","status":"pass","detail":"fixture provider -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:08:00.674Z","event":"self-test","status":"pass","detail":"missing ingress -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T18:08:00.675Z","event":"self-test","status":"pass","detail":"reply not accepted -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:08:00.675Z","event":"self-test","status":"pass","detail":"tool outside whitelist -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T18:08:00.675Z","event":"self-test","status":"pass","detail":"no API readback -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T18:08:00.675Z","check":"self-test","status":"pass","detail":"6/6 bundled cases matched","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T18:08:00.675Z","check":"A1-A5","status":"blocker","detail":"offline self-test only; no real WeCom evidence was collected","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T18:08:00.676Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"A verdict=blocker","channel":"wecom"}
 ```
 
 ## A/real-no-creds
@@ -206,18 +206,18 @@ Node：v24.9.0 / win32
 命令：`node scripts/agt-03x/a-wecom-live-reply.mjs`
 
 ```
-{"scenario":"A","at":"2026-11-03T18:02:16.764Z","event":"start","mode":"real","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309","tools":{"exposed":[]}}
-{"scenario":"A","at":"2026-11-03T18:02:16.768Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first"}
-{"scenario":"A","at":"2026-11-03T18:02:16.769Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
-{"scenario":"A","at":"2026-11-03T18:02:16.769Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
-{"scenario":"A","at":"2026-11-03T18:02:16.769Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
-{"scenario":"A","at":"2026-11-03T18:02:16.769Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl"}
-{"scenario":"A","at":"2026-11-03T18:02:16.770Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first","mode":"real"}
-{"scenario":"A","at":"2026-11-03T18:02:16.770Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
-{"scenario":"A","at":"2026-11-03T18:02:16.770Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
-{"scenario":"A","at":"2026-11-03T18:02:16.770Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
-{"scenario":"A","at":"2026-11-03T18:02:16.770Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl","mode":"real"}
-{"scenario":"A","at":"2026-11-03T18:02:16.771Z","event":"result","mode":"real","status":"blocker","counts":{"total":5,"sent":0,"failed":0,"pending":5},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T18:08:00.768Z","event":"start","mode":"real","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T18:08:00.772Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first"}
+{"scenario":"A","at":"2026-11-03T18:08:00.772Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"A","at":"2026-11-03T18:08:00.772Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"A","at":"2026-11-03T18:08:00.773Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"A","at":"2026-11-03T18:08:00.773Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl"}
+{"scenario":"A","at":"2026-11-03T18:08:00.773Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:08:00.773Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:08:00.774Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:08:00.774Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:08:00.774Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl","mode":"real"}
+{"scenario":"A","at":"2026-11-03T18:08:00.774Z","event":"result","mode":"real","status":"blocker","counts":{"total":5,"sent":0,"failed":0,"pending":5},"note":"A verdict=blocker","channel":"wecom"}
 Scenario A cannot run yet (fail-closed, nothing was sent):
   - capability: npm run wecom:live absent; t6 must deliver the WeCom driver first
   - pre-P1: missing env: WECOM_BOT_ID, WECOM_SECRET
@@ -231,17 +231,17 @@ Scenario A cannot run yet (fail-closed, nothing was sent):
 命令：`node scripts/agt-03x/b-scheduled-research-delivery.mjs --offline`
 
 ```
-{"scenario":"B","at":"2026-11-03T18:02:16.866Z","event":"start","mode":"offline","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309"}
-{"scenario":"B","at":"2026-11-03T18:02:16.870Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
-{"scenario":"B","at":"2026-11-03T18:02:16.871Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded -> fail expect=fail actual=fail"}
-{"scenario":"B","at":"2026-11-03T18:02:16.871Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) -> fail expect=fail actual=fail"}
-{"scenario":"B","at":"2026-11-03T18:02:16.871Z","event":"self-test","status":"pass","detail":"no Guanlan tool call -> fail expect=fail actual=fail"}
-{"scenario":"B","at":"2026-11-03T18:02:16.871Z","event":"self-test","status":"pass","detail":"delivery reader unavailable -> blocker expect=blocker actual=blocker"}
-{"scenario":"B","at":"2026-11-03T18:02:16.872Z","event":"self-test","status":"pass","detail":"API/disk mismatch -> fail expect=fail actual=fail"}
-{"scenario":"B","at":"2026-11-03T18:02:16.872Z","event":"self-test","status":"pass","detail":"unbounded retries -> fail expect=fail actual=fail"}
-{"scenario":"B","at":"2026-11-03T18:02:16.872Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
-{"scenario":"B","at":"2026-11-03T18:02:16.872Z","check":"B1-B7","status":"blocker","detail":"offline self-test only - no live run was read back","mode":"offline"}
-{"scenario":"B","at":"2026-11-03T18:02:16.873Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T18:08:00.870Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"B","at":"2026-11-03T18:08:00.874Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T18:08:00.874Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T18:08:00.875Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T18:08:00.875Z","event":"self-test","status":"pass","detail":"no Guanlan tool call -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T18:08:00.875Z","event":"self-test","status":"pass","detail":"delivery reader unavailable -> blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T18:08:00.875Z","event":"self-test","status":"pass","detail":"API/disk mismatch -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T18:08:00.875Z","event":"self-test","status":"pass","detail":"unbounded retries -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T18:08:00.875Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T18:08:00.876Z","check":"B1-B7","status":"blocker","detail":"offline self-test only - no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T18:08:00.876Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
 ```
 
 ## B/real-no-creds
@@ -249,28 +249,28 @@ Scenario A cannot run yet (fail-closed, nothing was sent):
 命令：`node scripts/agt-03x/b-scheduled-research-delivery.mjs`
 
 ```
-{"scenario":"B","at":"2026-11-03T18:02:16.970Z","event":"start","mode":"real","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309"}
-{"scenario":"B","at":"2026-11-03T18:02:16.974Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
-{"scenario":"B","at":"2026-11-03T18:02:16.974Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
-{"scenario":"B","at":"2026-11-03T18:02:16.975Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
-{"scenario":"B","at":"2026-11-03T18:02:16.975Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
-{"scenario":"B","at":"2026-11-03T18:02:16.975Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
-{"scenario":"B","at":"2026-11-03T18:02:16.975Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
-{"scenario":"B","at":"2026-11-03T18:02:16.975Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
-{"scenario":"B","at":"2026-11-03T18:02:16.975Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
-{"scenario":"B","at":"2026-11-03T18:02:16.976Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH"}
-{"scenario":"B","at":"2026-11-03T18:02:16.976Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL"}
-{"scenario":"B","at":"2026-11-03T18:02:16.976Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.976Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.977Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL","mode":"real"}
-{"scenario":"B","at":"2026-11-03T18:02:16.978Z","event":"result","mode":"real","status":"blocker","counts":{"total":10,"sent":0,"failed":0,"pending":10},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T18:08:00.971Z","event":"start","mode":"real","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"B","at":"2026-11-03T18:08:00.974Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T18:08:00.975Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T18:08:00.975Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T18:08:00.975Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T18:08:00.975Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T18:08:00.975Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T18:08:00.975Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T18:08:00.976Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T18:08:00.976Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH"}
+{"scenario":"B","at":"2026-11-03T18:08:00.976Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL"}
+{"scenario":"B","at":"2026-11-03T18:08:00.976Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.977Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.977Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.977Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.977Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.977Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.977Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.977Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.978Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.978Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL","mode":"real"}
+{"scenario":"B","at":"2026-11-03T18:08:00.978Z","event":"result","mode":"real","status":"blocker","counts":{"total":10,"sent":0,"failed":0,"pending":10},"note":"B verdict=blocker"}
 Scenario B cannot run yet (fail-closed, nothing triggered):
   - api: --api is required for readback (loopback /v1 base URL)
   - target: --schedule-id or --run-id is required
@@ -289,23 +289,23 @@ Scenario B cannot run yet (fail-closed, nothing triggered):
 命令：`node scripts/agt-03x/c-feishu-regression.mjs`
 
 ```
-{"scenario":"C","at":"2026-11-03T18:02:17.074Z","event":"start","mode":"offline","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309 at=2026-11-03T18:02:17.074Z"}
-{"scenario":"C","at":"2026-11-03T18:02:19.036Z","event":"suite","check":"C1","status":"pass","durationMs":1899,"detail":"feishu: tests=48 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:21.380Z","event":"suite","check":"C2-api","status":"pass","durationMs":2285,"detail":"api: tests=26 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:22.255Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":813,"detail":"scheduler: tests=31 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:22.691Z","event":"suite","check":"C2-targets","status":"pass","durationMs":372,"detail":"targets: tests=29 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:22.959Z","event":"suite","check":"C5","status":"pass","durationMs":154,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
-{"scenario":"C","at":"2026-11-03T18:02:22.966Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
-{"scenario":"C","at":"2026-11-03T18:02:22.966Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
-{"scenario":"C","at":"2026-11-03T18:02:22.967Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1899","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.967Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2285","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.967Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=813","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.967Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=372","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.967Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=154","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.967Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.968Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.968Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:22.968Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T18:08:01.072Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056 at=2026-11-03T18:08:01.071Z"}
+{"scenario":"C","at":"2026-11-03T18:08:03.087Z","event":"suite","check":"C1","status":"pass","durationMs":1953,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:05.441Z","event":"suite","check":"C2-api","status":"pass","durationMs":2295,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:06.310Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":811,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:06.738Z","event":"suite","check":"C2-targets","status":"pass","durationMs":371,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:07.003Z","event":"suite","check":"C5","status":"pass","durationMs":150,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T18:08:07.010Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T18:08:07.011Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T18:08:07.011Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1953","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.011Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2295","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.011Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=811","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.011Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=371","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.012Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=150","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.012Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.012Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.012Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:07.012Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
 ```
 
 ## C/all-suites-pass
@@ -313,23 +313,23 @@ Scenario B cannot run yet (fail-closed, nothing triggered):
 命令：`node scripts/agt-03x/c-feishu-regression.mjs`
 
 ```
-{"scenario":"C","at":"2026-11-03T18:02:23.063Z","event":"start","mode":"offline","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309 at=2026-11-03T18:02:23.062Z"}
-{"scenario":"C","at":"2026-11-03T18:02:25.057Z","event":"suite","check":"C1","status":"pass","durationMs":1924,"detail":"feishu: tests=48 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:27.416Z","event":"suite","check":"C2-api","status":"pass","durationMs":2299,"detail":"api: tests=26 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:28.286Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":810,"detail":"scheduler: tests=31 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:28.720Z","event":"suite","check":"C2-targets","status":"pass","durationMs":375,"detail":"targets: tests=29 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:29.003Z","event":"suite","check":"C5","status":"pass","durationMs":162,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
-{"scenario":"C","at":"2026-11-03T18:02:29.010Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
-{"scenario":"C","at":"2026-11-03T18:02:29.011Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
-{"scenario":"C","at":"2026-11-03T18:02:29.011Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1924","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.011Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2299","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.011Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=810","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.012Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=375","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.012Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=162","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.012Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.012Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.012Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
-{"scenario":"C","at":"2026-11-03T18:02:29.012Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T18:08:07.105Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056 at=2026-11-03T18:08:07.104Z"}
+{"scenario":"C","at":"2026-11-03T18:08:09.058Z","event":"suite","check":"C1","status":"pass","durationMs":1891,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:11.400Z","event":"suite","check":"C2-api","status":"pass","durationMs":2283,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:12.269Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":810,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:12.700Z","event":"suite","check":"C2-targets","status":"pass","durationMs":373,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:12.972Z","event":"suite","check":"C5","status":"pass","durationMs":157,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T18:08:12.980Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T18:08:12.980Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T18:08:12.980Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1891","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.980Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2283","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.981Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=810","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.981Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=373","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.981Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=157","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.981Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.981Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.981Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T18:08:12.981Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
 ```
 
 ## D/offline
@@ -337,26 +337,26 @@ Scenario B cannot run yet (fail-closed, nothing triggered):
 命令：`node scripts/agt-03x/d-failure-modes.mjs`
 
 ```
-{"scenario":"D","at":"2026-11-03T18:02:29.108Z","event":"start","mode":"offline","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309"}
-{"scenario":"D","at":"2026-11-03T18:02:30.268Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1156,"detail":"policy+channel: tests=23 fail=0 duration_ms=1096.0948"}
-{"scenario":"D","at":"2026-11-03T18:02:32.042Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 1774ms, no network attempted"}
-{"scenario":"D","at":"2026-11-03T18:02:32.174Z","event":"suite","check":"D3","status":"pass","durationMs":132,"detail":"dedupe: tests=4 fail=0 duration_ms=73.9459"}
-{"scenario":"D","at":"2026-11-03T18:02:32.902Z","event":"runner","check":"D4-api","status":"pass","durationMs":727,"detail":"exit=0"}
-{"scenario":"D","at":"2026-11-03T18:02:33.586Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":684,"detail":"exit=0 interrupted=true completed=true"}
-{"scenario":"D","at":"2026-11-03T18:02:34.418Z","event":"suite","check":"D5","status":"pass","durationMs":831,"detail":"transport: tests=12 fail=0 duration_ms=772.0903"}
-{"scenario":"D","at":"2026-11-03T18:02:34.467Z","event":"scan","check":"D8","status":"pass","detail":"files=30 hits=0"}
-{"scenario":"D","at":"2026-11-03T18:02:34.468Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1096.0948","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.468Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.469Z","check":"D2-offline","status":"pass","detail":"exit=2 in 1774ms, no network attempted","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.469Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.469Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=73.9459","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.469Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 727ms","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.469Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.469Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=772.0903","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.469Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.470Z","check":"D8","status":"pass","detail":"scanned 30 evidence files, zero secret-shaped hits","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.470Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:34.470Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}
+{"scenario":"D","at":"2026-11-03T18:08:13.076Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"D","at":"2026-11-03T18:08:14.229Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1150,"detail":"policy+channel: tests=23 fail=0 duration_ms=1089.4196"}
+{"scenario":"D","at":"2026-11-03T18:08:16.110Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 1881ms, no network attempted"}
+{"scenario":"D","at":"2026-11-03T18:08:16.247Z","event":"suite","check":"D3","status":"pass","durationMs":137,"detail":"dedupe: tests=4 fail=0 duration_ms=77.0553"}
+{"scenario":"D","at":"2026-11-03T18:08:16.969Z","event":"runner","check":"D4-api","status":"pass","durationMs":722,"detail":"exit=0"}
+{"scenario":"D","at":"2026-11-03T18:08:17.652Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":683,"detail":"exit=0 interrupted=true completed=true"}
+{"scenario":"D","at":"2026-11-03T18:08:18.489Z","event":"suite","check":"D5","status":"pass","durationMs":836,"detail":"transport: tests=12 fail=0 duration_ms=779.2077"}
+{"scenario":"D","at":"2026-11-03T18:08:18.549Z","event":"scan","check":"D8","status":"pass","detail":"files=42 hits=0"}
+{"scenario":"D","at":"2026-11-03T18:08:18.549Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1089.4196","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D2-offline","status":"pass","detail":"exit=2 in 1881ms, no network attempted","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=77.0553","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 722ms","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=779.2077","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","check":"D8","status":"pass","detail":"scanned 42 evidence files, zero secret-shaped hits","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}
 ```
 
 ## D/wecom-absent
@@ -364,26 +364,26 @@ Scenario B cannot run yet (fail-closed, nothing triggered):
 命令：`node scripts/agt-03x/d-failure-modes.mjs`
 
 ```
-{"scenario":"D","at":"2026-11-03T18:02:34.566Z","event":"start","mode":"offline","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309"}
-{"scenario":"D","at":"2026-11-03T18:02:35.718Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1149,"detail":"policy+channel: tests=23 fail=0 duration_ms=1086.6333"}
-{"scenario":"D","at":"2026-11-03T18:02:37.534Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 1815ms, no network attempted"}
-{"scenario":"D","at":"2026-11-03T18:02:37.671Z","event":"suite","check":"D3","status":"pass","durationMs":137,"detail":"dedupe: tests=4 fail=0 duration_ms=75.9239"}
-{"scenario":"D","at":"2026-11-03T18:02:38.402Z","event":"runner","check":"D4-api","status":"pass","durationMs":731,"detail":"exit=0"}
-{"scenario":"D","at":"2026-11-03T18:02:39.099Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":697,"detail":"exit=0 interrupted=true completed=true"}
-{"scenario":"D","at":"2026-11-03T18:02:39.948Z","event":"suite","check":"D5","status":"pass","durationMs":849,"detail":"transport: tests=12 fail=0 duration_ms=784.5273"}
-{"scenario":"D","at":"2026-11-03T18:02:39.998Z","event":"scan","check":"D8","status":"pass","detail":"files=30 hits=0"}
-{"scenario":"D","at":"2026-11-03T18:02:39.999Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1086.6333","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:39.999Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:39.999Z","check":"D2-offline","status":"pass","detail":"exit=2 in 1815ms, no network attempted","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=75.9239","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 731ms","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=784.5273","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D8","status":"pass","detail":"scanned 30 evidence files, zero secret-shaped hits","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
-{"scenario":"D","at":"2026-11-03T18:02:40.001Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}
+{"scenario":"D","at":"2026-11-03T18:08:18.647Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"D","at":"2026-11-03T18:08:19.802Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1151,"detail":"policy+channel: tests=23 fail=0 duration_ms=1091.2365"}
+{"scenario":"D","at":"2026-11-03T18:08:21.701Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 1899ms, no network attempted"}
+{"scenario":"D","at":"2026-11-03T18:08:21.843Z","event":"suite","check":"D3","status":"pass","durationMs":142,"detail":"dedupe: tests=4 fail=0 duration_ms=76.6466"}
+{"scenario":"D","at":"2026-11-03T18:08:22.576Z","event":"runner","check":"D4-api","status":"pass","durationMs":732,"detail":"exit=0"}
+{"scenario":"D","at":"2026-11-03T18:08:23.266Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":690,"detail":"exit=0 interrupted=true completed=true"}
+{"scenario":"D","at":"2026-11-03T18:08:24.099Z","event":"suite","check":"D5","status":"pass","durationMs":832,"detail":"transport: tests=12 fail=0 duration_ms=774.6888"}
+{"scenario":"D","at":"2026-11-03T18:08:24.158Z","event":"scan","check":"D8","status":"pass","detail":"files=42 hits=0"}
+{"scenario":"D","at":"2026-11-03T18:08:24.159Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1091.2365","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.159Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D2-offline","status":"pass","detail":"exit=2 in 1899ms, no network attempted","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=76.6466","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 732ms","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=774.6888","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D8","status":"pass","detail":"scanned 42 evidence files, zero secret-shaped hits","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.161Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.161Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}
 ```
 
 ## C/full
@@ -391,23 +391,23 @@ Scenario B cannot run yet (fail-closed, nothing triggered):
 命令：`node scripts/agt-03x/c-feishu-regression.mjs --full`
 
 ```
-{"scenario":"C","at":"2026-11-03T18:02:40.101Z","event":"start","mode":"full","detail":"head=f52eb68915f5b7e5747d7fcb42eb7936375cf309 at=2026-11-03T18:02:40.100Z"}
-{"scenario":"C","at":"2026-11-03T18:02:42.088Z","event":"suite","check":"C1","status":"pass","durationMs":1921,"detail":"feishu: tests=48 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:44.459Z","event":"suite","check":"C2-api","status":"pass","durationMs":2311,"detail":"api: tests=26 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:45.334Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":814,"detail":"scheduler: tests=31 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:45.770Z","event":"suite","check":"C2-targets","status":"pass","durationMs":376,"detail":"targets: tests=29 fail=0 exit=0"}
-{"scenario":"C","at":"2026-11-03T18:02:46.040Z","event":"suite","check":"C5","status":"pass","durationMs":152,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
-{"scenario":"C","at":"2026-11-03T18:03:13.571Z","event":"suite","check":"C3","status":"pass","durationMs":27448,"detail":"tests=555 fail=2 exit=1"}
-{"scenario":"C","at":"2026-11-03T18:03:13.571Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
-{"scenario":"C","at":"2026-11-03T18:03:13.572Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1921","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.572Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2311","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.572Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=814","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.572Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=376","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.572Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=152","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.573Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.573Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known TAP lines)","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.573Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
-{"scenario":"C","at":"2026-11-03T18:03:13.573Z","event":"result","mode":"full","status":"blocker","counts":{"total":8,"sent":7,"failed":0,"pending":1},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T18:08:24.258Z","event":"start","mode":"full","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056 at=2026-11-03T18:08:24.257Z"}
+{"scenario":"C","at":"2026-11-03T18:08:26.231Z","event":"suite","check":"C1","status":"pass","durationMs":1911,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:28.596Z","event":"suite","check":"C2-api","status":"pass","durationMs":2304,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:29.469Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":813,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:29.900Z","event":"suite","check":"C2-targets","status":"pass","durationMs":374,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T18:08:30.169Z","event":"suite","check":"C5","status":"pass","durationMs":151,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T18:08:57.508Z","event":"suite","check":"C3","status":"pass","durationMs":27251,"detail":"tests=555 fail=2 exit=1"}
+{"scenario":"C","at":"2026-11-03T18:08:57.509Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T18:08:57.509Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1911","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.509Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2304","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.509Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=813","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.509Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=374","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.510Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=151","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.510Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.510Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known TAP lines)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.510Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T18:08:57.510Z","event":"result","mode":"full","status":"blocker","counts":{"total":8,"sent":7,"failed":0,"pending":1},"note":"C verdict=blocker","channel":"feishu"}
 ```
 
 ## 判定器本身的内建回归（进程内，不 spawn）

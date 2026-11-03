@@ -6,7 +6,15 @@
  */
 import { check } from "./harness.mjs";
 
-/** Baseline `dev` @ 8efc250: 555 tests, 2 known failures (both Windows defects). */
+/**
+ * Baseline `dev` @ 8efc250: 555 tests, 2 known failures (both Windows defects).
+ *
+ * DELIBERATELY A CONSTANT. Do not turn this into an env var or a
+ * "tolerated failures" setting: that would give the gate a silent relaxation
+ * switch. When the baseline legitimately moves (defect fixed, or an intentional
+ * new failure lands), edit the numbers/patterns here **and** record why in the
+ * commit message and in docs/evidence/wecom-v1/README.md §7.
+ */
 export const BASELINE_TOTAL = 555;
 
 /**
@@ -20,7 +28,11 @@ export const KNOWN_FAILURES = Object.freeze([
   /research policy reaches the model-visible system prompt/i,
 ]);
 
-/** Number of real failing tests expected on the baseline. */
+/**
+ * Number of real failing tests expected on the baseline. Same rule as
+ * BASELINE_TOTAL: a hand-edited constant with a recorded reason, never derived
+ * from the run being judged.
+ */
 export const EXPECTED_FAILURES = 2;
 
 export function fullSuiteVerdict({ tests, fail, failing }, options = {}) {

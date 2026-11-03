@@ -86,7 +86,13 @@ function evidenceStrings(text, structured) {
 }
 
 function scanEvidenceDirs() {
-  const targets = [join(ROOT, "poc", "evidence"), join(ROOT, "docs", "evidence")];
+  // Evidence plus the engineering docs that quote it: a real message id leaks into
+  // a write-up as easily as into a JSONL (it did once - see docs/evidence README §8).
+  const targets = [
+    join(ROOT, "poc", "evidence"),
+    join(ROOT, "docs", "evidence"),
+    join(ROOT, "docs", "engineering"),
+  ];
   const hits = [];
   let scanned = 0;
   const walk = (dir) => {

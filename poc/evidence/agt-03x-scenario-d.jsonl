@@ -562,3 +562,83 @@
 {"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"D8","status":"pass","detail":"scanned 30 evidence files, zero secret-shaped hits","mode":"offline"}
 {"scenario":"D","at":"2026-11-03T18:02:40.000Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
 {"scenario":"D","at":"2026-11-03T18:02:40.001Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}
+{"scenario":"D","at":"2026-11-03T18:06:15.843Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"D","at":"2026-11-03T18:06:16.993Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1146,"detail":"policy+channel: tests=23 fail=0 duration_ms=1088.9117"}
+{"scenario":"D","at":"2026-11-03T18:06:18.750Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 1757ms, no network attempted"}
+{"scenario":"D","at":"2026-11-03T18:06:18.885Z","event":"suite","check":"D3","status":"pass","durationMs":134,"detail":"dedupe: tests=4 fail=0 duration_ms=76.8462"}
+{"scenario":"D","at":"2026-11-03T18:06:19.605Z","event":"runner","check":"D4-api","status":"pass","durationMs":720,"detail":"exit=0"}
+{"scenario":"D","at":"2026-11-03T18:06:20.294Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":688,"detail":"exit=0 interrupted=true completed=true"}
+{"scenario":"D","at":"2026-11-03T18:06:21.125Z","event":"suite","check":"D5","status":"pass","durationMs":831,"detail":"transport: tests=12 fail=0 duration_ms=773.8105"}
+{"scenario":"D","at":"2026-11-03T18:06:21.181Z","event":"scan","check":"D8","status":"fail","detail":"files=42 hits=1"}
+{"scenario":"D","at":"2026-11-03T18:06:21.182Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1088.9117","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.182Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.182Z","check":"D2-offline","status":"pass","detail":"exit=2 in 1757ms, no network attempted","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.182Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.182Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=76.8462","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.183Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 720ms","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.183Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.183Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=773.8105","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.183Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.183Z","check":"D8","status":"fail","detail":"secret-shaped hits: agt-029-live-evidence.md:wecom_chat_id","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.183Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:06:21.183Z","event":"result","mode":"offline","status":"fail","counts":{"total":11,"sent":6,"failed":1,"pending":4},"note":"D verdict=fail"}
+{"scenario":"D","at":"2026-11-03T18:06:55.863Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"D","at":"2026-11-03T18:06:57.028Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1161,"detail":"policy+channel: tests=23 fail=0 duration_ms=1098.4762"}
+{"scenario":"D","at":"2026-11-03T18:06:59.524Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 2494ms, no network attempted"}
+{"scenario":"D","at":"2026-11-03T18:06:59.676Z","event":"suite","check":"D3","status":"pass","durationMs":151,"detail":"dedupe: tests=4 fail=0 duration_ms=80.5795"}
+{"scenario":"D","at":"2026-11-03T18:07:00.449Z","event":"runner","check":"D4-api","status":"pass","durationMs":773,"detail":"exit=0"}
+{"scenario":"D","at":"2026-11-03T18:07:01.153Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":703,"detail":"exit=0 interrupted=true completed=true"}
+{"scenario":"D","at":"2026-11-03T18:07:01.981Z","event":"suite","check":"D5","status":"pass","durationMs":828,"detail":"transport: tests=12 fail=0 duration_ms=768.765"}
+{"scenario":"D","at":"2026-11-03T18:07:02.038Z","event":"scan","check":"D8","status":"pass","detail":"files=42 hits=0"}
+{"scenario":"D","at":"2026-11-03T18:07:02.039Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1098.4762","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.039Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.039Z","check":"D2-offline","status":"pass","detail":"exit=2 in 2494ms, no network attempted","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.039Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.040Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=80.5795","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.040Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 773ms","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.040Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.040Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=768.765","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.040Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.040Z","check":"D8","status":"pass","detail":"scanned 42 evidence files, zero secret-shaped hits","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.040Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:07:02.041Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}
+{"scenario":"D","at":"2026-11-03T18:08:13.076Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"D","at":"2026-11-03T18:08:14.229Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1150,"detail":"policy+channel: tests=23 fail=0 duration_ms=1089.4196"}
+{"scenario":"D","at":"2026-11-03T18:08:16.110Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 1881ms, no network attempted"}
+{"scenario":"D","at":"2026-11-03T18:08:16.247Z","event":"suite","check":"D3","status":"pass","durationMs":137,"detail":"dedupe: tests=4 fail=0 duration_ms=77.0553"}
+{"scenario":"D","at":"2026-11-03T18:08:16.969Z","event":"runner","check":"D4-api","status":"pass","durationMs":722,"detail":"exit=0"}
+{"scenario":"D","at":"2026-11-03T18:08:17.652Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":683,"detail":"exit=0 interrupted=true completed=true"}
+{"scenario":"D","at":"2026-11-03T18:08:18.489Z","event":"suite","check":"D5","status":"pass","durationMs":836,"detail":"transport: tests=12 fail=0 duration_ms=779.2077"}
+{"scenario":"D","at":"2026-11-03T18:08:18.549Z","event":"scan","check":"D8","status":"pass","detail":"files=42 hits=0"}
+{"scenario":"D","at":"2026-11-03T18:08:18.549Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1089.4196","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D2-offline","status":"pass","detail":"exit=2 in 1881ms, no network attempted","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=77.0553","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 722ms","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.550Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=779.2077","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","check":"D8","status":"pass","detail":"scanned 42 evidence files, zero secret-shaped hits","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:18.551Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}
+{"scenario":"D","at":"2026-11-03T18:08:18.647Z","event":"start","mode":"offline","detail":"head=a9cd3ba31a6c0ea67c149941bc2ed30d3c53c056"}
+{"scenario":"D","at":"2026-11-03T18:08:19.802Z","event":"suite","check":"D1-feishu","status":"pass","durationMs":1151,"detail":"policy+channel: tests=23 fail=0 duration_ms=1091.2365"}
+{"scenario":"D","at":"2026-11-03T18:08:21.701Z","event":"config-gate","check":"D2-offline","status":"pass","detail":"exit=2 in 1899ms, no network attempted"}
+{"scenario":"D","at":"2026-11-03T18:08:21.843Z","event":"suite","check":"D3","status":"pass","durationMs":142,"detail":"dedupe: tests=4 fail=0 duration_ms=76.6466"}
+{"scenario":"D","at":"2026-11-03T18:08:22.576Z","event":"runner","check":"D4-api","status":"pass","durationMs":732,"detail":"exit=0"}
+{"scenario":"D","at":"2026-11-03T18:08:23.266Z","event":"runner","check":"D4-scheduler","status":"pass","durationMs":690,"detail":"exit=0 interrupted=true completed=true"}
+{"scenario":"D","at":"2026-11-03T18:08:24.099Z","event":"suite","check":"D5","status":"pass","durationMs":832,"detail":"transport: tests=12 fail=0 duration_ms=774.6888"}
+{"scenario":"D","at":"2026-11-03T18:08:24.158Z","event":"scan","check":"D8","status":"pass","detail":"files=42 hits=0"}
+{"scenario":"D","at":"2026-11-03T18:08:24.159Z","check":"D1-feishu","status":"pass","detail":"policy+channel: tests=23 fail=0 duration_ms=1091.2365","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.159Z","check":"D1-wecom","status":"blocker","detail":"WeCom negative cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D2-offline","status":"pass","detail":"exit=2 in 1899ms, no network attempted","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D2-wrong-secret","status":"blocker","detail":"missing env: FEISHU_APP_ID, FEISHU_APP_SECRET - wrong-secret variant not executed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D3","status":"pass","detail":"dedupe: tests=4 fail=0 duration_ms=76.6466","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D4-api","status":"pass","detail":"api-smoke exit=0 in 732ms","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D4-scheduler","status":"pass","detail":"interrupted recovery scenario present, later fires still succeed","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D5","status":"pass","detail":"transport: tests=12 fail=0 duration_ms=774.6888","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D6","status":"blocker","detail":"WeCom /stop cancellation cases do not exist yet (t6)","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.160Z","check":"D8","status":"pass","detail":"scanned 42 evidence files, zero secret-shaped hits","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.161Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"offline"}
+{"scenario":"D","at":"2026-11-03T18:08:24.161Z","event":"result","mode":"offline","status":"blocker","counts":{"total":11,"sent":7,"failed":0,"pending":4},"note":"D verdict=blocker"}

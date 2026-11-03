@@ -80,7 +80,8 @@ export const SECRET_SCAN_PATTERNS = Object.freeze([
   { name: "feishu_union_id", pattern: /\bon_[A-Za-z0-9_-]{6,}/ },
   // `wm_local_*` / `wmfixture_*` are the documented synthetic fixture namespace.
   { name: "wecom_message_id", pattern: /\bwm(?!(?:_)?(?:local|fixture))[A-Za-z0-9]{8,}/ },
-  { name: "wecom_chat_id", pattern: /\b(?:chatid|chat_id)=[A-Za-z0-9_-]{4,}/i },
+  // Masks such as `chat_id=0f3b9e…a9b6` are the sanctioned projection; a full id is not.
+  { name: "wecom_chat_id", pattern: /\b(?:chatid|chat_id)=(?![A-Za-z0-9_-]*…)[A-Za-z0-9_-]{4,}/i },
   { name: "bearer", pattern: /Bearer\s+[A-Za-z0-9._-]{20,}/ },
   { name: "app_secret", pattern: /app_?secret\s*[=:]\s*[A-Za-z0-9]{8,}/i },
   // Mixed-case 32+ character tokens (base64url secrets). Requires a digit, rejects
@@ -97,8 +98,12 @@ export const SECRET_SCAN_PATTERNS = Object.freeze([
 /**
  * The only strings allowed to carry non-ASCII text into evidence. Message
  * bodies, chat transcripts and titles must never reach a JSONL file, so free
- * text is ASCII-only unless it is one of these verbatim labels. Add a label
- * here on purpose - never by loosening the rule.
+ * text is ASCII-only unless it is one of these verbatim labels.
+ *
+ * KEEP THIS TO THE SEED LABEL. Any second label - even a seemingly harmless
+ * one - turns the "no Chinese prose in evidence" rule into "no Chinese prose
+ * except these N phrases", and the list only grows. A new approved label needs
+ * an explicit maintainer decision, not a convenient commit.
  */
 export const APPROVED_TEXT_LABELS = Object.freeze([
   "seed 数据，非 A2 注册链能力（证据必须原样标注）",

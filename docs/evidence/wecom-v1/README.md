@@ -114,13 +114,25 @@ node scripts/agt-03x/b-scheduled-research-delivery.mjs \
   一个标题里含已知子串的新失败会被静默放过（Node 的 TAP 还会为子测试补打父 `describe` 行，
   2 个真实失败会产生 4 行 `not ok`）。基线漂移（修好一个已知缺陷、或新增失败）现在一律判 `fail`，
   必须人工改基线——不允许自动「适应」。
-- **D8 按值扫描**：结构化证据（`.jsonl`/`.json`）先解析再扫字符串值，避免把
-  `…_after_sdk_…` 这类键值边界误判为长 token；`.md` 才整篇扫描。
+- **D8 按值扫描，并覆盖写它的文档**：扫描 `poc/evidence`、`docs/evidence`、`docs/engineering`；
+  结构化证据（`.jsonl`/`.json`）先解析再扫字符串值，避免把
+  `…_after_sdk_…` 这类键值边界误判为长 token；`.md` 才整篇扫描。形如 `chat_id=0f3b9e…a9b6` 的
+  **掩码**是允许的投影，未截断的完整 id 会被拒。
 - 两者都有进程内回归用例（`self-test.mjs` 的「判定器本身的内建回归」表，16 条）。
 
 ## 8. 历史证据脱敏记录
 
-2026-11-04：`poc/evidence/agt-033-live-delivery.jsonl`、`agt-033-live-final-head.jsonl`、
-`agt-033-live-status.md` 曾含**真实**飞书 message id（`om_x1…`）。这些 id 已替换为
-`om_<redacted>`，**只改 id 值**：计数、顺序、时间戳、判定与文本其余部分未改动，
-JSONL 仍可逐行解析。脱敏前 D8 扫描命中 `feishu_message_id`；脱敏后 30 个证据文件零命中。
+2026-11-04（外审 F-28-1 收紧扫描后暴露；这是**纠正纪律 3 的违规**，不是改分）：
+
+| 位置 | 内容 | 处理 |
+| --- | --- | --- |
+| `poc/evidence/agt-033-live-delivery.jsonl` | 真实 `om_x1…` message id（2 处） | → `om_<redacted>` |
+| `poc/evidence/agt-033-live-final-head.jsonl` | 同上（1 处） | → `om_<redacted>` |
+| `poc/evidence/agt-033-live-status.md` | 同上（3 行） | → `om_<redacted>` |
+| `docs/engineering/agt-033-scheduler-delivery.md` §10 | 同上（1 处 messageId） | → `om_<redacted>`，并在该节留「证据卫生」说明 |
+| `tests/agt-035-targets.test.mjs` | 维护者**完整** `ou_…` open_id（与 §10 掩码同源） | → 合成常量 `ou_000…0001`（该文件 21/21 用例仍通过） |
+
+**只替换标识符值**：计数、顺序、时间戳、`attempts`、`checks`、
+`correction.originalSha256`、判定结论与文本其余部分均未改动，JSONL 仍逐行可解析。
+脱敏前 D8 在 30 个文件上命中；脱敏后 42 个文件（含 `docs/engineering`）零命中。
+`om_local_*` / `om_fixture_*` / `wm_local_*` 是合成夹具命名空间，未动、也不会被误报。

@@ -21,7 +21,7 @@ import {
 } from "../src/delivery/targets.mjs";
 
 const GROUP = { chatId: "oc_0931aaaabbbbcccc", name: "东热战神", chatMode: "group" };
-const MAINTAINER = "ou_f7a1b2c3d4e5f6a7b8c9d0e1f2a381a5";
+const MAINTAINER = "ou_00000000000000000000000000000001";
 
 function pagingClient(pages) {
   let index = 0;
