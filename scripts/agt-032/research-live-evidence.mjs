@@ -15,14 +15,22 @@
  * records only run id, research status, duration, source count, replyDelivered
  * and masked ids. The run directory itself is the real AGT-028 artifact root.
  */
-import { appendFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { maskId } from "../../src/channels/feishu/config.mjs";
 import { startFeishuService } from "../../src/channels/feishu/service.mjs";
 import { readResearchRun } from "../../src/research/index.mjs";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+
+const ARG_KEYS = Object.freeze({
+  "--chat-type": "chatType",
+  "--timeout-ms": "timeoutMs",
+  "--evidence": "evidence",
+  "--runs-dir": "runsDir",
+});
 
 function parseArgs(argv) {
   const options = {
@@ -32,29 +40,29 @@ function parseArgs(argv) {
     runsDir: undefined,
   };
   for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    const next = () => {
-      index += 1;
-      if (index >= argv.length) throw new Error(`${arg} requires a value`);
-      return argv[index];
-    };
-    if (arg === "--chat-type") options.chatType = next();
-    else if (arg === "--timeout-ms") options.timeoutMs = Number(next());
-    else if (arg === "--evidence") options.evidence = next();
-    else if (arg === "--runs-dir") options.runsDir = next();
-    else if (arg === "--help" || arg === "-h") options.help = true;
-    else throw new Error(`unknown argument: ${arg}`);
+    const flag = argv[index];
+    if (flag === "--help" || flag === "-h") {
+      options.help = true;
+      continue;
+    }
+    const key = ARG_KEYS[flag];
+    if (!key) throw new Error(`unknown argument: ${flag}`);
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) throw new Error(`${flag} requires a value`);
+    index += 1;
+    options[key] = key === "timeoutMs" ? Number(value) : value;
   }
-  if (!["p2p", "group"].includes(options.chatType)) throw new Error("--chat-type must be p2p or group");
-  if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 10_000) {
-    throw new Error("--timeout-ms must be >= 10000");
+  if (options.chatType !== "p2p" && options.chatType !== "group") {
+    throw new Error("--chat-type must be p2p or group");
   }
+  if (!(options.timeoutMs >= 10_000)) throw new Error("--timeout-ms must be >= 10000");
   return options;
 }
 
-function packageVersion(relativePath) {
+function versionOf(packageName) {
   try {
-    return JSON.parse(readFileSync(join(ROOT, relativePath), "utf8")).version ?? null;
+    const file = join(ROOT, "node_modules", packageName, "package.json");
+    return JSON.parse(readFileSync(file, "utf8")).version ?? null;
   } catch {
     return null;
   }
@@ -62,23 +70,8 @@ function packageVersion(relativePath) {
 
 function gitHead() {
   try {
-    let gitDir = join(ROOT, ".git");
-    if (statSync(gitDir).isFile()) {
-      const pointer = readFileSync(gitDir, "utf8").trim();
-      const match = /^gitdir:\s*(.+)$/.exec(pointer);
-      if (!match) return null;
-      gitDir = resolve(ROOT, match[1]);
-    }
-    const head = readFileSync(join(gitDir, "HEAD"), "utf8").trim();
-    if (!head.startsWith("ref: ")) return head;
-    const ref = head.slice(5);
-    try {
-      return readFileSync(join(gitDir, ref), "utf8").trim();
-    } catch {
-      const packed = readFileSync(join(gitDir, "packed-refs"), "utf8");
-      const line = packed.split("\n").find((entry) => entry.endsWith(` ${ref}`));
-      return line ? line.split(" ")[0] : null;
-    }
+    const head = execFileSync("git", ["-C", ROOT, "rev-parse", "HEAD"], { encoding: "utf8" });
+    return head.trim() || null;
   } catch {
     return null;
   }
@@ -124,8 +117,8 @@ writeEvidence({
   at: new Date().toISOString(),
   commit: gitHead(),
   node: process.version,
-  piCodingAgent: packageVersion("node_modules/@earendil-works/pi-coding-agent/package.json"),
-  feishuSdk: packageVersion("node_modules/@larksuiteoapi/node-sdk/package.json"),
+  piCodingAgent: versionOf("@earendil-works/pi-coding-agent"),
+  feishuSdk: versionOf("@larksuiteoapi/node-sdk"),
   chatType: options.chatType,
   timeoutMs: options.timeoutMs,
   runsDir: options.runsDir ?? "default (RESEARCH_RUNS_DIR or .work/research-runs)",
