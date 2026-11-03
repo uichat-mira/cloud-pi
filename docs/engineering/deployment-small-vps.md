@@ -1,7 +1,7 @@
 # 1C1G 小服务器运行手册（Cloud Agent V1）
 
 > 状态：**装机手册，未部署**。本文件不含任何真实主机、域名、密钥；命令里的 `<...>` 需按实际环境替换。
-> 编写日期 2026-11-04，代码基线 `origin/dev`（`776e6b9`）。
+> 编写日期 2026-11-04，代码基线 `origin/dev`（`d2c7c4b`，含本手册初版 PR #39）。
 > 标注约定：**【本机已验证】** = 本次在 Windows + Node v24.9.0 上实际执行过；
 > **【需 Linux 验证】** = 只能在上线机器上核对（systemd/logrotate/内核参数）；
 > **【引用】** = 引用仓库既有文档或官方手册，未重复实测；**【估算】** = 没有实测数字，必须先测再用。
@@ -24,13 +24,17 @@
 | 生产依赖（`npm ci --omit=dev`） | **182 个包 / 146.3 MB**，本机 5.7 s 装完 | 【本机已验证】 |
 | 含开发依赖的安装体积 | 196 包 / 约 233 MB | 【引用】[agt-029-feishu-channel.md](agt-029-feishu-channel.md):35 |
 | 代码 + 文档（不含 `node_modules`） | **2.0 MB / 204 个文件** | 【本机已验证】`src doc scripts tests` 合计 |
-| 单次真实 run 的 RSS 峰值 | **未实测**（需要真实模型调用，本轮未跑） | 见下方上界推算 |
-| 每 run 归档大小 | **未实测**（本机无历史 runs 目录） | 按抓取页数增长，装机后先量 3 次 |
+| 单次真实 run 的 RSS 峰值 | **未实测**（需要真实模型调用，本轮未跑） | 见下方上界推算；装机后按 §7.1 测量 1 回填 |
+| 每 run 归档大小 | **未实测**（本机无历史 runs 目录） | 按抓取页数增长，装机后按 §7.1 量 3 次 |
 
-**上界推算（不是实测）**：`--max-old-space-size=384` 在 Node 24 上把 V8 `heap_size_limit` 定在
-**576 MB**（【本机已验证】`require('v8').getHeapStatistics().heap_size_limit`），加上本机观测到的
-约 115 MB 非堆开销，理论 RSS 上界约 **690 MB**。所以 `MemoryMax=700M` 是**刚好够**的边界，
-不是富裕值——出现 OOM kill 时先按 §4 降 heap 上限，而不是直接加内存。
+**上界推算（不是实测）**：默认 heap 上限取 `--max-old-space-size=320`，在 Node 24 上对应 V8
+`heap_size_limit=512 MB`（【本机已验证】`require('v8').getHeapStatistics().heap_size_limit`；
+作为对照，384 对应 576 MB），加上本机观测到的约 115 MB 非堆开销，理论 RSS 上界约 **630 MB**。
+所以 `MemoryMax=768M` 留出约 **140 MB** 余量（OS、突发、日志缓冲），1 GB 机器 + 2 GB swap 仍然安全。
+
+**触顶时的处理顺序（不要反过来）**：先把 heap 降到 256 MB 并观察一轮；仍然 OOM 才按 §4 升配。
+**不要**为了让进程活下来先加大 `MemoryMax`——那只是把「确定性 OOM kill」换成「不确定的 swap 抖动」，
+整机延迟会一起变差。
 
 **这些不占本机**：
 - **模型推理**：走远端 OpenAI 兼容网关（`CLOUD_PI_MODEL_BASE_URL`），本机只做 HTTP/SSE 客户端，无 GPU、无模型权重。
@@ -80,7 +84,7 @@ Group=cloudagent
 WorkingDirectory=/opt/cloud-agent
 EnvironmentFile=/etc/cloud-agent/agent.env
 Environment=NODE_ENV=production
-Environment=NODE_OPTIONS=--max-old-space-size=384
+Environment=NODE_OPTIONS=--max-old-space-size=320
 ExecStartPre=/usr/bin/node src/entry/main.mjs --check
 ExecStart=/usr/bin/node src/entry/main.mjs --channels wecom
 Restart=always
@@ -88,8 +92,8 @@ RestartSec=5
 RestartPreventExitStatus=2
 KillSignal=SIGTERM
 TimeoutStopSec=30
-MemoryHigh=600M
-MemoryMax=700M
+MemoryHigh=640M
+MemoryMax=768M
 LimitNOFILE=4096
 NoNewPrivileges=true
 PrivateTmp=true
@@ -114,6 +118,11 @@ WantedBy=multi-user.target
 - `Type=simple` + 前台 node 进程：应用把日志写 stdout（JSONL），由 systemd 收走，不要用 nohup/PM2 再包一层。
 - 管理 API 默认 `127.0.0.1:8787`（`src/api/contracts.mjs` 的 `DEFAULT_API_HOST`/`DEFAULT_API_PORT`），
   **loopback-only**，不要改 host、不要做公网反代。
+- `NODE_OPTIONS=--max-old-space-size=320` 与 `MemoryMax=768M` 是**配对**的：320 → V8 heap limit 512 MB，
+  加上约 115 MB 非堆开销 ≈ 630 MB，768M 留约 140 MB（OS + 突发）。
+  只改大 `MemoryMax` 而不动 heap 上限，只是把确定性 OOM 换成 swap 抖动——见 §1 的处理顺序。
+- `MemoryHigh=640M` 是提前节流（超过后内核开始回收、给应用施压），`MemoryMax=768M` 才硬杀；
+  两者都改大之前先降 heap。
 
 【需 Linux 验证】整段 unit 未经 `systemd-analyze verify`（Windows 上无 systemd）。
 
@@ -220,7 +229,7 @@ timedatectl status          # 期望 System clock synchronized: yes
 | 触发条件 | 判定命令 | 动作 |
 | --- | --- | --- |
 | 发生 OOM kill | `dmesg -T \| grep -iE 'killed process\|out of memory'` 有 `node` 记录 | 先按本节顺序处理；连续 2 次/周才升内存 |
-| 持续 swap | `vmstat 1 5`，`si`/`so` 列**持续 >0**（不是偶发 1 个采样） | 先查泄漏/峰值（heap 用 `--max-old-space-size` 压），再考虑 2C2G |
+| 持续 swap | `vmstat 1 5`，`si`/`so` 列**持续 >0**（不是偶发 1 个采样） | 先把 heap 从 320 降到 256 再观察一轮，然后才考虑 2C2G |
 | 磁盘 >80% | `df -h /var/lib/cloud-agent` | **先归档**（本节顺序）再扩盘 |
 | 单小时多次排队 | `journalctl -u cloud-agent --since '-1h' \| grep -c 'wecom_run_failed'` 显著上升，或 `/v1/status` 显示 pending 堆积 | 升 2C2G（CPU 是瓶颈） |
 
@@ -228,7 +237,10 @@ timedatectl status          # 期望 System clock synchronized: yes
 1. **先加归档**：压缩/迁走 `runs` 历史、清理旧 journal（`journalctl --vacuum-size=200M`）；
 2. **再加盘**：只扩 block storage，不动 CPU/内存；
 3. **再升 2C2G**：CPU 型瓶颈（run 排队、tick 延迟）；
-4. **最后 2C4G**：内存型瓶颈（OOM 反复出现且 heap 已压到 320 仍不够）。
+4. **最后 2C4G**：内存型瓶颈（OOM 反复出现，且 heap 已从 320 降到 256 仍不够）。
+
+**不要做的事**：不要在没降 heap 的情况下先加大 `MemoryMax`。1C1G 上把内存上限抬到 1 GB 以上，
+进程会拿 swap 当内存用，`si/so` 持续非零，整机响应时间崩掉——这比一次干脆的 OOM kill 更难排查。
 
 理由：多数 1C1G 事故是磁盘/日志/runs 增长或泄漏，先升内存只会把问题推迟一周。
 
@@ -278,15 +290,59 @@ curl -o /dev/null -s -m 5 -w '%{http_code}\n' https://openws.work.weixin.qq.com
 | 内容 | 状态 | 证据 |
 | --- | --- | --- |
 | 裸 Node 与统一入口 RSS | ✅ 本机实测 | 59.9 MB / 156.4 MB（§1） |
-| `--max-old-space-size=384` 生效 | ✅ 本机实测 | heap_limit 576 MB |
-| `NODE_OPTIONS=--max-old-space-size=384` 生效 | ✅ 本机实测 | 同上 |
+| `--max-old-space-size=320` 生效 | ✅ 本机实测 | heap_limit **512 MB** |
+| `NODE_OPTIONS=--max-old-space-size=320` 生效 | ✅ 本机实测 | 同上（另测 384 → 576 MB 作对照） |
 | `node --env-file-if-exists` 可用 | ✅ 本机实测 | Node v24.9.0 接受该参数 |
 | `src/entry/main.mjs --check` | ✅ 本机实测 | 退出码 0 + `cloud_agent_config_ok` |
 | 用 `--channels none --api-port` 起进程并访问 `/v1/health` | ✅ 本机实测 | 200 + `{"ok":true,...}`；`/v1/status` 200 |
 | `npm ci --omit=dev` 体积/耗时 | ✅ 本机实测 | 182 包 / 146.3 MB / 5.7 s |
 | systemd unit / logrotate / sysctl / swapon | ⚠️ 需 Linux 验证 | 按 systemd、logrotate、procps 手册写，未执行 |
-| 单 run 峰值、每 run 归档大小 | ⚠️ 未实测 | 装机后先量 3 次再定磁盘预算 |
+| 单 run 峰值、每 run 归档大小、`npm ci` 峰值 | ⚠️ 未实测 | 装机后按 §7.1 的三次测量回填再定磁盘预算 |
 | 真实部署 | ❌ 未做 | 本文是手册，不代表已上线 |
+
+### 7.1 首次装机后的三次测量（回填本表，再定磁盘预算）
+
+装完、`systemctl start` 正常之后，**先做三次测量再定磁盘和是否升配**。
+前提：2 GB swap 已生效（`swapon --show` 有输出）、`free -m` 看过。三条都在服务器上执行。
+
+**测量 1 — 单 run 峰值 RSS**（研究任务跑起来的那段时间采样，取最大值）：
+
+```bash
+# 另开一个 SSH 会话，run 进行中执行；Ctrl-C 停止采样（采样结果落到文件，不会被 SIGINT 冲掉）
+: > /tmp/rss.log
+while systemctl is-active -q cloud-agent; do
+  pgrep -f 'src/entry/main.mjs' | head -1 | xargs -r ps -o rss= -p >> /tmp/rss.log
+  sleep 2
+done
+sort -n /tmp/rss.log | tail -1        # 单位 KB，除以 1024 得 MB
+```
+
+**测量 2 — 每 run 归档大小**（连跑 3 次后看中位数）：
+
+```bash
+du -sm /var/lib/cloud-agent/runs/* | sort -n | tail -3
+```
+
+**测量 3 — `npm ci` 峰值（带 swap，只为验证「别在服务器上装依赖」）**：
+
+```bash
+mkdir -p /tmp/npm-probe && cd /tmp/npm-probe
+cp /opt/cloud-agent/package.json /opt/cloud-agent/package-lock.json .
+/usr/bin/time -v npm ci --omit=dev 2>&1 | grep 'Maximum resident set size'
+cd / && rm -rf /tmp/npm-probe
+```
+
+填这张表（把「待实测」替换成数字）：
+
+| 项 | 首次测量值 | 判读 |
+| --- | --- | --- |
+| 单 run 峰值 RSS | ___ MB | >614 MB（768M 的 80%）→ 先把 heap 降到 256 重测；仍超再按 §4 升 2C2G |
+| 每 run 归档中位数 | ___ MB | 预算 = 中位数 × 每天 run 数 × 保留天数；`df` ≥80% 先归档再加盘 |
+| `npm ci` 峰值 | ___ MB | 只用于验证判断，**不要**把 npm 装到 `/opt/cloud-agent` |
+
+三次数据齐了才算装机完成；把结果回填 §1 的两行「未实测」和 §4 的判据，并删掉本节里对应的「待实测」。
+
+【需 Linux 验证】三条命令依赖 `ps`/`du`/`/usr/bin/time -v`（GNU time）与 systemd；Windows 上无法执行。
 
 ## 8. 与既有文档的关系（不重复）
 
