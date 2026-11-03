@@ -350,3 +350,25 @@
 {"scenario":"A","at":"2026-11-03T18:14:37.418Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
 {"scenario":"A","at":"2026-11-03T18:14:37.418Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl","mode":"real"}
 {"scenario":"A","at":"2026-11-03T18:14:37.419Z","event":"result","mode":"real","status":"blocker","counts":{"total":5,"sent":0,"failed":0,"pending":5},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T19:03:31.064Z","event":"start","mode":"offline","detail":"head=ac071f0e62448333da10d23f79beab93f1c81c6a","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T19:03:31.068Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
+{"scenario":"A","at":"2026-11-03T19:03:31.068Z","event":"self-test","status":"pass","detail":"fixture provider -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T19:03:31.068Z","event":"self-test","status":"pass","detail":"missing ingress -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T19:03:31.069Z","event":"self-test","status":"pass","detail":"reply not accepted -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T19:03:31.069Z","event":"self-test","status":"pass","detail":"tool outside whitelist -> fail expect=fail actual=fail"}
+{"scenario":"A","at":"2026-11-03T19:03:31.069Z","event":"self-test","status":"pass","detail":"no API readback -> blocker expect=blocker actual=blocker"}
+{"scenario":"A","at":"2026-11-03T19:03:31.069Z","check":"self-test","status":"pass","detail":"6/6 bundled cases matched","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T19:03:31.070Z","check":"A1-A5","status":"blocker","detail":"offline self-test only; no real WeCom evidence was collected","mode":"offline"}
+{"scenario":"A","at":"2026-11-03T19:03:31.070Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"A verdict=blocker","channel":"wecom"}
+{"scenario":"A","at":"2026-11-03T19:03:31.124Z","event":"start","mode":"real","detail":"head=ac071f0e62448333da10d23f79beab93f1c81c6a","tools":{"exposed":[]}}
+{"scenario":"A","at":"2026-11-03T19:03:31.128Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first"}
+{"scenario":"A","at":"2026-11-03T19:03:31.128Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"A","at":"2026-11-03T19:03:31.128Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"A","at":"2026-11-03T19:03:31.129Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"A","at":"2026-11-03T19:03:31.129Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl"}
+{"scenario":"A","at":"2026-11-03T19:03:31.129Z","check":"capability","status":"blocker","detail":"npm run wecom:live absent; t6 must deliver the WeCom driver first","mode":"real"}
+{"scenario":"A","at":"2026-11-03T19:03:31.130Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"A","at":"2026-11-03T19:03:31.130Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"A","at":"2026-11-03T19:03:31.130Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"A","at":"2026-11-03T19:03:31.130Z","check":"evidence-in","status":"blocker","detail":"evidence file not found: poc\\evidence\\agt-036-live.jsonl","mode":"real"}
+{"scenario":"A","at":"2026-11-03T19:03:31.131Z","event":"result","mode":"real","status":"blocker","counts":{"total":5,"sent":0,"failed":0,"pending":5},"note":"A verdict=blocker","channel":"wecom"}

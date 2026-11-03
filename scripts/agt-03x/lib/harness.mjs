@@ -155,16 +155,14 @@ function assertWhitelisted(record) {
       }
     }
     if (typeof value === "string") {
-      for (const violation of findTextViolations(value)) {
-        throw new Error(`evidence key "${key}" ${violation}; refusing to write it`);
-      }
+      const violations = findTextViolations(value);
+      if (violations.length > 0) throw new Error(`evidence key "${key}" ${violations[0]}; refusing to write it`);
     }
     if (Array.isArray(value)) {
       for (const item of value) {
         if (typeof item !== "string") throw new Error(`evidence key "${key}" must hold strings only`);
-        for (const violation of findTextViolations(item)) {
-          throw new Error(`evidence key "${key}" ${violation}; refusing to write it`);
-        }
+        const violations = findTextViolations(item);
+        if (violations.length > 0) throw new Error(`evidence key "${key}" ${violations[0]}; refusing to write it`);
       }
     }
   }
@@ -251,40 +249,50 @@ export function writeUsage(usage) {
   if (usage) process.stderr.write(`${usage}\n`);
 }
 
+/** Read a ref (branch/tag) from the ref file or `packed-refs`, as git does. */
+function readRef(gitDir, commonDir, ref) {
+  for (const base of [gitDir, commonDir]) {
+    const candidate = join(base, ref);
+    if (existsSync(candidate)) return readFileSync(candidate, "utf8").trim();
+  }
+  const packed = join(commonDir, "packed-refs");
+  if (!existsSync(packed)) return null;
+  for (const line of readFileSync(packed, "utf8").split(/\r?\n/)) {
+    if (!line || line.startsWith("#") || line.startsWith("^")) continue;
+    const [sha, name] = line.split(" ");
+    if (name === ref) return sha;
+  }
+  return null;
+}
+
+/** `.git` may be a directory or, in a worktree, a pointer file. */
+function resolveGitDirs() {
+  const dotGit = join(ROOT, ".git");
+  if (!existsSync(dotGit)) return null;
+  let gitDir = dotGit;
+  if (statSync(dotGit).isFile()) {
+    const pointer = readFileSync(dotGit, "utf8").trim();
+    if (!pointer.startsWith("gitdir:")) return null;
+    gitDir = resolve(ROOT, pointer.slice("gitdir:".length).trim());
+  }
+  const commonFile = join(gitDir, "commondir");
+  const commonDir = existsSync(commonFile) ? resolve(gitDir, readFileSync(commonFile, "utf8").trim()) : gitDir;
+  return { gitDir, commonDir };
+}
+
 /**
- * HEAD of the checkout. Uses git when present (worktrees store refs outside
- * `.git`), then falls back to reading the ref files directly.
+ * HEAD of the checkout, read straight from the git metadata. Worktrees store
+ * refs in the common dir, so both are consulted. Reading files beats spawning
+ * `git`: no PATH lookup, no subprocess, and it still works when git is absent.
  */
 export function gitHead() {
-  const git = spawnSync("git", ["rev-parse", "HEAD"], {
-    cwd: ROOT,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 15_000,
-  });
-  const sha = git.status === 0 ? git.stdout.trim() : "";
-  if (/^[0-9a-f]{40}$/.test(sha)) return sha;
   try {
-    let gitDir = join(ROOT, ".git");
-    if (statSync(gitDir).isFile()) {
-      const pointer = readFileSync(gitDir, "utf8").trim();
-      const match = /^gitdir:\s*(.+)$/.exec(pointer);
-      if (!match) return null;
-      gitDir = resolve(ROOT, match[1]);
-    }
-    const commonFile = join(gitDir, "commondir");
-    const commonDir = existsSync(commonFile) ? resolve(gitDir, readFileSync(commonFile, "utf8").trim()) : gitDir;
-    const head = readFileSync(join(gitDir, "HEAD"), "utf8").trim();
-    if (!head.startsWith("ref: ")) return head;
-    const ref = head.slice(5);
-    for (const base of [gitDir, commonDir]) {
-      try {
-        return readFileSync(join(base, ref), "utf8").trim();
-      } catch {
-        // try the next location
-      }
-    }
-    return null;
+    const dirs = resolveGitDirs();
+    if (!dirs) return null;
+    const head = readFileSync(join(dirs.gitDir, "HEAD"), "utf8").trim();
+    if (!head.startsWith("ref: ")) return /^[0-9a-f]{40}$/.test(head) ? head : null;
+    const sha = readRef(dirs.gitDir, dirs.commonDir, head.slice(5));
+    return sha && /^[0-9a-f]{40}$/.test(sha) ? sha : null;
   } catch {
     return null;
   }
