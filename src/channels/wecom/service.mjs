@@ -28,6 +28,9 @@ export const DEFAULT_WECOM_STATE_DIR = ".work/wecom-channel";
  * @param {Function} [options.createClient] SDK client injection (tests)
  * @param {Function} [options.log]
  * @param {Function} [options.runResearch] research seam; absent means `/research` is unavailable
+ * @param {object} [options.chatRuns] recorder that persists chat runs into the run
+ *   store (`createChatRunRecorder()`); omitted means chat runs are not persisted
+ * @param {() => string} [options.generateRunId] run-store compatible id generator
  */
 export function createWecomService({
   env = process.env,
@@ -39,12 +42,14 @@ export function createWecomService({
   createClient,
   log = () => {},
   runResearch,
+  chatRuns,
+  generateRunId,
   now = Date.now,
   pid = process.pid,
   onOutcome,
 } = {}) {
   const config = wecomConfig ?? loadWecomConfig(env);
-  const runner = createWecomAgentRunner({ env, cwd, config: modelConfig, createRuntime });
+  const runner = createWecomAgentRunner({ env, cwd, config: modelConfig, createRuntime, generateRunId });
   const sessions = createKnownSessionStore({ now });
   const dedupe = createWecomDedupeStore({ now });
   const lock = createInstanceLock({ dir: stateDir, pid });
@@ -69,6 +74,11 @@ export function createWecomService({
     onOutcome: (outcome) => {
       if (outcome?.action === "accepted" && outcome.chatId) {
         sessions.record({ chatId: outcome.chatId, chatType: outcome.chatType });
+      }
+      // Persist the finished turn as a run record (AGT-037 trace). Best effort:
+      // a storage failure must not undo a reply that already reached the user.
+      if (chatRuns && outcome?.runId && (outcome.action === "replied" || outcome.action === "failed")) {
+        void chatRuns.record(outcome, { channel: "wecom" });
       }
       onOutcome?.(outcome);
     },

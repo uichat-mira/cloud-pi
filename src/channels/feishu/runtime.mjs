@@ -48,12 +48,15 @@ export function feishuChannelPromptExtension(systemPrompt = FEISHU_CHANNEL_SYSTE
  * @param {string} [options.cwd] session working directory (default a private temp dir)
  * @param {object} [options.config] injected validated model config (tests)
  * @param {Function} [options.createRuntime] `createAgentRuntime` injection (tests)
+ * @param {() => string} [options.generateRunId] run id generator shared with the
+ *   run store, so a chat run is readable by id (AGT-037 trace)
  */
 export function createFeishuAgentRunner({
   env = process.env,
   cwd,
   config,
   createRuntime = createAgentRuntime,
+  generateRunId,
 } = {}) {
   // Fail at startup, not on the first message, if the model configuration is
   // incomplete. The runtime itself still loads the credential from `env` so the
@@ -81,6 +84,7 @@ export function createFeishuAgentRunner({
         createRuntime({
           ...(config ? { config } : { env }),
           cwd: workdir,
+          ...(generateRunId ? { generateRunId } : {}),
           // Empty lists are meaningful: no built-in tool and no MCP tool is
           // exposed to, or executable by, a Feishu-triggered run.
           allowedTools: [],
