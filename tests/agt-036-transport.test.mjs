@@ -4,8 +4,9 @@ import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { loadWecomConfig } from "../src/channels/wecom/config.mjs";
+import { WecomConfigError, loadWecomConfig } from "../src/channels/wecom/config.mjs";
 import { createInstanceLock } from "../src/channels/wecom/instance.mjs";
+import { exitCodeFor } from "../src/channels/wecom/server.mjs";
 import { createWecomService } from "../src/channels/wecom/service.mjs";
 import { WecomTransportError, createWecomTransport } from "../src/channels/wecom/transport.mjs";
 import { byteLength } from "../src/channels/wecom/text.mjs";
@@ -303,4 +304,13 @@ test("text: byteLength measures UTF-8 bytes, not characters", () => {
   assert.equal(byteLength("abc"), 3);
   assert.equal(byteLength("中文"), 6);
   assert.equal(byteLength("🙂"), 4);
+});
+
+test("exit codes: configuration errors are 2 and everything else is 1", () => {
+  assert.equal(exitCodeFor(new WecomConfigError(["WECOM_BOT_ID"], "missing")), 2);
+  assert.equal(exitCodeFor({ code: "config_error" }), 2);
+  assert.equal(exitCodeFor({ code: "wecom_config_error" }), 2);
+  assert.equal(exitCodeFor(Object.assign(new Error("dup"), { code: "already_running" })), 1);
+  assert.equal(exitCodeFor(Object.assign(new Error("auth"), { code: "auth_failed" })), 1);
+  assert.equal(exitCodeFor(undefined), 1);
 });

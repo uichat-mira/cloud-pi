@@ -6,6 +6,11 @@
  * Pi SDK session, no tools and a fixed channel prompt, so a WeCom message can
  * never reach the private notes root, MCP tools or another conversation.
  *
+ * This adapter is intentionally separate from the Feishu one rather than a
+ * shared abstraction: the two channels differ in cancellation semantics,
+ * transport lifetime and delivery rules, and the architecture ADR keeps each
+ * channel an independent thin adapter instead of a parameterised ChannelPort.
+ *
  * The session working directory is a private temp directory so a developer's
  * repository `AGENTS.md` never enters the model context.
  */
@@ -31,6 +36,17 @@ export function wecomChannelPromptExtension(systemPrompt = WECOM_CHANNEL_SYSTEM_
   };
 }
 
+/** A turn that was aborted before it reached the model. */
+const CANCELLED_TURN = Object.freeze({
+  status: "cancelled",
+  text: "",
+  error: Object.freeze({ code: "cancelled" }),
+  durationMs: 0,
+});
+
+/** AGT-027 contract: no built-in, MCP or custom tool for a chat-triggered run. */
+const NO_TOOLS = Object.freeze({ allowedTools: [], exposedTools: [], customTools: [] });
+
 /**
  * @param {object} [options]
  * @param {Record<string,string>} [options.env] configuration source (default process.env)
@@ -48,65 +64,60 @@ export function createWecomAgentRunner({
   // incomplete.
   if (!config) loadConfig(env);
 
-  const ownsCwd = cwd === undefined;
+  const ownsWorkdir = cwd === undefined;
   const workdir = cwd ?? mkdtempSync(join(tmpdir(), "cloud-pi-wecom-"));
 
   let runtimePromise;
   let disposed = false;
-  // AGT-027's contract: one runtime instance must not run two turns at once.
-  let runLock = Promise.resolve();
+  /** Serialises turns: the one runtime must not run two at once. */
+  let tail = Promise.resolve();
 
-  function cancelledRecord() {
-    return { status: "cancelled", text: "", error: { code: "cancelled" }, durationMs: 0 };
+  function serialize(task) {
+    const run = tail.then(task, task);
+    // A failed turn must not poison the queue for the next message.
+    tail = run.then(
+      () => {},
+      () => {},
+    );
+    return run;
   }
 
-  async function getRuntime() {
+  async function startRuntime() {
+    const model = config ? { config } : { env };
+    return await createRuntime({
+      ...model,
+      cwd: workdir,
+      ...NO_TOOLS,
+      extensionFactories: [wecomChannelPromptExtension()],
+    });
+  }
+
+  async function ensureRuntime() {
     if (disposed) throw new Error("WeCom agent runner is disposed");
-    if (!runtimePromise) {
-      runtimePromise = (async () =>
-        createRuntime({
-          ...(config ? { config } : { env }),
-          cwd: workdir,
-          // Empty lists are meaningful: no built-in tool and no MCP tool is
-          // exposed to, or executable by, a WeCom-triggered run.
-          allowedTools: [],
-          exposedTools: [],
-          customTools: [],
-          extensionFactories: [wecomChannelPromptExtension()],
-        }))();
-    }
+    if (!runtimePromise) runtimePromise = startRuntime();
     return await runtimePromise;
   }
 
   return {
     /** @param {{text: string, signal?: AbortSignal}} input */
     async runTurn({ text, signal }) {
-      const previous = runLock;
-      let release;
-      runLock = new Promise((resolve) => {
-        release = resolve;
-      });
-      await previous.catch(() => {});
-      try {
-        if (signal?.aborted) return cancelledRecord();
-        const runtime = await getRuntime();
-        if (signal?.aborted) return cancelledRecord();
+      return await serialize(async () => {
+        // A queued turn canceled before its slot starts must not call the model.
+        if (signal?.aborted) return CANCELLED_TURN;
+        const runtime = await ensureRuntime();
+        if (signal?.aborted) return CANCELLED_TURN;
         return await runtime.run(text, { signal });
-      } finally {
-        release();
-      }
+      });
     },
 
     async dispose() {
       if (disposed) return;
       disposed = true;
       try {
-        if (runtimePromise) {
-          const runtime = await runtimePromise.catch(() => undefined);
-          runtime?.dispose?.();
-        }
+        const runtime = await runtimePromise?.catch(() => undefined);
+        runtime?.dispose?.();
       } finally {
-        if (ownsCwd) rmSync(workdir, { recursive: true, force: true });
+        if (ownsWorkdir) rmSync(workdir, { recursive: true, force: true });
       }
     },
   };

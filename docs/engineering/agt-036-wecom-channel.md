@@ -117,7 +117,7 @@ npm run channel:wecom
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
-| 通道离线测试 | `npm run test:wecom` | 50 passed / 0 failed（5 个测试文件：config/events/policy/dedupe、channel、text/sessions、transport、service/lock） |
+| 通道离线测试 | `npm run test:wecom` | 55 passed / 0 failed（6 个测试文件：config、events/policy/dedupe、channel/text/sessions、transport、service/lock、runtime） |
 | 全仓回归 | `npm test` | 见 PR 描述（含既有飞书、调度、API、投递测试） |
 | 配置校验入口 | `npm run wecom:check` | 有凭证时 exit 0 并输出脱敏配置摘要；无凭证 exit 2 且列出缺失字段 |
 | 真实链路 | — | **未执行**（无凭证）。取得凭证后需记录：认证成功、一条单聊消息的真实回复、一次群 @ 的真实回复、日志脱敏抽查 |

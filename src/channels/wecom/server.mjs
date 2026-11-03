@@ -7,9 +7,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { WecomConfigError } from "./config.mjs";
-import { WecomInstanceError } from "./instance.mjs";
 import { createWecomService } from "./service.mjs";
-import { WecomTransportError } from "./transport.mjs";
 
 export function createJsonLogger(stream = process.stdout) {
   return (entry) => {
@@ -28,8 +26,8 @@ export function exitCodeFor(error) {
   const code = error?.code;
   if (code && CONFIG_CODES.has(code)) return 2;
   if (error instanceof WecomConfigError) return 2;
-  if (error instanceof WecomInstanceError) return 1;
-  if (error instanceof WecomTransportError) return error.code === "auth_failed" ? 1 : 1;
+  // Anything else — instance lock, transport, auth, runtime — is a runtime
+  // failure for a supervisor to restart, not a configuration error.
   return 1;
 }
 
@@ -116,7 +114,12 @@ export async function main({
 
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isDirectRun) {
-  main().then((result) => {
-    if (typeof result === "number") process.exit(result);
-  });
+  main()
+    .then((result) => {
+      if (typeof result === "number") process.exit(result);
+    })
+    .catch((error) => {
+      process.stderr.write(`${JSON.stringify({ level: "error", event: "wecom_entry_failed" })}\n`);
+      process.exit(exitCodeFor(error));
+    });
 }
