@@ -4,7 +4,8 @@
 > 不可达 destination 失败隔离通过（修复 SDK 抛错分类后复测）。**
 > 时间：2026-11-03 17:01 Asia/Shanghai。
 > 被测实现：`feat/agt-033-scheduler-delivery`，PR #18；主 Live 运行 commit
-> `93aacb7`，失败分类修复/复测 commit `350666f`（基线 `dev@fad03f8`）。
+> `93aacb7`，失败分类修复/复测 commit `350666f`（基线 `dev@fad03f8`）；PR 最终
+> head `2664c5b` 仅去掉 probe 脚本对 PATH/git 的依赖，投递代码与 `350666f` 相同。
 > 原始 JSONL：[`agt-033-live-delivery.jsonl`](agt-033-live-delivery.jsonl)。
 > 本文与 JSONL 不含 App Secret、token、模型 Key、消息正文、完整 open_id/chat_id。
 
