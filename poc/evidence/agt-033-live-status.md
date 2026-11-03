@@ -51,7 +51,15 @@
   - `codeCommit=350666f`
 - 因此最终代码的失败隔离为“一次 API 尝试即终态”，不会对坏目标刷重试。
 
-## 4. 仍未验证 / 不在本卡范围
+## 4. Live 之后的修复
+
+Live 主运行之后又加入了单次请求有界超时（`feishu_send_timeout`，默认 15s，只消耗既有
+`maxAttempts` 预算）和 SDK 抛错分类修复。为遵守“每个目标只发 1 条”，没有为了验证超时
+再次向真人/群发送；超时行为由 `tests/agt-033-transport.test.mjs` 与
+`tests/agt-033-delivery.test.mjs` 的挂起请求测试覆盖（有界耗时 + attempts 计数）。
+因此 Live 的送达/messageId 仍是上表事实，后续代码改动不改变已发生的发送。
+
+## 5. 仍未验证 / 不在本卡范围
 
 - 多实例/distributed exactly-once（本卡是单进程本地持久化幂等）；
 - “已发送但记录尚未落盘”的极端崩溃窗口仍可能 at-least-once（先 pending 落盘已缩小窗口）；
@@ -59,7 +67,7 @@
 - 授权群以外的群、个人目标以外的用户；
 - 未部署、未合并、未关闭 Issue。
 
-## 5. 复现
+## 6. 复现
 
 ```bash
 # 主 Live（需要维护者私聊窗口；每个目标 1 条）
