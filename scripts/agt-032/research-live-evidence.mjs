@@ -15,9 +15,8 @@
  * records only run id, research status, duration, source count, replyDelivered
  * and masked ids. The run directory itself is the real AGT-028 artifact root.
  */
-import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { maskId } from "../../src/channels/feishu/config.mjs";
 import { startFeishuService } from "../../src/channels/feishu/service.mjs";
@@ -68,10 +67,24 @@ function versionOf(packageName) {
   }
 }
 
+/**
+ * Read HEAD from fixed repository paths (no subprocess, no PATH lookup). A
+ * worktree pointer is resolved relative to the repository root only.
+ */
 function gitHead() {
   try {
-    const head = execFileSync("git", ["-C", ROOT, "rev-parse", "HEAD"], { encoding: "utf8" });
-    return head.trim() || null;
+    const dotGit = join(ROOT, ".git");
+    const pointer = statSync(dotGit).isFile() ? readFileSync(dotGit, "utf8").trim() : null;
+    const gitDir = pointer && pointer.startsWith("gitdir:")
+      ? resolve(ROOT, pointer.slice("gitdir:".length).trim())
+      : dotGit;
+    const head = readFileSync(join(gitDir, "HEAD"), "utf8").trim();
+    if (!head.startsWith("ref: ")) return head || null;
+    try {
+      return readFileSync(join(gitDir, head.slice(5)), "utf8").trim() || null;
+    } catch {
+      return null;
+    }
   } catch {
     return null;
   }
