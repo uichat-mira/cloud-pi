@@ -213,10 +213,11 @@ export function createDeliveryCoordinator({
     record.updatedAt = at;
 
     while (record.attempts < limits.maxAttempts) {
+      const attemptAt = nowIso(clock);
       record.attempts += 1;
       record.status = DELIVERY_STATUS.PENDING;
-      record.lastAttemptAt = at;
-      record.updatedAt = at;
+      record.lastAttemptAt = attemptAt;
+      record.updatedAt = attemptAt;
       // Persist the attempt before touching the network. A crash after this
       // point is visible as a pending attempt, not as an invisible send.
       await store.writeRecord(record);
@@ -237,25 +238,28 @@ export function createDeliveryCoordinator({
           if (typeof messageId !== "string" || messageId.length === 0) {
             throw new DeliveryError(DELIVERY_ERROR.MISSING_MESSAGE_ID, "send returned no message id");
           }
-          record.segmentsSent.push({ index, messageId, sentAt: at });
+          const sentAt = nowIso(clock);
+          record.segmentsSent.push({ index, messageId, sentAt });
           record.messageId = record.segmentsSent[0].messageId;
-          record.updatedAt = at;
+          record.updatedAt = sentAt;
           // Persist after every segment: a retry resumes at the first
           // unacknowledged segment instead of repeating acknowledged ones.
           await store.writeRecord(record);
         }
+        const sentAt = nowIso(clock);
         record.status = DELIVERY_STATUS.SENT;
-        record.sentAt = at;
+        record.sentAt = sentAt;
         record.lastError = null;
-        record.updatedAt = at;
+        record.updatedAt = sentAt;
         await store.writeRecord(record);
         logger.info?.(`delivery: ${key} sent (${record.segmentsSent.length} segment(s), attempt ${record.attempts})`);
         return record;
       } catch (error) {
-        const failure = toDeliveryError(error, at);
+        const failureAt = nowIso(clock);
+        const failure = toDeliveryError(error, failureAt);
         failure.message = redactSecrets(failure.message);
         record.lastError = failure;
-        record.updatedAt = at;
+        record.updatedAt = failureAt;
         const retryable = error?.retryable === true && record.attempts < limits.maxAttempts;
         if (!retryable) {
           record.status = DELIVERY_STATUS.FAILED;
