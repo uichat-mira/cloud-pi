@@ -81,8 +81,8 @@ function runUnitCases() {
       rows.push({ name, pass: false, detail: error.message });
     }
   };
-  const c3 = (name, input, expected) => {
-    const verdict = fullSuiteVerdict(input);
+  const c3 = (name, input, expected, options = {}) => {
+    const verdict = fullSuiteVerdict(input, options);
     rows.push({ name, pass: verdict.status === expected, detail: `${verdict.status}: ${verdict.detail}` });
   };
 
@@ -106,27 +106,38 @@ function runUnitCases() {
   scanCase("scan/ellipsis-mask-allowed", "chat_id=0f3b9e…a9b6", 0);
   scanCase("scan/ascii-mask-allowed", "chat_id=0f3b9e...a9b6", 0);
   scanCase("scan/full-chat-id-detected", "chat_id=0f3b9e12ab34cd56ef78a9b6", "wecom_chat_id");
+  // t11 G12: documentation explaining a mapping writes the *placeholder* form.
+  // Allow-listing those words keeps the scanner usable on docs without letting a
+  // real id through (the case above still has to fire).
+  scanCase("scan/placeholder-chatid-allowed", "单聊 → chatid=userid, chat_type=1", 0);
+  scanCase("scan/placeholder-chatid-group-allowed", "群聊 → chatid=chatid, chat_type=2", 0);
+  scanCase("scan/placeholder-redacted-allowed", "chat_id=redacted", 0);
+  scanCase("scan/placeholder-does-not-hide-real-id", "chat_id=0f3b9e12ab34cd56ef78a9b6", "wecom_chat_id");
   reject("writer/oversized-text", { event: "x", detail: "a".repeat(200) }, /longer than 160/);
   reject("writer/forbidden-key", { event: "x", messageId: "wm123" }, /not on the whitelist/);
   accept("writer/seed-label", { event: "x", note: "seed 数据，非 A2 注册链能力（证据必须原样标注）" });
-  accept("writer/ascii-summary", { event: "x", detail: "tests=555 fail=2 exit=1 head=8efc250" });
+  accept("writer/ascii-summary", { event: "x", detail: "tests=642 fail=0 exit=0 head=ade8a36" });
 
-  // --- F-28-2: the C3 gate asserts the failure *count* -------------------
-  const known = [
-    "resolveRunsRoot: explicit > env > default",
-    "adapter: system prompt and cwd isolation through Pi",
-    "research policy reaches the model-visible system prompt",
-  ];
-  c3("judge/c3-baseline-pass", { tests: 555, fail: 2, failing: known }, "pass");
+  // --- G13: the C3 gate reads counts from the TAP summary -----------------
+  // Old behaviour asserted absolute constants (555 tests / exactly 2 failures)
+  // captured from an older baseline; once t7 fixed those defects, a healthy
+  // 642/0 suite was rejected. The only constant left is the *known-failure*
+  // list, which is currently empty (no tolerated failures).
+  c3("judge/dev-actual-642-0-pass", { tests: 642, fail: 0, failing: [] }, "pass");
+  c3("judge/small-suite-pass", { tests: 12, fail: 0, failing: [] }, "pass");
   c3(
-    "judge/c3-third-failure-with-known-title",
-    { tests: 555, fail: 3, failing: [...known, "research policy reaches the model-visible system prompt for wecom"] },
-    "fail",
+    "judge/known-list-tolerated",
+    { tests: 642, fail: 1, failing: ["acme: known flaky windows case"] },
+    "pass",
+    { known: [/acme: known flaky windows case/] },
   );
-  c3("judge/c3-known-defect-fixed", { tests: 555, fail: 1, failing: [known[0]] }, "fail");
-  c3("judge/c3-tests-dropped", { tests: 553, fail: 2, failing: known }, "fail");
-  c3("judge/c3-unknown-name", { tests: 555, fail: 2, failing: [known[0], "brand new failure"] }, "fail");
-  c3("judge/c3-no-summary", { tests: undefined, fail: undefined, failing: [] }, "fail");
+  c3("judge/failure-without-known-list", { tests: 642, fail: 1, failing: ["brand new failure"] }, "fail");
+  c3("judge/known-list-does-not-hide-stranger", { tests: 642, fail: 2, failing: ["acme: known", "brand new"] }, "fail", {
+    known: [/acme: known/],
+  });
+  c3("judge/zero-tests", { tests: 0, fail: 0, failing: [] }, "fail");
+  c3("judge/fail-exceeds-tests", { tests: 10, fail: 11, failing: ["x"] }, "fail");
+  c3("judge/no-summary", { tests: undefined, fail: undefined, failing: [] }, "fail");
 
   rmSync(dir, { recursive: true, force: true });
   return rows;

@@ -56,7 +56,7 @@
    `Bearer …`、`app_secret=`、绝对路径、混合大小写 32+ 位随机 token（git SHA 与 `call_…` 工具调用 id
    不受影响）、**非 ASCII 文本**、以及超过 160 字符的自由文本。
 
-自由文本（`detail`/`note`）因此是**机器摘要**，不是聊天记录：只写 `tests=555 fail=2` 这类投影。
+自由文本（`detail`/`note`）因此是**机器摘要**，不是聊天记录：只写 `tests=642 fail=0` 这类投影。
 中文只允许一个白名单标签（`scripts/agt-03x/lib/harness.mjs` 的 `APPROVED_TEXT_LABELS`，当前只有 §6 的
 seed 标注原文）；其余中文一律拒绝——需要中文解释时写到 stdout/文档，不要写进证据。
 
@@ -109,19 +109,29 @@ node scripts/agt-03x/b-scheduled-research-delivery.mjs \
 
 ## 7. 判定器自身的硬约束（外审 F-28-1/2 后）
 
-- **C3 断言失败数量**：`scripts/agt-03x/lib/judge.mjs#fullSuiteVerdict` 同时校验
-  `tests >= 555` **和** `fail === 2`，再校验每个失败名命中已知模式。只用名字匹配的话，
-  一个标题里含已知子串的新失败会被静默放过（Node 的 TAP 还会为子测试补打父 `describe` 行，
-  2 个真实失败会产生 4 行 `not ok`）。基线漂移（修好一个已知缺陷、或新增失败）现在一律判 `fail`，
-  必须人工改基线——不允许自动「适应」。
+- **C3 从 TAP 输出读计数，不写死基线**（t11 G13 后修订）：`scripts/agt-03x/lib/judge.mjs#fullSuiteVerdict`
+  的输入是 `{tests, fail, failing}`（由 `parseTestSummary` / `failingTests` 从 TAP 解析），规则只有三条：
+  1. `tests` 必须是正数、`fail` 必须是 `>= 0` 的有限数，且 `fail <= tests`（摘要不自相矛盾）；
+  2. `fail === 0` 直接 `pass`；
+  3. `fail > 0` 时，**仅当** `KNOWN_FAILURES`（显式已知失败清单，当前为空）非空且**每个**失败行都命中清单才 `pass`；
+     否则 `fail`。
+  旧实现断言 `tests >= 555 && fail === 2`——那是 `dev@8efc250` 的历史快照；t7 修掉两个 Windows 缺陷后
+  基线变成 642/0，判定器反而把**健康的**测试套件判成失败。绝对基线记录的是历史，不是健康度；现在的规则
+  只对「出现未声明失败」报警，所以既不会随套件增长误报，也不会在失败被掩盖时放过。
+  放宽清单意味着**加模式 + 在提交信息与本文件记录原因**，不允许用环境变量开关（那等于给了静默放宽的旋钮）。
 - **D8 按值扫描，覆盖 `docs/**` + `poc/**`**：结构化证据（`.jsonl`/`.json`）先解析再扫字符串值，避免把
   `…_after_sdk_…` 这类键值边界误判为长 token；`.md` 才整篇扫描。形如 `chat_id=0f3b9e…a9b6` 的
-  **掩码**是允许的投影，未截断的完整 id 一律拒。`tests/` **不在**范围内（合成夹具会把扫描器调成噪音）。
-- 两者都有进程内回归用例（`self-test.mjs` 的「判定器本身的内建回归」表，**21 条**），
-  其中 `scan/ellipsis-mask-allowed` / `scan/ascii-mask-allowed`（掩码放行）与
-  `scan/full-chat-id-detected` / `writer/full-chat-id`（完整 id 拒绝）专门守住掩码规则。
-  注意分层：**掩码规则属于扫描器**（D8 读的是人写的文档，允许 `…`），而**生成的证据必须 ASCII**，
-  所以证据里的掩码用 `...`（`writer/ascii-mask` 用例）。
+  **掩码**是允许的投影，未截断的完整 id 一律拒。**占位词**（`chatid=userid`、`chatid=chatid`、
+  `chat_id=redacted`、`chat_id=<chatid>` 等说明文里解释映射的写法）不算命中（t11 G12：`t6-answers.md`
+  的一段散文曾把干净的工作树变成 1 个假阳性）。`tests/` **不在**范围内（合成夹具会把扫描器调成噪音）。
+- 两者都有进程内回归用例（`self-test.mjs` 的「判定器本身的内建回归」表，**27 条**）：
+  G12 由 `scan/placeholder-chatid-allowed`、`scan/placeholder-chatid-group-allowed`、
+  `scan/placeholder-redacted-allowed`（占位放行）与 `scan/full-chat-id-detected`、
+  `scan/placeholder-does-not-hide-real-id`（完整 id 仍拒）守住；G13 由
+  `judge/dev-actual-642-0-pass`（给定 dev 实际输出 → pass）、`judge/small-suite-pass`、
+  `judge/failure-without-known-list`、`judge/known-list-does-not-hide-stranger` 等守住。
+  注意分层：**掩码/占位规则属于扫描器**（D8 读的是人写的文档，允许 `…` 与占位词），而**生成的证据必须 ASCII**，
+  所以证据里的掩码用 `...`（`writer/ascii-mask` 用例），占位词同样不能替真实 id 开脱。
 
 ## 8. 证据卫生与更正记录
 
