@@ -1,7 +1,8 @@
 # AGT-033 · 定时研究的多目标飞书主动投递
 
 Status: 实现、自动化验证与 Live 验证均完成；真实个人/群各 1 条主动投递、
-幂等重放零新增、失败隔离 partial；Draft PR target `dev`（不合并、不部署，见 §10）。
+幂等重放零新增、失败隔离 partial；超时重构后的最终 head 又补验了 1 条真实个人投递
+（不发群）；Draft PR target `dev`（不合并、不部署，见 §10）。
 Owning Issue: [#15](https://github.com/uichat-mira/cloud-pi/issues/15)。
 Base: `origin/dev` at `fad03f8`（AGT-028/029/030 已合入）。Branch:
 `feat/agt-033-scheduler-delivery`。
@@ -236,8 +237,11 @@ fixture 研究冒充真实模型研究）。
 4. 失败隔离：用一个格式合法但不可达的 `open_id` 作为可信配置的额外目标，真实调用失败、
    不产生消息；断言个人/群已 sent 不被回滚，最终 `research=completed` /
    `delivery=partial`、sent=2/failed=1；
-5. 证据写到 `poc/evidence/agt-033-live-delivery.jsonl`：masked destination、run id、
-   message id、attempts、最终状态；不含正文、topic、raw id、secret。
+5. `--personal-only`（维护者批准）：只保留个人目标 1 条、不发群，用于补验超时重构后的
+   专属 client 路径，默认写 `agt-033-live-final-head.jsonl`；
+6. 证据写到 `poc/evidence/agt-033-live-delivery.jsonl`（或 personal-only 的
+   `agt-033-live-final-head.jsonl`）：masked destination、run id、message id、attempts、
+   最终状态；不含正文、topic、raw id、secret。
 
 运行命令（`.env` 只读，不提交）：
 
@@ -247,6 +251,11 @@ node --env-file-if-exists=.env scripts/agt-033/live-delivery-evidence.mjs --wait
 
 # 失败路径复测：只打不可达 id，不产生真实消息
 node --env-file-if-exists=.env scripts/agt-033/live-failure-probe.mjs
+
+# 最终 head 个人补验（只发个人 1 条，不发群）
+AGT_033_CODE_COMMIT=$(git rev-parse HEAD) \
+  node --env-file-if-exists=.env scripts/agt-033/live-delivery-evidence.mjs \
+  --personal-only --wait-dm-seconds 240
 ```
 
 **当前状态：已执行（2026-11-03 17:01 Asia/Shanghai）。** 主运行 commit `93aacb7`：
@@ -261,6 +270,24 @@ node --env-file-if-exists=.env scripts/agt-033/live-failure-probe.mjs
 - 详细脱敏证据见
   [`poc/evidence/agt-033-live-delivery.jsonl`](../../poc/evidence/agt-033-live-delivery.jsonl)
   与 [`agt-033-live-status.md`](../../poc/evidence/agt-033-live-status.md)。
+
+**最终 head 个人补验（2026-11-03 17:52 Asia/Shanghai，代码 commit `2783e86`）**：为证明
+“专属 client + per-request timeout/signal”重构后真实飞书仍能发出，维护者批准只向个人
+目标补发 1 条、明确不发群（避免打扰群成员）：
+
+- run `r-20261103T095233-b00061`，research=`completed`、trigger=`succeeded`；
+- 个人 `ou_f7a…81a5`：`sent`、`attempts=1`、messageId `om_x100b61aea0ecc4a4dfc6c51c0c684b6`、
+  sentAt `2026-11-03T09:52:34.146Z`；`realMessages=1`，`groupTarget=null`（无群发送）；
+- 运行时诊断：`dedicatedSendClient=true`、`sendTimeoutMs=15000`、
+  `sharedDefaultsTimeoutAfterCreate=0`（未改共享 `defaults`）；
+- 幂等重放：同一 `runId+destination` 再 replay 两次 completion callback + 新 coordinator
+  重启，发送计数 `1→1→1`、messageId 未变（零新增）；
+- 失败探测：不可达 `open_id` 为 `failed`、`attempts=1`、`createdMessages=0`、
+  `feishuCode=99992351`、`retryable=false`；个人目标保持 sent；最终
+  `research=completed` / `delivery=partial`、counts total=2 / sent=1 / failed=1；
+- 脱敏证据：
+  [`poc/evidence/agt-033-live-final-head.jsonl`](../../poc/evidence/agt-033-live-final-head.jsonl)。
+  personal-only 的 checks 中 `groupSent` 是模式占位（无群目标），不作为群发送证据。
 
 Live 研究 run 的 runtime 仍是确定性 fixture；真实模型/联网研究触发投递不在本卡 Live
 证据内。

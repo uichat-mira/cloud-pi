@@ -79,3 +79,20 @@ node --env-file-if-exists=.env scripts/agt-033/live-delivery-evidence.mjs --wait
 # 失败路径复测（不产生真实消息）
 node --env-file-if-exists=.env scripts/agt-033/live-failure-probe.mjs
 ```
+
+## 7. 最终 head 个人补验（超时重构后）
+
+维护者批准：超时重构后的最终 head 只向**个人目标**补发 1 条，不发群。代码 commit
+`2783e86`，run `r-20261103T095233-b00061`（确定性 fixture 研究）。脱敏结果：
+
+- 个人 `ou_f7a…81a5`：`sent`、`attempts=1`、messageId
+  `om_x100b61aea0ecc4a4dfc6c51c0c684b6`、sentAt `2026-11-03T09:52:34.146Z`；
+- `realMessages=1`、`groupTarget=null`：没有群发送；
+- 专属 client 诊断：`dedicatedSendClient=true`、`sendTimeoutMs=15000`、
+  `sharedDefaultsTimeoutAfterCreate=0`；
+- 幂等：callback×2 + 新 coordinator 重启后 `1→1→1`，messageId 未变；
+- 失败探测：不可达 `open_id` `attempts=1`、`createdMessages=0`、`feishuCode=99992351`、
+  `retryable=false`；最终 `research=completed` / `delivery=partial`（total=2/sent=1/failed=1）；
+- 原始证据：
+  [`agt-033-live-final-head.jsonl`](agt-033-live-final-head.jsonl)。
+  personal-only 模式下 checks 的 `groupSent` 是占位（没有群目标），不是群发送证据。
