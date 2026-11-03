@@ -192,12 +192,12 @@ await scheduler.createSchedule({
 
 ## 9. 测试与本地证据
 
-新增测试（`node --test tests/agt-033-*.test.mjs`，55 tests）：
+新增测试（`node --test tests/agt-033-*.test.mjs`，56 tests）：
 
 | 文件 | 覆盖 |
 | --- | --- |
 | `tests/agt-033-contracts.test.mjs` | destination schema/未知字段拒绝/去重/上限；schedule 持久化与篡改 fail-closed；旧记录兼容；`runId+destination` 幂等键；五态策略；长文本段数/码点/截断标识/surrogate；接收人不可由额外字段注入 |
-| `tests/agt-033-transport.test.mjs` | 官方 SDK `im.message.create` 参数形状（open_id/chat_id）；`reply` 回归；业务码可重试分类；网络错误；缺 `message_id`；无效 destination 在网络前失败 |
+| `tests/agt-033-transport.test.mjs` | 官方 SDK `im.message.create` 参数形状（open_id/chat_id）；`reply` 回归；返回业务码与 SDK 抛出的 HTTP 业务拒绝（AxiosError）分类；网络错误；缺 `message_id`；无效 destination 在网络前失败 |
 | `tests/agt-033-delivery.test.mjs` | pending 先落盘；sent 持久字段；重复 callback/重启/并发 callback 不重发；记录篡改 fail-closed；单目标失败隔离；report missing；有界 retry/exhausted/non-retryable/unknown error；长报告分段与段级续传；报告文本无法改 recipient；无目标/interrupted/no-runId 不投递 |
 | `tests/agt-033-integration.test.mjs` (T3) | **真实** `createScheduler` → 真实 AGT-028 `startResearch()` → 真实 run store/`readResearchRun` → 真实 coordinator/store → 假 Feishu transport；completed/partial/failed/cancelled 全链路；重启/重复回调不重发；崩溃后启动 reconcile 只补发一次未投递的终态 run；失败隔离（research 仍 succeeded）；报告注入不改目标；executor 在 runId 前失败不投递 |
 
@@ -207,7 +207,7 @@ await scheduler.createSchedule({
 Feishu 为 fake sendMessage，无真实网络）。覆盖 4 个场景：双目标成功 + 重复回调/重启
 零新增发送；单目标失败隔离；有界 retry 与耗尽；长报告 3 段且重放零新增。
 
-回归：`npm test` 从基线 399 tests 增至 454 tests（+55），0 fail；AGT-029/030 的
+回归：`npm test` 从基线 399 tests 增至 455 tests（+56），0 fail；AGT-029/030 的
 scheduler 与 Feishu 测试全部保留。
 
 ## 10. Live（T4）与未验证项
@@ -232,12 +232,28 @@ fixture 研究冒充真实模型研究）。
 运行命令（`.env` 只读，不提交）：
 
 ```bash
-node --env-file-if-exists=.env scripts/agt-033/live-delivery-evidence.mjs --append
+# 主 Live：需要维护者私聊窗口，每个目标 1 条
+node --env-file-if-exists=.env scripts/agt-033/live-delivery-evidence.mjs --wait-dm-seconds 240
+
+# 失败路径复测：只打不可达 id，不产生真实消息
+node --env-file-if-exists=.env scripts/agt-033/live-failure-probe.mjs
 ```
 
-**当前状态：未执行（等待维护者私聊窗口）。** 尚未拿到真人窗口，本文与 PR 不声称
-真实个人/群主动投递已验证；自动化 T1/T2/T3 已全部通过。执行后会把脱敏 JSONL 与
-`poc/evidence/agt-033-live-status.md` 更新为真实结果（成功或失败均如实记录）。
+**当前状态：已执行（2026-11-03 17:01 Asia/Shanghai）。** 主运行 commit `93aacb7`：
+
+- 个人 `ou_f7a…81a5`：`sent`、`attempts=1`、messageId `om_x100b…bfc8`、sentAt；
+- 群 `oc_09e…5daf`：`sent`、`attempts=1`、messageId `om_x100b…1e6`、sentAt；
+- 重复 callback ×2 + coordinator 重启后发送计数仍为 2，messageId 未变（零新增）；
+- 不可达 `open_id` 隔离：修复前因 SDK 把 HTTP 400 业务拒绝抛成 AxiosError，被误当网络
+  错误重试 3 次（未创建消息、个人/群未回滚）；已在 commit `350666f` 改为先提取
+  `response.data.code` 再分类，并用只打不可达 id 的复测验证 `attempts=1`、
+  `feishuCode=99992351`、`retryable=false`、`createdMessages=0`。
+- 详细脱敏证据见
+  [`poc/evidence/agt-033-live-delivery.jsonl`](../../poc/evidence/agt-033-live-delivery.jsonl)
+  与 [`agt-033-live-status.md`](../../poc/evidence/agt-033-live-status.md)。
+
+Live 研究 run 的 runtime 仍是确定性 fixture；真实模型/联网研究触发投递不在本卡 Live
+证据内。
 
 仍未证明/明确不在本卡范围：
 
