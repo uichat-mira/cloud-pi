@@ -61,6 +61,7 @@ export async function startFeishuService({
       agent,
       summary: {
         ...describeFeishuConfig(config),
+        appId: maskId(config.appId),
         botOpenIdResolved: Boolean(started.botOpenId),
         botOpenId: started.botOpenId ? maskId(started.botOpenId) : undefined,
       },

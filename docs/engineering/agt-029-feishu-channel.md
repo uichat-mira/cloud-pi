@@ -1,7 +1,7 @@
 # AGT-029 · 飞书双向通道 POC（Pi SDK / Cloud Pi Runtime）
 
-> 状态（2026-11-03）：本地实现、T1/T2/T3 离线回归已通过；真实飞书 Live POC 见
-> [agt-029-live-evidence.md](agt-029-live-evidence.md)。本文不把“代码可运行”写成“Live 已通过”。
+> 状态（2026-11-03）：本地实现、T1/T2/T3 离线回归已通过；真实飞书**私聊**与**授权群 @**
+> Live 往返也已通过，证据见 [agt-029-live-evidence.md](agt-029-live-evidence.md)。
 
 ## 1. 范围与结论
 
@@ -134,14 +134,15 @@ FEISHU_APP_ID=cli_... FEISHU_APP_SECRET=... npm run feishu:live
 `npm run feishu:live` 支持 `--expect reply|ignored:<reason>`、`--chat-type p2p|group`、
 `--timeout-ms`、`--evidence`。脚本不能伪造入站消息：必须由真人在飞书发送。
 
-## 8. 验证矩阵（离线部分）
+## 8. 验证矩阵
 
 | 卡片 | 证据 |
 | --- | --- |
 | T1 配置 / 路由 / 事件 / 去重 | `tests/agt-029-config.test.mjs`、`events`、`policy`、`dedupe`：23 项 |
 | T2 Adapter → Runtime 调用边界、AbortSignal、错误回复、负例 | `tests/agt-029-channel.test.mjs`：15 项；`tests/agt-029-service.test.mjs`：2 项 |
 | T3 真实 `createAgentRuntime().run()` + Pi faux 管线 | `tests/agt-029-runtime.test.mjs`：5 项 |
-| 全仓回归 | `npm test`：362 项通过，0 失败（含 P0/AGT-027/AGT-028） |
+| Live 私聊 / 授权群 @ / 群非 @ 忽略 | `npm run feishu:live`：真实事件 + 真实模型，证据见 Live 文档 |
+| 全仓回归 | `npm test`：365 项通过，0 失败（含 P0/AGT-027/AGT-028） |
 
 T3 的 faux 模型只替代模型边界，Session 组装、extension、工具权限门、取消与错误分类均为
 生产代码；它不是真实模型调用，真实调用证据单独记录。
@@ -150,9 +151,11 @@ T3 的 faux 模型只替代模型边界，Session 组装、extension、工具权
 
 1. 不保留跨消息会话/历史；每条消息独立 Session。
 2. 不核验群成员资格，也不把飞书身份映射到 Cloud Account / Guanlan consumer。
-3. 去重只在单进程内；多实例或重启后的共享幂等需要持久化去重存储。
+3. 去重只在单进程内；多实例或重启后的共享幂等需要持久化去重存储。Live 未人为制造飞书重投，
+   顺序/并发重投由 T1/T2 覆盖。
 4. 仅文本消息；图片/富文本/卡片、文件与 reaction 未实现。
 5. 回复没有应用级重试；依赖 SDK 连接重连，投递失败只记录 outcome。
 6. 卡片按钮回调（webhook/card action）未实现。
 7. `FEISHU_ALLOWED_CHAT_IDS` 是 POC 本地允许列表，不是 Cloud Auth 正式群授权管理。
 8. 群聊不读取非 @ 消息作为上下文（隐私边界待产品另行决定）。
+9. Live 未稳定复现 `/stop` 的人工窗口；Adapter abort 与真实 Pi Session AbortSignal 由 T2/T3 覆盖。
