@@ -7,9 +7,9 @@
  *  - reply framing (`replyStream` needs a stream id, and the channel sends
  *    bounded segments rather than one streaming answer);
  *  - the per-conversation rate limits (30/min, 1000/h) the platform documents;
- *  - the `chat_type` gap: `WSClient.sendMessage()` cannot send `chat_type`, so a
- *    single-chat push would be inferred as a group chat. This module refuses it
- *    instead of delivering to the wrong place;
+ *  - `chat_type`: `WSClient.sendMessage()` spreads its body into `aibot_send_msg`,
+ *    so this module passes `chat_type` explicitly (1 single / 2 group) — without
+ *    it the platform prefers a group and a single-chat push would be misrouted;
  *  - a hard timeout per send so a missing protocol ack can never hang a run.
  *
  * The SDK is imported lazily, so offline tests and any non-WeCom command never
@@ -17,7 +17,7 @@
  * transport exposes; it never sees credentials outside the client options.
  */
 
-import { WECOM_MAX_CONTENT_BYTES, hashId } from "./config.mjs";
+import { WECOM_MAX_CONTENT_BYTES, WECOM_PLATFORM_ERROR, hashId } from "./config.mjs";
 import { byteLength } from "./text.mjs";
 
 export const WECOM_RATE_LIMITS = Object.freeze({
@@ -26,11 +26,14 @@ export const WECOM_RATE_LIMITS = Object.freeze({
 });
 
 export class WecomTransportError extends Error {
-  constructor(code, detail, { retryable = false } = {}) {
+  constructor(code, detail, { retryable = false, platformCode } = {}) {
     super(detail ? `WeCom transport error (${code}): ${detail}` : `WeCom transport error (${code})`);
     this.name = "WecomTransportError";
     this.code = code;
     this.retryable = retryable;
+    // A platform error code (when the failure has a documented one) so callers can
+    // report `93006`/`40058` semantics instead of a generic transport class.
+    if (typeof platformCode === "number") this.platformCode = platformCode;
   }
 }
 
@@ -129,6 +132,7 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       throw new WecomTransportError(
         "content_too_large",
         `${bytes} bytes exceeds ${WECOM_MAX_CONTENT_BYTES}; channel must segment first`,
+        { retryable: false, platformCode: WECOM_PLATFORM_ERROR.PAYLOAD_TOO_LARGE },
       );
     }
   }
@@ -274,7 +278,7 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       recordSend(reqId);
       // The SDK resolves only on a platform acknowledgement, so a resolved call is
       // an accepted delivery; the code is reported for the evidence projection.
-      return { replyId: streamId, errcode: typeof ack?.errcode === "number" ? ack.errcode : 0 };
+      return { messageId: streamId, replyId: streamId, errcode: typeof ack?.errcode === "number" ? ack.errcode : 0 };
     } catch (error) {
       if (error instanceof WecomTransportError) throw error;
       throw new WecomTransportError("reply_failed", String(error?.message ?? error), { retryable: false });
