@@ -53,12 +53,15 @@ const NO_TOOLS = Object.freeze({ allowedTools: [], exposedTools: [], customTools
  * @param {string} [options.cwd] session working directory (default a private temp dir)
  * @param {object} [options.config] injected validated model config (tests)
  * @param {Function} [options.createRuntime] `createAgentRuntime` injection (tests)
+ * @param {() => string} [options.generateRunId] run id generator shared with the
+ *   run store, so a chat run is readable by id (AGT-037 trace)
  */
 export function createWecomAgentRunner({
   env = process.env,
   cwd,
   config,
   createRuntime = createAgentRuntime,
+  generateRunId,
 } = {}) {
   // Fail at startup, not on the first message, if the model configuration is
   // incomplete.
@@ -87,6 +90,7 @@ export function createWecomAgentRunner({
     return await createRuntime({
       ...model,
       cwd: workdir,
+      ...(generateRunId ? { generateRunId } : {}),
       ...NO_TOOLS,
       extensionFactories: [wecomChannelPromptExtension()],
     });
