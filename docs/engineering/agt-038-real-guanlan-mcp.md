@@ -15,7 +15,7 @@ Cloud Auth 签发的服务令牌、真实 `https://…workers.dev/mcp` 端点、
 | 令牌不进日志/提示/工具参数/run 记录 | ✅ 日志只有 `tokenFingerprint`(sha256[:12])/`exp`/`kid`；单测断言序列化后不含令牌 |
 | 缺失/过期/错 audience/伪造签名 | ✅ 四种负例均 fail-closed，无伪造成功 |
 | 工具调用可追溯（名字/参数摘要/结果摘要/耗时） | ✅ 在 run 记录的 `toolCalls` 中 |
-| 写工具（`guanlan_news_decide`） | ⛔ 本卡只读；留 `GUANLAN_MCP_ALLOW_WRITE` 显式开关，未做真实写验收 |
+| 写工具（`guanlan_news_decide`） | ⚠️ 只读默认隐藏；`GUANLAN_MCP_ALLOW_WRITE=1` 才暴露。CAS 语义（stale version → 逐字报错；重读后成功）用本地真实 MCP 服务集成测试覆盖，**未**在真实账本上执行写 |
 
 ## 2. 实现
 
@@ -101,8 +101,9 @@ run: status=succeeded  durationMs=9926  usage{input:596,output:364}
 
 ## 6. 未覆盖与风险
 
-1. **写工具未验收**：`guanlan_news_decide` 仅在 `GUANLAN_MCP_ALLOW_WRITE=1` 时暴露，未做真实读+写
-   +CAS 的端到端验证（本卡只读范围）。
+1. **写工具未在真实账本上验收**：`guanlan_news_decide` 默认隐藏，`GUANLAN_MCP_ALLOW_WRITE=1` 才暴露；
+   CAS 的"旧版本被拒 → 重读 → 成功"链路用本地真实 MCP 服务集成测试覆盖（逐字 `version_conflict`），
+   但没有对生产账本执行写（Issue #25 的非目标，且真实授权查询当前 0 条，无可选目标）。
 2. **真实长 run 跨 TTL**：用可注入时钟的单测覆盖，没有在真实网关上跑几分钟去"顺便验证"（避免把
    TTL 失败与网络失败混在一起）。
 3. **runId 形态**：合并 `dev`（含 t7 统一入口）后实测为 run-store 形态 `r-20261103T190201-1a7caf`；

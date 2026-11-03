@@ -26,6 +26,7 @@ import { createGuanlanMcpBinding } from "../src/mcp/guanlan.mjs";
 const TOOL_WHOAMI = "guanlan_whoami";
 const TOOL_NEWS = "guanlan_news_recent";
 const TOOL_SECRET = "guanlan_internal_debug"; // offered by the server, must stay hidden
+const TOOL_DECIDE = "guanlan_news_decide"; // write scope, only exposed on opt-in
 
 function jwt(expOffsetSec = 300) {
   const header = Buffer.from(JSON.stringify({ alg: "EdDSA", kid: "t9-test", typ: "JWT" })).toString("base64url");
@@ -37,7 +38,7 @@ function jwt(expOffsetSec = 300) {
 }
 
 /** A minimal streamable-HTTP MCP server: initialize, tools/list, tools/call. */
-async function startMcpServer({ newsFails = true } = {}) {
+async function startMcpServer({ newsFails = true, cas = false } = {}) {
   const requests = [];
   const server = createServer((request, response) => {
     let body = "";
@@ -74,6 +75,15 @@ async function startMcpServer({ newsFails = true } = {}) {
                 inputSchema: { type: "object", properties: { limit: { type: "number" } } },
               },
               { name: TOOL_SECRET, description: "debug", inputSchema: { type: "object", properties: {} } },
+              ...(cas
+                ? [
+                    {
+                      name: TOOL_DECIDE,
+                      description: "decide a news item with compare-and-set",
+                      inputSchema: { type: "object", properties: { id: { type: "string" } } },
+                    },
+                  ]
+                : []),
             ],
           });
           return;
@@ -81,6 +91,19 @@ async function startMcpServer({ newsFails = true } = {}) {
           const name = payload.params?.name;
           if (name === TOOL_WHOAMI) {
             send({ content: [{ type: "text", text: JSON.stringify({ sub: "svc:t9", scope: ["guanlan.read"] }) }] });
+            return;
+          }
+          if (name === TOOL_DECIDE) {
+            // Compare-and-set: a stale version is a normal, expected rejection.
+            const expected = payload.params?.arguments?.expectedVersion;
+            if (expected !== 3) {
+              send({
+                isError: true,
+                content: [{ type: "text", text: `version_conflict: expected 3, got ${expected}` }],
+              });
+              return;
+            }
+            send({ content: [{ type: "text", text: JSON.stringify({ state: "adopted", stateVersion: 4 }) }] });
             return;
           }
           if (name === TOOL_NEWS && newsFails) {
@@ -201,6 +224,62 @@ test("a tool error from the server reaches the transcript verbatim, not as a fak
     assert.match(text, /upstream_error: ledger_unavailable/);
     // The credential went out on the wire exactly as a bearer token…
     assert.ok(server.requests.every((request) => request.authorization?.startsWith("Bearer ")));
+  } finally {
+    await server.close();
+  }
+});
+
+test("compare-and-set: a stale version is rejected verbatim, a re-read version succeeds", async () => {
+  const server = await startMcpServer({ newsFails: false, cas: true });
+  const tempDir = mkdtempSync(join(tmpdir(), "cloud-pi-t9-int-"));
+  const binding = createGuanlanMcpBinding({
+    env: { GUANLAN_MCP_URL: server.url, GUANLAN_MCP_TOKEN: jwt(), GUANLAN_MCP_ALLOW_WRITE: "1" },
+    log: () => {},
+    fetch: globalThis.fetch,
+  });
+  try {
+    const { session, faux } = await openSession({ binding, tempDir });
+    const tools = await waitForTools(session, 3);
+    assert.ok(tools.includes(`mcp__guanlan__${TOOL_DECIDE}`), "the write tool is exposed only with the explicit opt-in");
+
+    const decideResult = () =>
+      session.messages.findLast(
+        (message) => message.role === "toolResult" && message.toolName === `mcp__guanlan__${TOOL_DECIDE}`,
+      );
+    const textOf = (message) =>
+      (message.content ?? [])
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("\n");
+
+    // 1. Decide with the version the caller *thought* was current.
+    faux.setResponses([
+      fauxAssistantMessage(
+        [fauxToolCall(`mcp__guanlan__${TOOL_DECIDE}`, { id: "n-1", decision: "adopted", expectedVersion: 1 }, { id: "t9-cas-1" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage("conflict, re-reading"),
+    ]);
+    await session.prompt("decide with a stale version");
+    const stale = decideResult();
+    assert.equal(stale.isError, true, "a stale version must not look like success");
+    assert.match(textOf(stale), /version_conflict: expected 3, got 1/);
+
+    // 2. Re-read to learn the current version, then decide again.
+    faux.setResponses([
+      fauxAssistantMessage([fauxToolCall(`mcp__guanlan__${TOOL_NEWS}`, { limit: 2 }, { id: "t9-cas-reread" })], {
+        stopReason: "toolUse",
+      }),
+      fauxAssistantMessage(
+        [fauxToolCall(`mcp__guanlan__${TOOL_DECIDE}`, { id: "n-1", decision: "adopted", expectedVersion: 3 }, { id: "t9-cas-2" })],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage("adopted"),
+    ]);
+    await session.prompt("re-read then decide");
+    const applied = decideResult();
+    assert.notEqual(applied.isError, true);
+    assert.match(textOf(applied), /"stateVersion":4/);
   } finally {
     await server.close();
   }
