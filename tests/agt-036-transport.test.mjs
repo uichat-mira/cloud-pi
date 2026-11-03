@@ -141,24 +141,35 @@ test("transport: the per-conversation rate limit is enforced and retryable", asy
   await transport.stop();
 });
 
-test("transport: single-chat push is refused instead of being sent as a group message", async () => {
+test("transport: push carries chat_type so a single chat is not misrouted as a group", async () => {
   const client = new FakeClient();
   const transport = createWecomTransport({ config: CONFIG, createClient: () => client });
   await transport.start();
 
+  const single = await transport.send({ chatId: "user-a", chatType: "single", text: "hi" });
+  assert.equal(single.delivered, true);
+  assert.equal(client.messages.length, 1);
+  // 1 = single chat. Omitting `chat_type` makes the platform prefer group, which
+  // is exactly the misroute this assertion prevents.
+  assert.equal(client.messages[0].body.chat_type, 1);
+  assert.equal(client.messages[0].chatId, "user-a");
+  assert.equal(client.messages[0].body.msgtype, "markdown");
+
+  const group = await transport.send({ chatId: "chat-a", chatType: "group", text: "群消息" });
+  assert.equal(group.delivered, true);
+  assert.equal(client.messages.length, 2);
+  assert.equal(client.messages[1].body.chat_type, 2);
+  assert.equal(client.messages[1].body.markdown.content, "群消息");
+
+  // An unknown chat type is a caller bug, not something to guess about.
   await assert.rejects(
-    () => transport.send({ chatId: "user-a", chatType: "single", text: "hi" }),
+    () => transport.send({ chatId: "user-a", chatType: "channel", text: "hi" }),
     (error) => {
-      assert.equal(error.code, "chat_type_unsupported");
+      assert.equal(error.code, "invalid_target");
       return true;
     },
   );
-  assert.equal(client.messages.length, 0);
-
-  const result = await transport.send({ chatId: "chat-a", chatType: "group", text: "群消息" });
-  assert.equal(result.delivered, true);
-  assert.equal(client.messages.length, 1);
-  assert.equal(client.messages[0].body.msgtype, "markdown");
+  assert.equal(client.messages.length, 2);
 
   await transport.stop();
 });

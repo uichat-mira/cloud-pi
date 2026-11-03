@@ -102,6 +102,10 @@ export function createWecomService({
     sessions,
     config,
     stateDir,
+    /** The transport is shared with the delivery stage: one socket, one rate ledger. */
+    get transport() {
+      return transport;
+    },
 
     async start() {
       if (started) return this.describe();
