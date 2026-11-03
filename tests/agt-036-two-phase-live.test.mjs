@@ -13,6 +13,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { Writable } from "node:stream";
 import { main, phaseEvidence, verifyTwoPhase } from "../scripts/agt-036/two-phase-live.mjs";
+import { WECOM_DEFAULT_ACK_TEXT } from "../src/channels/wecom/config.mjs";
 
 function capture() {
   const chunks = [];
@@ -108,7 +109,7 @@ test("two-phase live: --self-test verifies ack then push over the fake client", 
   assert.equal(result.real, false);
   // The fake client saw the ack and then the pushed answer with chat_type single.
   assert.equal(client.replies.length, 1);
-  assert.equal(client.replies[0].content, "已收到，正在处理…");
+  assert.equal(client.replies[0].content, WECOM_DEFAULT_ACK_TEXT);
   assert.equal(client.sent.length, 1);
   assert.equal(client.sent[0].payload.chat_type, 1);
   assert.equal(client.sent[0].payload.markdown.content, "两段式最终回答");

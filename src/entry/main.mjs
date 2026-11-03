@@ -158,6 +158,46 @@ export async function main({
   }
 
   if (parsed.check) {
+    // Offline validation of the WeCom startup gate: an operator must learn that
+    // external tools are enabled without an explicit session allowlist here, not
+    // from a failed production start.
+    if (config.channels?.enabled?.includes("wecom")) {
+      try {
+        const { loadWecomConfig } = await import("../channels/wecom/config.mjs");
+        const { assertWecomSessionAuthorization } = await import("../channels/wecom/authorization.mjs");
+        const { WECOM_PROMPT_VERSION } = await import("../channels/wecom/runtime.mjs");
+        const wecomConfig = loadWecomConfig(effective.env);
+        const authorization = assertWecomSessionAuthorization({ env: effective.env, config: wecomConfig });
+        log({
+          level: "info",
+          event: "wecom_session_authorization",
+          enforced: authorization.enforced,
+          sources: authorization.sources,
+          allowedUserCount: authorization.allowedUserCount,
+          allowedChatCount: authorization.allowedChatCount,
+        });
+        // Experience settings an operator can verify offline: which prompts are in
+        // play and how chat replies are bounded. Numbers and version ids only.
+        log({
+          level: "info",
+          event: "wecom_experience_config",
+          promptVersions: { ...WECOM_PROMPT_VERSION },
+          ackEnabled: wecomConfig.ackEnabled,
+          ackMergeMs: wecomConfig.ackMergeMs,
+          singleMaxSegments: wecomConfig.singleMaxSegments,
+          groupMaxSegments: wecomConfig.groupMaxSegments,
+        });
+      } catch (error) {
+        log({
+          level: "error",
+          event: "cloud_agent_config_invalid",
+          code: String(error?.code ?? error?.name ?? "error"),
+          message: String(error?.message ?? error),
+          fields: Array.isArray(error?.fields) ? error.fields : undefined,
+        });
+        return { code: exitCodeFor(error) };
+      }
+    }
     log({
       level: "info",
       event: "cloud_agent_config_ok",

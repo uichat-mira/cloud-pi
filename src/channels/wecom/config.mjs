@@ -17,6 +17,12 @@ export const WECOM_CONFIG_KEYS = Object.freeze({
   BOT_NAME: "WECOM_BOT_NAME",
   ALLOWED_USER_IDS: "WECOM_ALLOWED_USER_IDS",
   ALLOWED_CHAT_IDS: "WECOM_ALLOWED_CHAT_IDS",
+  /**
+   * Optional fixed sentence sent to a rejected sender. Empty by default so a
+   * rejection gives no signal at all; set it only when a deployment wants to tell
+   * a colleague why the bot stayed silent.
+   */
+  DENIED_REPLY: "WECOM_DENIED_REPLY",
   WS_URL: "WECOM_WS_URL",
   HEARTBEAT_INTERVAL_MS: "WECOM_HEARTBEAT_INTERVAL_MS",
   CONNECT_TIMEOUT_MS: "WECOM_CONNECT_TIMEOUT_MS",
@@ -30,13 +36,26 @@ export const WECOM_CONFIG_KEYS = Object.freeze({
    */
   ACK_ENABLED: "WECOM_ACK_ENABLED",
   ACK_TEXT: "WECOM_ACK_TEXT",
+  /**
+   * Ack merge window (ms). A chat answer that finishes inside this window is sent
+   * alone: short questions must not get "收到" plus the answer (rubric A3a).
+   * `0` restores "ack every accepted message".
+   */
+  ACK_MERGE_MS: "WECOM_ACK_MERGE_MS",
+  /** Per-conversation segment caps for chat replies (rubric L2/L4). */
+  SINGLE_MAX_SEGMENTS: "WECOM_SINGLE_MAX_SEGMENTS",
+  GROUP_MAX_SEGMENTS: "WECOM_GROUP_MAX_SEGMENTS",
 });
 
 /** Documented platform limit for one markdown/stream payload, in UTF-8 bytes. */
 export const WECOM_MAX_CONTENT_BYTES = 20_480;
 
-/** Default acknowledgement text (configurable via `WECOM_ACK_TEXT`). */
-export const WECOM_DEFAULT_ACK_TEXT = "已收到，正在处理…";
+/**
+ * Default acknowledgement text (configurable via `WECOM_ACK_TEXT`).
+ *
+ * Rubric §3 A3b: a long task says what will happen next, not "收到，正在处理…".
+ */
+export const WECOM_DEFAULT_ACK_TEXT = "收到，这个要跑一会儿。跑完我直接发结论，中间不用等。";
 
 /**
  * Platform error codes this channel can name precisely.
@@ -68,6 +87,11 @@ export const WECOM_DEFAULTS = Object.freeze({
   replyMaxBytes: 20_000,
   replyTimeoutMs: 15_000,
   ackEnabled: true,
+  /** A chat answer that finishes inside this window is sent without an ack. */
+  ackMergeMs: 1_500,
+  /** Chat replies: a direct chat may continue across 3 messages, a group stays 1. */
+  singleMaxSegments: 3,
+  groupMaxSegments: 1,
 });
 
 export class WecomConfigError extends Error {
@@ -157,6 +181,7 @@ export function loadWecomConfig(env = process.env) {
     botName,
     allowedUserIds: readIdList(env, WECOM_CONFIG_KEYS.ALLOWED_USER_IDS),
     allowedChatIds: readIdList(env, WECOM_CONFIG_KEYS.ALLOWED_CHAT_IDS),
+    deniedReply: readString(env, WECOM_CONFIG_KEYS.DENIED_REPLY),
     wsUrl,
     heartbeatIntervalMs: readInteger(env, WECOM_CONFIG_KEYS.HEARTBEAT_INTERVAL_MS, {
       min: 5_000,
@@ -176,6 +201,21 @@ export function loadWecomConfig(env = process.env) {
     }),
     ackEnabled: readBool(env, WECOM_CONFIG_KEYS.ACK_ENABLED, WECOM_DEFAULTS.ackEnabled),
     ackText: readString(env, WECOM_CONFIG_KEYS.ACK_TEXT) ?? WECOM_DEFAULT_ACK_TEXT,
+    ackMergeMs: readInteger(env, WECOM_CONFIG_KEYS.ACK_MERGE_MS, {
+      min: 0,
+      max: 30_000,
+      fallback: WECOM_DEFAULTS.ackMergeMs,
+    }),
+    singleMaxSegments: readInteger(env, WECOM_CONFIG_KEYS.SINGLE_MAX_SEGMENTS, {
+      min: 1,
+      max: 8,
+      fallback: WECOM_DEFAULTS.singleMaxSegments,
+    }),
+    groupMaxSegments: readInteger(env, WECOM_CONFIG_KEYS.GROUP_MAX_SEGMENTS, {
+      min: 1,
+      max: 8,
+      fallback: WECOM_DEFAULTS.groupMaxSegments,
+    }),
   });
 }
 
@@ -206,9 +246,13 @@ export function describeWecomConfig(config) {
     wsUrl: config?.wsUrl,
     allowedUserCount: config?.allowedUserIds?.length ?? 0,
     allowedChatCount: config?.allowedChatIds?.length ?? 0,
+    deniedReplyConfigured: typeof config?.deniedReply === "string" && config.deniedReply.length > 0,
     replyMaxBytes: config?.replyMaxBytes,
     replyTimeoutMs: config?.replyTimeoutMs,
     ackEnabled: config?.ackEnabled ?? true,
+    ackMergeMs: config?.ackMergeMs,
+    singleMaxSegments: config?.singleMaxSegments,
+    groupMaxSegments: config?.groupMaxSegments,
     heartbeatIntervalMs: config?.heartbeatIntervalMs,
   });
 }

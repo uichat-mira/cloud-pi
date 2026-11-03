@@ -17,12 +17,15 @@
 import { hashId, WECOM_DEFAULT_ACK_TEXT, WECOM_MAX_CONTENT_BYTES, WECOM_PLATFORM_ERROR } from "./config.mjs";
 import { createWecomDedupeStore } from "./dedupe.mjs";
 import { normalizeWecomMessageEvent } from "./events.mjs";
-import { decideWecomRoute } from "./policy.mjs";
+import { decideWecomRoute, WECOM_IGNORE_REASON } from "./policy.mjs";
 import { byteLength, splitForSend, WECOM_CHAT_SEGMENT_LIMITS } from "./text.mjs";
 import { sanitizeModelReply } from "../../redaction.mjs";
 
 export const WECOM_STOP_COMMAND = "/stop";
 export const WECOM_RESEARCH_COMMAND = "/research";
+
+/** Rejections a configured `deniedReply` may answer (authorization, not routing). */
+const DENIAL_REASONS = new Set([WECOM_IGNORE_REASON.USER_NOT_ALLOWED, WECOM_IGNORE_REASON.CHAT_NOT_ALLOWED]);
 
 /**
  * Every user-visible string of this channel, in one place.
@@ -72,6 +75,9 @@ function safeErrorCode(record) {
  *   first phase (`{enabled: true, text: "已收到，正在处理…"}` by default). Only
  *   effective together with `push`
  * @param {{botName?: string, allowedUserIds?: readonly string[], allowedChatIds?: readonly string[]}} [options.policy]
+ * @param {string} [options.deniedReply] fixed sentence for a rejected sender
+ *   (`user_not_allowed` / `chat_not_allowed`); empty means silence, which is the
+ *   default so the allowlist cannot be probed
  * @param {{maxBytes?: number, maxSegments?: number}} [options.segment]
  * @param {object} [options.dedupe]
  * @param {Function} [options.log]
@@ -85,6 +91,7 @@ export function createWecomChannel({
   sessions,
   ack = {},
   policy = {},
+  deniedReply,
   segment = {},
   dedupe = createWecomDedupeStore(),
   log = () => {},
@@ -105,7 +112,17 @@ export function createWecomChannel({
   const twoPhase = typeof push === "function" && ack.enabled !== false;
   const ackText =
     typeof ack.text === "string" && ack.text.trim().length > 0 ? ack.text.trim() : WECOM_DEFAULT_ACK_TEXT;
+  /**
+   * Ack merge window (ms): a chat answer that finishes inside this window sends
+   * only the answer. `0` restores "ack every accepted message".
+   */
+  const ackMergeMs = Number.isFinite(ack.mergeMs) && ack.mergeMs > 0 ? Math.floor(ack.mergeMs) : 0;
   const pushMaxBytes = Math.min(segment.maxBytes ?? WECOM_MAX_CONTENT_BYTES, WECOM_MAX_CONTENT_BYTES);
+  /** Chat replies are capped per conversation type (rubric L2/L4): groups never split. */
+  const chatSegmentLimits = {
+    single: segment.singleMaxSegments ?? WECOM_CHAT_SEGMENT_LIMITS.single,
+    group: segment.groupMaxSegments ?? WECOM_CHAT_SEGMENT_LIMITS.group,
+  };
 
   /** @type {Map<string, {items: Function[], running: boolean}>} */
   const queues = new Map();
@@ -113,6 +130,8 @@ export function createWecomChannel({
   const activeRuns = new Map();
   /** @type {Map<string, number>} bumped by /stop so queued pre-stop work is dropped */
   const epochs = new Map();
+  /** Pending delayed acks: `ackKeyOf(event) -> {timer, startedAt}`. */
+  const pendingAckTimers = new Map();
   const idleWaiters = new Set();
   let pending = 0;
   /** Acks in flight: part of `pending` (so shutdown waits) but not a queued run. */
@@ -224,16 +243,22 @@ export function createWecomChannel({
   }
 
   /**
-   * Phase 1: acknowledge the callback immediately.
+   * Phase 1: acknowledge the callback.
    *
    * The platform's reply handle is bound to the callback and expires long before a
-   * real model or research run finishes, so `/research` and slow answers cannot
-   * wait for the run. Fired without awaiting: the run must not queue behind the
-   * network round-trip, and `whenIdle()` still counts it.
+   * real model or research run finishes, so a slow answer cannot wait for the run.
+   * Fired without awaiting: the run must not queue behind the network round-trip,
+   * and `whenIdle()` still counts it.
+   *
+   * Whether an ack is sent at all is a product decision (rubric §3 A3a/A3b): a
+   * short question should get exactly one message, not "收到" plus the answer. Two
+   * triggers, both explicit:
+   *  - `immediate: true` for a long-task intent (a `/research` command), which is
+   *    known to be slow before the model runs;
+   *  - otherwise the ack is delayed by `ackMergeMs` and only sent if the answer has
+   *    not been delivered by then (`cancelPendingAck` below).
    */
-  function sendAck(event) {
-    if (!twoPhase) return;
-    const startedAt = Date.now();
+  function fireAck(event, startedAt = Date.now()) {
     beginAck();
     void safeReply(event.frame, ackText)
       .then((sent) => {
@@ -252,6 +277,54 @@ export function createWecomChannel({
         });
       })
       .finally(endAck);
+  }
+
+  function ackKeyOf(event) {
+    return event?.messageId ?? event?.chatId;
+  }
+
+  function sendAck(event, { immediate = false } = {}) {
+    if (!twoPhase) return;
+    if (immediate || ackMergeMs <= 0) {
+      fireAck(event);
+      return;
+    }
+    const key = ackKeyOf(event);
+    if (key === undefined) {
+      fireAck(event);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setTimeout(() => {
+      pendingAckTimers.delete(key);
+      fireAck(event, startedAt);
+    }, ackMergeMs);
+    if (typeof timer.unref === "function") timer.unref();
+    pendingAckTimers.set(key, { timer, startedAt });
+  }
+
+  /**
+   * The answer arrived inside the merge window: the user gets one message, not an
+   * ack plus the answer.
+   *
+   * @returns {boolean} true when a still-pending ack was cancelled
+   */
+  function cancelPendingAck(event, { durationMs } = {}) {
+    const key = ackKeyOf(event);
+    if (key === undefined) return false;
+    const pendingAck = pendingAckTimers.get(key);
+    if (!pendingAck) return false;
+    clearTimeout(pendingAck.timer);
+    pendingAckTimers.delete(key);
+    emit({
+      action: "ack_suppressed",
+      phase: "ack",
+      reason: "answered_within_merge_window",
+      mergeMs: ackMergeMs,
+      durationMs,
+      ...baseOutcome(event),
+    });
+    return true;
   }
 
   /** Answer a message that carries no question (for example a bare `@Mira`). */
@@ -295,7 +368,11 @@ export function createWecomChannel({
    * refused here with the same meaning and an explicit reason.
    */
   async function pushSegments(event, text) {
-    const { segments, truncated } = splitForSend(text, { ...segment, maxBytes: pushMaxBytes });
+    const { segments, truncated } = splitForSend(text, {
+      ...segment,
+      maxBytes: pushMaxBytes,
+      maxSegments: chatSegmentLimits[event.chatType] ?? chatSegmentLimits.single,
+    });
     const verdict = sessions.assertDeliverable({ chatId: event.chatId, chatType: event.chatType });
     if (!verdict.deliverable) {
       return {
@@ -344,7 +421,7 @@ export function createWecomChannel({
   /** The answer leaves through the push path when wired, otherwise as a reply. */
   async function deliver(event, text) {
     if (typeof push === "function") return await pushSegments(event, text);
-    return await sendSegments(event.frame, text);
+    return await sendSegments(event, text);
   }
 
   function deliveryFields(sent) {
@@ -401,13 +478,16 @@ export function createWecomChannel({
     }
   }
 
-  async function sendSegments(frame, text) {
-    const { segments, truncated } = splitForSend(text, segment);
+  async function sendSegments(event, text) {
+    const { segments, truncated } = splitForSend(text, {
+      ...segment,
+      maxSegments: chatSegmentLimits[event.chatType] ?? chatSegmentLimits.single,
+    });
     let delivered = 0;
     let replyMessageId;
     let errcode;
     for (const part of segments) {
-      const sent = await safeReply(frame, part);
+      const sent = await safeReply(event.frame, part);
       if (!sent.ok) break;
       delivered += 1;
       replyMessageId = sent.messageId ?? replyMessageId;
@@ -416,6 +496,12 @@ export function createWecomChannel({
     return { delivered, total: segments.length, truncated, replyMessageId, errcode };
   }
 
+  /**
+   * The user-visible answer.
+   *
+   * Copy never carries an internal code (rubric §4/E5): the code goes to the log
+   * through `wecom_turn_failed`, the user gets one sentence and a next step.
+   */
   function buildReplyText(record) {
     const status = typeof record?.status === "string" ? record.status : "failed";
     if (status === "succeeded") {
@@ -424,7 +510,7 @@ export function createWecomChannel({
     }
     if (status === "cancelled") return WECOM_REPLIES.cancelled;
     if (status === "timeout") return WECOM_REPLIES.timeout;
-    return `${WECOM_REPLIES.failure}（${safeErrorCode(record)}）`;
+    return WECOM_REPLIES.failure;
   }
 
   /** Token accounting projection: numbers only, no prompt or credential material. */
@@ -455,6 +541,7 @@ export function createWecomChannel({
       let record;
       if (kind === "research") {
         if (typeof runResearch !== "function") {
+          cancelPendingAck(event, { durationMs: Date.now() - started });
           const sent = await deliver(event, WECOM_REPLIES.researchUnavailable);
           return emit({ kind, status: "unavailable", ...deliveryFields(sent), ...baseOutcome(event) });
         }
@@ -488,13 +575,25 @@ export function createWecomChannel({
       }
 
       const text = buildReplyText(record);
-      // A research run must be identifiable in the conversation: the reply
-      // carries its runId so the chat message, the run record and the report can
-      // be correlated without a new tracing system.
-      const answer =
-        kind === "research" && typeof record?.runId === "string" && record.runId.length > 0
-          ? `${text}\n\nrunId: ${record.runId}`
-          : text;
+      const failedStatus = typeof record?.status === "string" && record.status !== "succeeded";
+      if (failedStatus) {
+        // The user-visible copy never carries the code; the log must, or a failure
+        // becomes unreportable.
+        log({
+          level: "warn",
+          event: "wecom_turn_failed",
+          kind,
+          status: record.status,
+          code: safeErrorCode(record),
+          chatType: event.chatType,
+        });
+      }
+      if (typeof record?.promptVersion === "string") {
+        log({ level: "info", event: "wecom_prompt_selected", chatType: event.chatType, promptVersion: record.promptVersion });
+      }
+      // D7: the runId is a trace identifier, not conversation content. It stays in
+      // the outcome/run record and never in the message the user reads.
+      const answer = text;
       // A model that could not use a tool sometimes writes the invocation syntax as
       // prose. It must never reach the user: replace it with a human sentence and
       // record the turn as failed, so the run trace matches what the user saw.
@@ -502,6 +601,9 @@ export function createWecomChannel({
       if (leaked) {
         log({ level: "warn", event: "wecom_reply_pseudo_tool_text", action: "replaced" });
       }
+      // The answer is ready: if the ack is still inside its merge window, cancel it
+      // so a short question gets one message instead of "收到" plus the answer.
+      cancelPendingAck(event, { durationMs: Date.now() - started });
       const sent = await deliver(event, outbound);
       const ackInfo = event.messageId ? ackRecords.get(event.messageId) : undefined;
       if (event.messageId) ackRecords.delete(event.messageId);
@@ -526,6 +628,9 @@ export function createWecomChannel({
         kind,
         status: typeof record?.status === "string" ? record.status : "failed",
         runId: typeof record?.runId === "string" ? record.runId : undefined,
+        // Which prompt version produced this turn (`wecom-single-v2` /
+        // `wecom-group-v2`); the prompt text itself is never logged.
+        promptVersion: typeof record?.promptVersion === "string" ? record.promptVersion : undefined,
         // Token accounting only: never the prompt, the provider credentials or the
         // rendered system prompt.
         usage: usageOf(record),
@@ -608,7 +713,27 @@ export function createWecomChannel({
       // A bare mention (`@Mira`) carries no question. Answering it is better than
       // swallowing the message: the user gets a hint in the same conversation.
       if (route.reason === "empty_text") sendHint(event, WECOM_REPLIES.emptyText);
-      return ignored(event, route.reason, { routing: route.kind, replied: route.reason === "empty_text" });
+      // A rejected sender gets no model run and no tool call. By default they get
+      // no reply either, so the allowlist cannot be probed; a deployment may set
+      // one fixed sentence instead.
+      const denial = DENIAL_REASONS.has(route.reason);
+      const denyText = typeof deniedReply === "string" ? deniedReply.trim() : "";
+      if (denial && denyText.length > 0) {
+        void safeReply(event.frame, denyText).then((sent) => {
+          log({
+            level: "info",
+            event: "wecom_denied_reply",
+            reason: route.reason,
+            senderUserId: event.senderUserId ? hashId(event.senderUserId) : undefined,
+            chatId: event.chatId ? hashId(event.chatId) : undefined,
+            delivered: sent.ok === true,
+          });
+        });
+      }
+      return ignored(event, route.reason, {
+        routing: route.kind,
+        replied: route.reason === "empty_text" || (denial && denyText.length > 0),
+      });
     }
 
     if (!event.dedupeKey) return ignored(event, "missing_dedupe_key");
@@ -624,8 +749,10 @@ export function createWecomChannel({
     const epoch = epochs.get(event.chatId) ?? 0;
     emit({ action: "accepted", kind, ...baseOutcome(event) });
     // Phase 1 happens here, on the receive path, before the model is called: the
-    // callback's reply handle is short-lived and the run may take minutes.
-    sendAck(event);
+    // callback's reply handle is short-lived and the run may take minutes. A
+    // `/research` command is a long task by construction, so it acks at once; a
+    // chat message only acks if it outlives the merge window.
+    sendAck(event, { immediate: kind === "research" });
     enqueue(event.chatId, () => runOne(event, kind, routeText, epoch));
     return {
       action: "accepted",
@@ -668,6 +795,10 @@ export function createWecomChannel({
     async dispose(options) {
       await stopAll(options);
       disposed = true;
+      // A delayed ack that never fires would otherwise keep a timer alive after
+      // shutdown; cancel them all (the run that would have cancelled them is gone).
+      for (const { timer } of pendingAckTimers.values()) clearTimeout(timer);
+      pendingAckTimers.clear();
     },
     get activeRunCount() {
       return activeRuns.size;

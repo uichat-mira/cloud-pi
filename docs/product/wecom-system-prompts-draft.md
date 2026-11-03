@@ -1,10 +1,14 @@
 # 企业微信系统提示词草案 v2（单聊版 / 群聊版）
 
-> **状态：设计草案，未落地、未验证。** 撰写 2026-11-04，交 pi-dev 落地、captain 批准。
-> 本文件只提供可粘贴文本与接线建议，**不改代码**。
+> **状态：已落地（t31/t34，分支 `feat/agt-036-experience-copy`）。** 撰写 2026-11-04，由 pi-dev 落地。
+> 落地位置：`src/channels/wecom/runtime.mjs` 的 `WECOM_SINGLE_SYSTEM_PROMPT` / `WECOM_GROUP_SYSTEM_PROMPT`，
+> 版本 id `wecom-single-v2` / `wecom-group-v2`（`WECOM_PROMPT_VERSION`），按 `chatType` 每轮选择。
+> 实现说明见 [docs/engineering/agt-036-wecom-channel.md](../engineering/agt-036-wecom-channel.md) §13。
+> 本文件仍是文案基线：改文案先改这里，再改常量，两者不一致以本文件为准。
+> 落地常量为本页的**字节预算精简版**（示例段保留 2 对、重复句合并），规则集合与本页一致；
+> 差异仅在示例数量，不在约束条目。
 > **已按 2026-11-04 lead 裁决更新（D1–D7）**：D1 群玩梗轻度、D5 聊天不开放 `/research`、D6 纯英文问候跟随英文、D7 不展示 runId。
 > 依据：[wecom-experience-rubric.md](wecom-experience-rubric.md) §1/§2/§5/§7、[wecom-experience-findings.md](wecom-experience-findings.md) F01/F03/F06/F07/F08/F13。
-> 当前基线：`dev@ade8a36`，`src/channels/wecom/runtime.mjs:23-28` 只有一套四句英文提示词，单聊/群聊共用。
 
 ## 0. 落地要点（先看这三条）
 

@@ -115,15 +115,19 @@ export function splitForSend(text, options = {}) {
   if (omitted.length > 0) {
     const omittedBytes = omitted.reduce((sum, segment) => sum + byteLength(segment), 0);
     const lastIndex = segments.length - 1;
-    // Trim the final kept segment so the notice still fits the platform limit.
+    // Trim the final kept segment so the notice still fits the platform limit. The
+    // final message keeps its "（续 n/m）" marker, so the user knows how far the
+    // answer got before the offer to continue.
+    const marker = total > 1 ? continuationSuffix(total, total) : "";
     const notice = truncationNotice(omitted.length);
+    const tail = `${marker}${notice}`;
     let last = segments[lastIndex];
-    const room = maxBytes - byteLength(notice);
+    const room = maxBytes - byteLength(tail);
     while (byteLength(last) > room) {
       const charsOfLast = Array.from(last);
       last = charsOfLast.slice(0, Math.max(0, charsOfLast.length - 1)).join("");
     }
-    segments[lastIndex] = `${last}${notice}`;
+    segments[lastIndex] = `${last}${tail}`;
     return { segments, truncated: true, omittedBytes };
   }
 

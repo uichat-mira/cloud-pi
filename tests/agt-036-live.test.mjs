@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { Writable } from "node:stream";
-import { loadWecomConfig } from "../src/channels/wecom/config.mjs";
+import { loadWecomConfig, WECOM_DEFAULT_ACK_TEXT } from "../src/channels/wecom/config.mjs";
 import { loadEnvFiles, main, parseEnvText } from "../scripts/agt-036/wecom-live.mjs";
 
 function capture() {
@@ -114,7 +114,10 @@ test("live: one inbound message is answered and the evidence is redacted", async
   const client = fakeClient();
   const code = await main({
     argv: ["--secrets", secretsFile, "--env-file", modelEnvFile, "--timeout-ms", "5000", "--evidence", join(dir, "evidence.jsonl")],
-    env: {},
+    // The fake runtime answers instantly, so the production ack merge window
+    // (1.5 s) would correctly suppress the ack; this test is about the two-phase
+    // evidence path, so turn the window off.
+    env: { WECOM_ACK_MERGE_MS: "0" },
     stdout: out.stream,
     stderr: err.stream,
     serviceOptions: {
@@ -131,7 +134,7 @@ test("live: one inbound message is answered and the evidence is redacted", async
   assert.equal(code, 0, `stderr: ${err.text()}`);
   // Two-phase: the callback gets the acknowledgement, the answer is pushed.
   assert.equal(client.replies.length, 1);
-  assert.equal(client.replies[0].content, "已收到，正在处理…");
+  assert.equal(client.replies[0].content, WECOM_DEFAULT_ACK_TEXT);
   assert.equal(client.replies[0].finish, true);
   assert.equal(client.sent.length, 1);
   assert.equal(client.sent[0].body.chat_type, 1);
