@@ -18,20 +18,27 @@ import { hashId, WECOM_DEFAULT_ACK_TEXT, WECOM_MAX_CONTENT_BYTES, WECOM_PLATFORM
 import { createWecomDedupeStore } from "./dedupe.mjs";
 import { normalizeWecomMessageEvent } from "./events.mjs";
 import { decideWecomRoute } from "./policy.mjs";
-import { byteLength, splitForSend } from "./text.mjs";
+import { byteLength, splitForSend, WECOM_CHAT_SEGMENT_LIMITS } from "./text.mjs";
 import { sanitizeModelReply } from "../../redaction.mjs";
 
 export const WECOM_STOP_COMMAND = "/stop";
 export const WECOM_RESEARCH_COMMAND = "/research";
 
+/**
+ * Every user-visible string of this channel, in one place.
+ *
+ * Copy rules (rubric §4): one human sentence plus one next step, never an error
+ * code, never an internal English word, never a runId. The exact codes stay in
+ * the logs (`safeErrorCode`), where an operator can find them.
+ */
 export const WECOM_REPLIES = Object.freeze({
   stopped: "已停止当前任务。",
   noActiveRun: "当前没有正在执行的任务。",
   cancelled: "任务已取消。",
-  timeout: "处理超时，请稍后重试。",
-  empty: "（模型没有返回内容）",
-  failure: "处理失败，请稍后重试。",
-  researchUnavailable: "研究功能未启用。",
+  timeout: "这次算太久了，我先停掉。要不要换个短点的问法？",
+  empty: "这次没生成出内容，再问一次？",
+  failure: "刚才没跑通，再试一次？",
+  researchUnavailable: "研究入口还没开。先在控制台建个定时任务，结果我会发给你。",
   emptyText: "请把问题写在 @ 我 的同一句话里，例如「@Mira 帮我查一下今天的进度」。",
 });
 

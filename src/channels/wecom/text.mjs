@@ -21,6 +21,17 @@ export const WECOM_SEGMENT_DEFAULTS = Object.freeze({
   maxSegments: 8,
 });
 
+/**
+ * Chat replies are capped well below the platform limit (rubric §2 L2/L4/L5):
+ * a direct chat may continue across at most 3 messages, a group must stay one
+ * message ("群聊不写小作文"). Research reports are not chat replies and keep the
+ * wider default.
+ */
+export const WECOM_CHAT_SEGMENT_LIMITS = Object.freeze({
+  single: 3,
+  group: 1,
+});
+
 export function byteLength(text) {
   return typeof text === "string" ? Buffer.byteLength(text, "utf8") : 0;
 }
@@ -29,8 +40,12 @@ function continuationSuffix(index, total) {
   return `\n\n（续 ${index}/${total}）`;
 }
 
-function truncationNotice(omittedSegments) {
-  return `\n\n（后续约 ${omittedSegments} 段内容超出单次回复上限，已省略。）`;
+/**
+ * The truncation notice must give a next step, not a dead end (rubric L6/E3):
+ * the old "已省略" sentence stated the loss and stopped there.
+ */
+export function truncationNotice(omittedSegments) {
+  return `\n\n内容太长，后面还有约 ${omittedSegments} 段没发。要我拆成几条继续发吗？`;
 }
 
 /**
