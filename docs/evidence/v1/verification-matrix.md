@@ -169,7 +169,7 @@
 | **G13** | **验收判定器基线漂移**：`judge` 仍假定 `tests≥555 且 fail===2`，dev 实际 **642/0** | 那两个 Windows 已知失败已被 PR #27/#29 修掉，基线与 `self-test` 的 3 个用例没同步更新 | 由 harness 作者把基线改成"当前全绿"形态（或把已知失败清单置空），同时更新 `self-test` 的期望；这是**工具维护缺口**，不是产品缺陷 |
 | **G14 / X4 前提** | **「超管创建的机器人只服务受控会话」目前靠配置纪律，不靠代码** | `src/channels/wecom/policy.mjs:46-58`：`allowedUserIds`/`allowedChatIds` 为空时**不拒绝**；配合单租户委托令牌，任何能给机器人发消息的人都会触发一次"用维护者身份"的 Guanlan 读取 | t29 完成后改为"启用外部工具时 allowlist 必须显式配置，否则启动失败"；届时把本行改成 `已强制` 并附测试名 |
 | **G15** | **验收执行包偶发失败（已观测、未定位）** | 2026-11-04 03:33 复跑 `self-test --full` 时 `C2-api` 出现 1 次失败（`T1 create returns 201 with Location…`，26 条中 1 失败）；随后同一命令**连续 8 次全过**（`test:api` 5/5、`c-feishu-regression --full` 3/3） | 用 `--test-concurrency=1` 或端口/临时目录隔离实验定位；**不得加重试掩盖**（重试会把偶发真失败一起吞掉） |
-| **G16** | **工具不可用时的投递纪律未强制**（§5.5） | 真实 401 后模型输出 `<||DSML|| invoke bash>` 伪工具文本，run 记录仍 `succeeded`，通道会把原文发给用户；已派 pi-dev | t27 + PR #30 修复落实四条（不投原文 / 一句人话 / 记录失败 / 失败态可查）；验收时用 forged 负例复检 |
+| **G16** | **工具不可用时的投递纪律（§5.5）→ 已强制**（#30 合并 `7715d62`） | 原缺口：真实 401 后模型输出 `<||DSML|| invoke bash>` 伪工具文本，run 记录仍 `succeeded`，通道会把原文发给用户 | **已闭合**：`sanitizeModelReply` 整句替换 + `pseudo_tool_text` 失败记录；证据行号见 C.11 |
 
 ## 5. 平台约束（产品边界，不是实现缺陷）
 
@@ -220,7 +220,12 @@
   但 ① `run.status` 仍是 `succeeded`（该 PR 的 F-30-2），② 这段文本在企微通道里会**原样发给用户**。
 - **为什么是产品边界而不是实现细节**：工具不可用是**常态**（令牌 300 s 过期、JWKS 轮换、限速、断网）。
   用户看到的第一句话决定他是否信任这个机器人；把模型原文投出去等于把"内部失败"变成"对外事故"。
-- **状态：未强制**。归属 pi-dev（t27 两段式回复 + PR #30 修复）。缺口表 G16。
+- **状态：已强制**（cloud-pi #30 合并 `7715d62`，修复 commit `5d6e26c`）：
+  `sanitizeModelReply`（`src/redaction.mjs:94-97`，命中即整句替换为 `PSEUDO_TOOL_REPLY`）；
+  WeCom 闸门在 `deliver()` **之前**（`src/channels/wecom/channel.mjs:494-505`，含 `pseudo_tool_text` 失败 emit）；
+  飞书对应 `src/channels/feishu/channel.mjs:433-478`（`errorCode=pseudo_tool_text`）；
+  单测 `tests/agt-038-t33-verify.test.mjs:99`（回复=人话、`action=failed/reason=pseudo_tool_text`）。
+  缺口表 G16 已闭合；细节见 C.11。
 
 ### 5.6 体验维度不在本矩阵判定范围内
 
@@ -509,3 +514,33 @@ $ npm run check
   A-2 仍待补，**不提前给判定**。
 
 > 结论不变：本矩阵的 L1/L2/L3 结论、缺口表其余行、§6 各仓判定一处都没动；C.10 只记录"仓库状态变了"。
+
+### C.11 cloud-pi #30 已合并（`7715d62`，修复 `5d6e26c`）：C.6 的 needs_revision 闭合，G16 转「已强制」
+
+- **合并事实**：cloud-pi PR #30（AGT-038 真实 Guanlan MCP）已合并为 `7715d62`；合并前一个 commit `5d6e26c`
+  是 Sonar 安全门的修复（把证据文件收进私有 per-run 目录 + `redaction.mjs` 增补），不是绕过门禁。
+- **C.6 的 needs_revision 两条必修都已闭合**：
+  1. `Next cursor` 不再以可还原形式落盘 —— `redactOpaqueHandles`（`src/redaction.mjs:72`）对 ≥20 字符 token 先解码，
+     只有"解出来是含 UUID 的 JSON"才整体替换成 `<handle len=N sha=xxxxxxxx>`，再接三个运行时投影
+     （`inputSummary` / `resultPreview` / `text`）。我按 dev@`7715d62` 复跑：真实 `news_recent` 结果里
+     `Next cursor: <handle len=475 sha=4a18d7a3>`，把 handle 强行解码**还原不出 UUID**；`run.text` 里也没有原始游标。
+  2. 失败态不再"假成功" —— `src/research/runtime/agt-027.mjs` 把裁决挂在错误的 `runRecord` 上，
+     `src/research/execute.mjs:693` 采纳并强制 `FAILED`；`tests/research-execute.test.mjs:312-345` 断言
+     持久化记录 `run.status` / `run.runtime.status` / `statusHistory.at(-1)` **三处同为 failed**。
+     真机 `--mode=forged`：`status:"failed"`、`runtimeStatus:"succeeded"`、`failureReason:"mcp_server_unavailable"`、
+     `health.status:401`。
+- **G16（零工具投递）转「已强制」**，证据三行：
+  - `src/redaction.mjs:94-97` `sanitizeModelReply`：命中 `<||DSML|| …>` 即**整句替换**为 `PSEUDO_TOOL_REPLY`
+    （不是删标记——所以分段发送的每一段都只能是人话）；
+  - `src/channels/wecom/channel.mjs:494-505`：闸门在 `deliver()` **之前**，命中后 emit
+    `action:"failed" / reason:"pseudo_tool_text" / status:"failed"`；飞书对应 `src/channels/feishu/channel.mjs:433-478`（含 `errorCode=pseudo_tool_text`）；
+  - `tests/agt-038-t33-verify.test.mjs:99`：断言用户侧只收到那句人话、`DSML` 不再出现、失败记录带 `runId`。
+- **顺带闭合 A-3**（PR #30 评审）：三条重点（真实工具调用可复现 / 令牌不进模型可见面 / 三类负例 fail-closed）
+  均已给 L3 证据（本附录 C.6 与 PR 评论 `6614809770`）。
+- **未闭合的仍是 t12 本身**：A-1 的"接线"已由 #31 `c15d0ef` 合入，但**真实入站触发一次 schedule 尚未发生**；
+  A-2 的两段式代码已由 #27/#35 落地（`test:wecom` 105/105），**群内真实 ack+终稿尚未跑**。二者都等 A-4 的四条件。
+- **基线与过度脱敏复核**（dev@`7715d62`，我在干净 worktree 实跑）：`npm run test:mcp` **27/27**；
+  10 个正常样本（中英文/超长词/sha256/github sha/URL 长 token/base64 图片/base64 文本）经 `redactOpaqueHandles`
+  **全部 unchanged**，只有散文 UUID 变 `id:xxxxxxxx`（预期）——"过度脱敏"这一风险不成立。
+
+> 判定影响：G16 由「未强制」改为「已强制」是 **captain 授权的状态回填**，其余 §2–§4 行、§6 判定一处未动。
