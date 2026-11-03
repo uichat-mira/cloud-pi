@@ -14,7 +14,26 @@ import { randomBytes } from "node:crypto";
 import { RUN_STATUS } from "../research/contracts.mjs";
 
 /** Bump when a persisted schedule/trigger shape or enum changes incompatibly. */
-export const SCHEDULER_CONTRACT_VERSION = 1;
+/** Bump when a persisted schedule/trigger shape or enum changes incompatibly. */
+/**
+ * Persisted shape version. Bumped 1 → 2 by W1 (AGT-036) for the delivery-target
+ * vocabulary; the bump is additive, so reads are compatible in both directions:
+ *
+ *  - **write**: new records are written as the current version;
+ *  - **read**: a version in `SCHEDULER_CONTRACT_VERSIONS` is accepted as-is and
+ *    never rewritten on read, so a v1 file stays a v1 file until it is saved;
+ *  - a v1 record simply cannot contain `wecom_user`/`wecom_chat` targets, because
+ *    those words did not exist when it was written. The type check itself does not
+ *    depend on the version.
+ */
+export const SCHEDULER_CONTRACT_VERSION = 2;
+
+/** Versions this build can read; newest last. */
+export const SCHEDULER_CONTRACT_VERSIONS = Object.freeze([1, 2]);
+
+export function isSupportedSchedulerContractVersion(value) {
+  return Number.isInteger(value) && SCHEDULER_CONTRACT_VERSIONS.includes(value);
+}
 
 export const SCHEDULE_KIND = Object.freeze({
   ONCE: "once",
@@ -105,19 +124,39 @@ export const MISSED_RUN_POLICY = Object.freeze({
 });
 
 /**
- * Trusted delivery destinations (AGT-033).
+ * Delivery destination vocabulary (AGT-033, extended by AGT-036 / W1).
  *
- * A schedule may name one or more Feishu destinations. The recipient is fixed
- * by trusted schedule configuration only: neither the model, a web page, a
- * report nor an inbound message may add, replace or rewrite a destination.
+ * A schedule may name trusted destinations. The recipient is fixed by trusted
+ * schedule configuration only: neither the model, a web page, a report nor an
+ * inbound message may add, replace or rewrite a destination.
  *
- * `type` is the Feishu `receive_id_type` the transport must use, so the stored
- * contract and the platform API agree on the same two values.
+ * `type` is the platform `receive_id_type` the transport must use, so the stored
+ * contract and the platform API agree on the same values:
+ *
+ *  - Feishu `open_id` / `chat_id` (AGT-033, unchanged: `^ou_` / `^oc_`);
+ *  - WeCom `wecom_user` (a chat `userid`) and `wecom_chat` (a group `chatid`),
+ *    added by W1. A WeCom id is opaque and lives in its own namespace: it is
+ *    never accepted as a Feishu id, and a Feishu id is never accepted as a WeCom
+ *    id, so one platform's identifier can never become a recipient on the other.
  */
 export const DELIVERY_TARGET_TYPE = Object.freeze({
   OPEN_ID: "open_id",
   CHAT_ID: "chat_id",
+  WECOM_USER: "wecom_user",
+  WECOM_CHAT: "wecom_chat",
 });
+
+/** The two Feishu kinds AGT-033 knows how to send to. */
+export const FEISHU_DELIVERY_TARGET_TYPES = Object.freeze([
+  DELIVERY_TARGET_TYPE.OPEN_ID,
+  DELIVERY_TARGET_TYPE.CHAT_ID,
+]);
+
+/** The two WeCom kinds W1 adds to the vocabulary. */
+export const WECOM_DELIVERY_TARGET_TYPES = Object.freeze([
+  DELIVERY_TARGET_TYPE.WECOM_USER,
+  DELIVERY_TARGET_TYPE.WECOM_CHAT,
+]);
 
 export const DELIVERY_TARGET_LIMITS = Object.freeze({
   /** Bounded fan-out per schedule; keeps one run from becoming a broadcast. */
@@ -127,10 +166,38 @@ export const DELIVERY_TARGET_LIMITS = Object.freeze({
 
 const DELIVERY_OPEN_ID = /^ou_[A-Za-z0-9]+$/;
 const DELIVERY_CHAT_ID = /^oc_[A-Za-z0-9_-]+$/;
+/**
+ * WeCom `userid`: 1-64 chars from `[A-Za-z0-9_@.-]` (the platform's own rule for
+ * super-admin-created accounts). `open_userid` is excluded on purpose — a channel
+ * that only ever saw an opaque `open_userid` has no trusted mapping to a userid.
+ */
+const DELIVERY_WECOM_USER = /^[A-Za-z0-9_@.-]{1,64}$/;
+/** WeCom group `chatid` is opaque base64url-ish text, not a Feishu chat id. */
+const DELIVERY_WECOM_CHAT = /^[A-Za-z0-9_+/=@.-]{1,128}$/;
 const DELIVERY_TARGET_KEYS = new Set(["type", "id", "label"]);
 
+const DELIVERY_ID_RULES = Object.freeze({
+  [DELIVERY_TARGET_TYPE.OPEN_ID]: { pattern: DELIVERY_OPEN_ID, hint: 'a Feishu open_id starting with "ou_"' },
+  [DELIVERY_TARGET_TYPE.CHAT_ID]: { pattern: DELIVERY_CHAT_ID, hint: 'a Feishu chat_id starting with "oc_"' },
+  [DELIVERY_TARGET_TYPE.WECOM_USER]: {
+    pattern: DELIVERY_WECOM_USER,
+    hint: "a WeCom userid (1-64 of [A-Za-z0-9_@.-])",
+  },
+  [DELIVERY_TARGET_TYPE.WECOM_CHAT]: { pattern: DELIVERY_WECOM_CHAT, hint: "a WeCom group chatid" },
+});
+
 export function isDeliveryTargetType(value) {
-  return value === DELIVERY_TARGET_TYPE.OPEN_ID || value === DELIVERY_TARGET_TYPE.CHAT_ID;
+  return Object.hasOwn(DELIVERY_ID_RULES, value);
+}
+
+/** True for the two Feishu kinds; delivery still only sends to these. */
+export function isFeishuDeliveryTargetType(value) {
+  return FEISHU_DELIVERY_TARGET_TYPES.includes(value);
+}
+
+/** True for the two WeCom kinds added by W1. */
+export function isWecomDeliveryTargetType(value) {
+  return WECOM_DELIVERY_TARGET_TYPES.includes(value);
 }
 
 /**
@@ -164,16 +231,22 @@ export function normalizeDeliveryTargets(input) {
       invalid(`[${index}] has unsupported field(s): ${unknown.join(", ")}`);
     }
     if (!isDeliveryTargetType(entry.type)) {
-      invalid(`[${index}].type must be "${DELIVERY_TARGET_TYPE.OPEN_ID}" or "${DELIVERY_TARGET_TYPE.CHAT_ID}"`);
+      invalid(
+        `[${index}].type must be one of ${Object.keys(DELIVERY_ID_RULES)
+          .map((type) => `"${type}"`)
+          .join(", ")}`,
+      );
     }
     const id = typeof entry.id === "string" ? entry.id.trim() : "";
-    const pattern = entry.type === DELIVERY_TARGET_TYPE.OPEN_ID ? DELIVERY_OPEN_ID : DELIVERY_CHAT_ID;
-    if (!pattern.test(id)) {
-      invalid(
-        `[${index}].id must be a Feishu ${entry.type} id starting with "${
-          entry.type === DELIVERY_TARGET_TYPE.OPEN_ID ? "ou_" : "oc_"
-        }"`,
-      );
+    const rule = DELIVERY_ID_RULES[entry.type];
+    if (!rule.pattern.test(id)) {
+      invalid(`[${index}].id must be ${rule.hint}`);
+    }
+    // A Feishu id can satisfy the WeCom character class, so reject the two known
+    // Feishu prefixes explicitly instead of letting one platform's identifier
+    // become a recipient on the other.
+    if (isWecomDeliveryTargetType(entry.type) && (DELIVERY_OPEN_ID.test(id) || DELIVERY_CHAT_ID.test(id))) {
+      invalid(`[${index}].id must be a WeCom id, not a Feishu id`);
     }
     let label;
     if (entry.label !== undefined) {
