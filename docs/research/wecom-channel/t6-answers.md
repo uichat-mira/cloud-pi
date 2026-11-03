@@ -108,3 +108,31 @@ Account 身份，也不得据此授予 Guanlan / 管理权限。若要把它当�
 **未验证的坑**：`@` 判定依赖解析正文中的显示名；机器人改名、群昵称、`@所有人`、文本含控制字符
 （`[社区]` #15）都会影响判定。首版建议：群里只处理"文本以 @<机器人名> 开头/mixed 首项为 text 且含
 @<机器人名>"这一类可解释的形态，其余记 `ignored:mention_unparsed`，不要猜。
+
+## 7. 真实冒烟后新增的两条 API 陷阱（t22 → t6 交接，2026-11-04）
+
+> 来源：真实凭证下的单聊冒烟（`errcode:0` 订阅 + 真实入站 + 真实回复被接受），详见
+> [live-smoke-evidence.md](live-smoke-evidence.md)。**这两条按真实链路踩过一遍，pi-dev 实现时直接照做，别重踩。**
+
+### 7.1 回复必须传**整个 frame**，不是 `frame.headers`
+
+```js
+// ✅ 对：SDK 内部读 frame.headers.req_id
+await client.replyStream(frame, streamId, text, true);
+
+// ❌ 错：frame.headers 自身没有 .headers → req_id 为空 → 平台返回 846605 invalid req_id
+await client.replyStream(frame.headers, streamId, text, true);
+```
+
+- 类型名 `WsFrameHeaders` **有误导性**：它定义为 `Pick<WsFrame,'headers'>`，意思是"带 `headers` 的对象"，
+  也就是**整个 frame**（或至少 `{ headers: frame.headers }`），不是 `frame.headers` 本身。
+- 真实后果：`errcode 846605 / invalid req_id`，`errmsg` 里会带提示链接；**不是**凭证或权限问题。
+- 同一条 `req_id` 也用于流式多帧与非阻塞帧（`replyStreamNonBlocking`），全部传整个 frame。
+
+### 7.2 入站事件顺序：先 `event.enter_chat`，约 3 秒后才 `aibot_msg_callback`
+
+- 实测：`enter_chat` 到达 → **约 2.9 s** 后 `aibot_msg_callback`（单聊）。
+- **回复要用 callback 帧的 `req_id`**（实测 `len=24`），不要用 `enter_chat` 帧的 `req_id`，两者不可互换。
+- `enter_chat` 不是收消息的前置条件：第二轮没有 `enter_chat` 也正常收到 `aibot_msg_callback`，
+  所以**不要**把它写成"必须等待进入事件"的状态机分支；收到消息直接处理即可。
+- `enter_chat` 的合法用途是发欢迎语（`replyWelcome`，5 s 窗口），与普通回复是两条路径。
