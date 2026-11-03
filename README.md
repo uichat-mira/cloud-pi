@@ -1,6 +1,6 @@
 # Mira Cloud Agent · cloud-pi
 
-> **状态：产品设计基线 + 本地已验证的基础 Agent 运行时（2026-11-02）。** P0（fixture 只读 MCP）与 AGT-027（真实模型 + 受限工具）已在本地验证；不是已部署、已排期或生产可用声明。
+> **状态：产品设计基线 + 本地已验证的基础 Agent 运行时与飞书 Channel（2026-11-03）。** P0（fixture 只读 MCP）、AGT-027（真实模型 + 受限工具）、AGT-028（研究执行）与 AGT-029（飞书 Channel 代码/离线回归）已在本地验证；飞书真实 Live 往返尚未通过。不是已部署、已排期或生产可用声明。
 
 **Mira Cloud Agent** 是面向日常研究与团队协作的轻量、常驻云端智能体，定位为 **Hermes Agent 的轻量替代品**，也是未来「云 Mira」可以逐步生长的前身。首版先让一只 Agent 真正能工作：**定时研究、读取观澜、飞书双向对话、原生 MCP 工具连接**。
 
@@ -21,6 +21,8 @@
 | [docs/engineering/p0-mcp-poc.md](docs/engineering/p0-mcp-poc.md) | **只读 Pi SDK → Guanlan MCP** 的最小 POC 及验收清单 |
 | [docs/engineering/agt-027-live-runtime.md](docs/engineering/agt-027-live-runtime.md) | **真实模型 Agent Runtime**：配置、命令、AGT-028 接口契约与安全边界 |
 | [docs/engineering/agt-027-live-evidence.md](docs/engineering/agt-027-live-evidence.md) | AGT-027 真实模型/真实工具的脱敏调用证据 |
+| [docs/engineering/agt-029-feishu-channel.md](docs/engineering/agt-029-feishu-channel.md) | **飞书双向 Channel POC**：插件选型、路由/去重/取消、配置与验证 |
+| [docs/engineering/agt-029-live-evidence.md](docs/engineering/agt-029-live-evidence.md) | AGT-029 飞书 Live POC 状态与脱敏证据 |
 | [AGENTS.md](AGENTS.md) | 仓库工程协作约束 |
 
 跨服务协议参考：[Mira Cloud MCP 互操作讨论稿](https://github.com/uichat-mira/.github/blob/main/docs/engineering/mira-cloud-mcp.md)。该文件仍属组织级架构提案，尚非正式凭证签发合同。
@@ -29,9 +31,9 @@
 
 **已确定的产品方向**：Pi SDK 优先；插件优先、薄适配；飞书私聊与已授权群 @；授权群成员可私聊；定时计划在 Cloud Auth 控制台管理，任务投递可配置多个接收目标；使用 Mira 统一身份，观澜不额外登录；本地 DSH 开发后评估广州 Docker 部署。
 
-**已在本地证明**：锁定版 Pi SDK 的真实 Session、确定性工具管线（P0）、真实 OpenAI-compatible 模型调用与模型自主 Tool Call、工具权限/超时/取消（AGT-027）。证据见上表工程文档。
+**已在本地证明**：锁定版 Pi SDK 的真实 Session、确定性工具管线（P0）、真实 OpenAI-compatible 模型调用与模型自主 Tool Call、工具权限/超时/取消（AGT-027）；飞书 Channel 的授权路由、事件去重、/stop → AbortSignal 与 Adapter → 真实 Runtime 装配（AGT-029 离线 T1–T3）。证据见上表工程文档。
 
-**尚未证明**：调度/飞书插件兼容性、多目标飞书投递、云端无人值守委托凭证、观澜生产 MCP 接通、Docker 资源占用与生产并发。**不得把产品决定、上游文档支持和运行验证混为一谈。**
+**尚未证明**：真实飞书私聊/群往返、多目标飞书投递、云端无人值守委托凭证、观澜生产 MCP 接通、Docker 资源占用与生产并发。**不得把产品决定、上游文档支持和运行验证混为一谈。**
 
 ## 开发起点
 
@@ -44,7 +46,7 @@ npm run agent -- "Use local_read_text to read welcome.md and reply with the fixt
 npm run test:agent          # 确定性回归，不需要 Key
 ```
 
-**不要**把 `.env` 提交进仓库；密钥只由宿主环境注入。真实调用证据与失败案例见 [AGT-027 证据](docs/engineering/agt-027-live-evidence.md)。P0 **不需要**完整控制台、飞书机器人、定时器、云账号委托或生产环境；通过后再按业务价值递进。
+**不要**把 `.env` 提交进仓库；密钥只由宿主环境注入。真实调用证据与失败案例见 [AGT-027 证据](docs/engineering/agt-027-live-evidence.md)。飞书 Channel 的启动、Live 脚本与安全边界见 [AGT-029 文档](docs/engineering/agt-029-feishu-channel.md)。P0 **不需要**完整控制台、飞书机器人、定时器、云账号委托或生产环境；通过后再按业务价值递进。
 
 ## OpenCode 付费 Worker（工程施工）
 
