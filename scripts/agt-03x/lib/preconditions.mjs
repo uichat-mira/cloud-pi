@@ -122,7 +122,11 @@ export function evaluatePreconditions(env = process.env) {
       if (!["byte-identical", "byte_identical", "confirmed"].includes(declared)) {
         return { ...unmet, reason: "AGTX_P7_SECRET_MATCH must be byte-identical (manual attestation by the maintainer)" };
       }
-      return { ...unmet, status: "met", note: "维护者人工确认两侧密钥逐字节一致（本机无法在不泄漏密钥的前提下比对）" };
+      return {
+        ...unmet,
+        status: "met",
+        note: "maintainer attested a byte-identical secret (a local comparison would need the secret itself)",
+      };
     }
 
     if (item.id === "P8" && missing.length === 0) {
@@ -146,7 +150,7 @@ export function evaluatePreconditions(env = process.env) {
         note:
           mode === "seed"
             ? "seed 数据，非 A2 注册链能力（证据必须原样标注）"
-            : "由 GLN-015 真实投递建立（P4 已就绪）",
+            : "created by a real GLN-015 delivery (P4 ready)",
       };
     }
 

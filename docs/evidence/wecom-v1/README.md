@@ -48,7 +48,19 @@
 `check`、`event`、`kind`、`mode`、`detail`、`note`、`at`、`scenario`。
 
 **禁止**：message id、原始 userid/chatid、消息正文、token、secret、绝对路径。
-写入前 `createEvidence` 会做字段白名单 + 密钥形状扫描，命中即抛错拒绝落盘。
+
+写入前 `createEvidence` 做两道校验，任一命中即抛错拒绝落盘：
+
+1. **字段白名单**（上面的键），嵌套对象只允许 `usage/counts/tools` 的既定子键；
+2. **值形态**（外审 F-28-1 后新增）：`ou_`/`oc_`/`om_`/`on_`/`wm…` 前缀 id、JWT、`sk-`、PEM、
+   `Bearer …`、`app_secret=`、绝对路径、混合大小写 32+ 位随机 token（git SHA 与 `call_…` 工具调用 id
+   不受影响）、**非 ASCII 文本**、以及超过 160 字符的自由文本。
+
+自由文本（`detail`/`note`）因此是**机器摘要**，不是聊天记录：只写 `tests=555 fail=2` 这类投影。
+中文只允许一个白名单标签（`scripts/agt-03x/lib/harness.mjs` 的 `APPROVED_TEXT_LABELS`，当前只有 §6 的
+seed 标注原文）；其余中文一律拒绝——需要中文解释时写到 stdout/文档，不要写进证据。
+
+合成夹具使用 `om_local_*` / `om_fixture_*` / `wm_local_*` 命名空间，扫描器不对其报警。
 
 ## 4. 拿到凭证后 10 分钟内跑完 A / C
 
@@ -94,3 +106,21 @@ node scripts/agt-03x/b-scheduled-research-delivery.mjs \
 
 脚本已在 `preflight` 与场景 B 的 blocker/note 中输出这句话；人工填写证据时也必须保留，
 不得删改成「已注册」。
+
+## 7. 判定器自身的硬约束（外审 F-28-1/2 后）
+
+- **C3 断言失败数量**：`scripts/agt-03x/lib/judge.mjs#fullSuiteVerdict` 同时校验
+  `tests >= 555` **和** `fail === 2`，再校验每个失败名命中已知模式。只用名字匹配的话，
+  一个标题里含已知子串的新失败会被静默放过（Node 的 TAP 还会为子测试补打父 `describe` 行，
+  2 个真实失败会产生 4 行 `not ok`）。基线漂移（修好一个已知缺陷、或新增失败）现在一律判 `fail`，
+  必须人工改基线——不允许自动「适应」。
+- **D8 按值扫描**：结构化证据（`.jsonl`/`.json`）先解析再扫字符串值，避免把
+  `…_after_sdk_…` 这类键值边界误判为长 token；`.md` 才整篇扫描。
+- 两者都有进程内回归用例（`self-test.mjs` 的「判定器本身的内建回归」表，16 条）。
+
+## 8. 历史证据脱敏记录
+
+2026-11-04：`poc/evidence/agt-033-live-delivery.jsonl`、`agt-033-live-final-head.jsonl`、
+`agt-033-live-status.md` 曾含**真实**飞书 message id（`om_x1…`）。这些 id 已替换为
+`om_<redacted>`，**只改 id 值**：计数、顺序、时间戳、判定与文本其余部分未改动，
+JSONL 仍可逐行解析。脱敏前 D8 扫描命中 `feishu_message_id`；脱敏后 30 个证据文件零命中。

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Scenario B — 定时研究 + 主动投递 验收执行脚本。
+ * Scenario B - 定时研究 + 主动投递 验收执行脚本。
  *
  *   node scripts/agt-03x/b-scheduled-research-delivery.mjs --offline
  *   node scripts/agt-03x/b-scheduled-research-delivery.mjs --dry-run
@@ -27,6 +27,7 @@ import {
   writeUsage,
 } from "./lib/harness.mjs";
 import { unmetFor } from "./lib/preconditions.mjs";
+import { mapResearchStatusToTriggerStatus } from "../../src/scheduler/contracts.mjs";
 
 const SCENARIO = "B";
 const USAGE = `usage: node scripts/agt-03x/b-scheduled-research-delivery.mjs [--offline|--dry-run]
@@ -34,14 +35,18 @@ const USAGE = `usage: node scripts/agt-03x/b-scheduled-research-delivery.mjs [--
        [--evidence-in <jsonl>] [--expect-target <type:maskedId> ...]
        [--runs-dir <dir>] [--evidence <out.jsonl>]`;
 
-/** Mirror of `src/scheduler/contracts.mjs#mapResearchStatusToTriggerStatus`. */
-const RESEARCH_TO_TRIGGER = Object.freeze({
-  completed: "succeeded",
-  completed_with_errors: "partial",
-  failed: "failed",
-  cancelled: "cancelled",
-  timeout: "timeout",
-});
+/**
+ * Statuses the research executor can report. The mapping itself is imported
+ * from `src/scheduler/contracts.mjs` - a local copy would keep judging against
+ * an outdated table after the runtime contract changes.
+ */
+const KNOWN_RESEARCH_STATUS = Object.freeze(new Set([
+  "completed",
+  "completed_with_errors",
+  "failed",
+  "cancelled",
+  "timeout",
+]));
 
 function targetKey(destination) {
   if (!destination || typeof destination.type !== "string" || typeof destination.maskedId !== "string") return null;
@@ -52,7 +57,7 @@ function targetKey(destination) {
 export function judgeB({ schedule, runs, run, delivery, runJson, toolEvents, expectedTargets }) {
   const checks = [];
 
-  // B1 — 到点触发恰好一次，不产生重复 runId
+  // B1 - 到点触发恰好一次，不产生重复 runId
   if (!schedule) {
     checks.push(check("B1", "blocker", "schedule not readable via GET /v1/schedules/:id"));
   } else if (!(schedule.stats?.triggers >= 1)) {
@@ -67,7 +72,7 @@ export function judgeB({ schedule, runs, run, delivery, runJson, toolEvents, exp
     else checks.push(check("B1", "pass", `triggers=${schedule.stats.triggers} runs=1 duplicates=0`));
   }
 
-  // B2 — 研究走真实链路：真实 Guanlan MCP 工具调用
+  // B2 - 研究走真实链路：真实 Guanlan MCP 工具调用
   if (!Array.isArray(toolEvents)) {
     checks.push(check("B2", "blocker", "no tool-event JSONL supplied (--evidence-in)"));
   } else {
@@ -82,12 +87,12 @@ export function judgeB({ schedule, runs, run, delivery, runJson, toolEvents, exp
     else checks.push(check("B2", "pass", `mcp__guanlan__ calls=${ok.length} all ok`));
   }
 
-  // B3 — trigger 终态与研究终态一致（partial 不得显示为成功）
+  // B3 - trigger 终态与研究终态一致（partial 不得显示为成功）
   if (!schedule || !run) {
     checks.push(check("B3", "blocker", "schedule or run missing for status comparison"));
   } else {
     const trigger = (schedule.triggers ?? []).find((item) => item.runId === run.runId);
-    const expected = RESEARCH_TO_TRIGGER[run.status] ?? null;
+    const expected = KNOWN_RESEARCH_STATUS.has(run.status) ? mapResearchStatusToTriggerStatus(run.status) : null;
     if (!trigger) checks.push(check("B3", "blocker", "trigger for this runId not present in schedule readback"));
     else if (!expected) checks.push(check("B3", "fail", `unknown run status ${run.status}`));
     else if (trigger.status !== expected) {
@@ -99,7 +104,7 @@ export function judgeB({ schedule, runs, run, delivery, runJson, toolEvents, exp
     }
   }
 
-  // B4 — 每个配置目标各投递一次，幂等
+  // B4 - 每个配置目标各投递一次，幂等
   if (delivery === null) {
     checks.push(check("B4", "blocker", "delivery reader not configured (404)"));
   } else if (!delivery) {
@@ -121,7 +126,7 @@ export function judgeB({ schedule, runs, run, delivery, runJson, toolEvents, exp
     } else checks.push(check("B4", "pass", `targets=${targets.length} sent=${sent.length} failed=0 pending=0`));
   }
 
-  // B6 — 分段/重试有界
+  // B6 - 分段/重试有界
   if (!delivery) {
     checks.push(check("B6", "blocker", "no delivery record for retry-bound judgement"));
   } else {
@@ -131,7 +136,7 @@ export function judgeB({ schedule, runs, run, delivery, runJson, toolEvents, exp
     else checks.push(check("B6", "pass", `maxAttempts=${worst} <= 3`));
   }
 
-  // B7 — API 读回与磁盘 run store 一致
+  // B7 - API 读回与磁盘 run store 一致
   if (!runJson) {
     checks.push(check("B7", "blocker", "run.json not read (no --runs-dir / RESEARCH_RUNS_DIR)"));
   } else if (!run) {
@@ -181,9 +186,9 @@ function synthetic() {
 function selfTestCases() {
   const good = () => judgeB(synthetic());
   return [
-    { name: "happy path → pass", expect: "pass", run: good },
+    { name: "happy path -> pass", expect: "pass", run: good },
     {
-      name: "partial research shown as succeeded → fail",
+      name: "partial research shown as succeeded -> fail",
       expect: "fail",
       run: () => {
         const input = synthetic();
@@ -194,7 +199,7 @@ function selfTestCases() {
       },
     },
     {
-      name: "duplicate runId (double trigger) → fail",
+      name: "duplicate runId (double trigger) -> fail",
       expect: "fail",
       run: () => {
         const input = synthetic();
@@ -203,7 +208,7 @@ function selfTestCases() {
       },
     },
     {
-      name: "no Guanlan tool call → fail",
+      name: "no Guanlan tool call -> fail",
       expect: "fail",
       run: () => {
         const input = synthetic();
@@ -212,7 +217,7 @@ function selfTestCases() {
       },
     },
     {
-      name: "delivery reader unavailable → blocker",
+      name: "delivery reader unavailable -> blocker",
       expect: "blocker",
       run: () => {
         const input = synthetic();
@@ -221,7 +226,7 @@ function selfTestCases() {
       },
     },
     {
-      name: "API/disk mismatch → fail",
+      name: "API/disk mismatch -> fail",
       expect: "fail",
       run: () => {
         const input = synthetic();
@@ -230,7 +235,7 @@ function selfTestCases() {
       },
     },
     {
-      name: "unbounded retries → fail",
+      name: "unbounded retries -> fail",
       expect: "fail",
       run: () => {
         const input = synthetic();
@@ -299,7 +304,7 @@ async function main() {
       mode: "offline",
       checks: [
         check("self-test", ok ? "pass" : "fail", `${rows.filter((row) => row.pass).length}/${rows.length} bundled cases matched`),
-        check("B1-B7", "blocker", "offline self-test only — no live run was read back"),
+        check("B1-B7", "blocker", "offline self-test only - no live run was read back"),
       ],
     }).exitCode;
   }
@@ -327,7 +332,7 @@ async function main() {
     return report(evidence, {
       scenario: SCENARIO,
       mode: "dry-run",
-      checks: [check("B1-B7", "blocker", "dry-run only — nothing executed")],
+      checks: [check("B1-B7", "blocker", "dry-run only - nothing executed")],
     }).exitCode;
   }
 

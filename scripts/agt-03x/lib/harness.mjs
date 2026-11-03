@@ -76,11 +76,57 @@ export const SECRET_SCAN_PATTERNS = Object.freeze([
   { name: "pem", pattern: /-----BEGIN/ },
   { name: "feishu_open_id", pattern: /\bou_[A-Za-z0-9_-]{6,}/ },
   { name: "feishu_chat_id", pattern: /\boc_[A-Za-z0-9_-]{6,}/ },
+  { name: "feishu_message_id", pattern: /\bom_(?!(?:local|fixture)_)[A-Za-z0-9_-]{6,}/ },
+  { name: "feishu_union_id", pattern: /\bon_[A-Za-z0-9_-]{6,}/ },
+  // `wm_local_*` / `wmfixture_*` are the documented synthetic fixture namespace.
+  { name: "wecom_message_id", pattern: /\bwm(?!(?:_)?(?:local|fixture))[A-Za-z0-9]{8,}/ },
   { name: "wecom_chat_id", pattern: /\b(?:chatid|chat_id)=[A-Za-z0-9_-]{4,}/i },
   { name: "bearer", pattern: /Bearer\s+[A-Za-z0-9._-]{20,}/ },
   { name: "app_secret", pattern: /app_?secret\s*[=:]\s*[A-Za-z0-9]{8,}/i },
+  // Mixed-case 32+ character tokens (base64url secrets). Requires a digit, rejects
+  // long alphabetic runs (camelCase identifiers), URL path segments and Pi tool-call
+  // ids (`call_...`), and leaves git SHAs (lowercase hex) writable.
+  {
+    name: "long_token",
+    pattern:
+      /(?<![\/\w.-])(?![A-Za-z]{13})(?!(?:call_|msg_|req_|tool_))(?=[A-Za-z0-9_-]{32,}\b)(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{32,}/,
+  },
   { name: "absolute_path", pattern: /[A-Za-z]:\\Users\\|\/home\/[a-z]+/ },
 ]);
+
+/**
+ * The only strings allowed to carry non-ASCII text into evidence. Message
+ * bodies, chat transcripts and titles must never reach a JSONL file, so free
+ * text is ASCII-only unless it is one of these verbatim labels. Add a label
+ * here on purpose - never by loosening the rule.
+ */
+export const APPROVED_TEXT_LABELS = Object.freeze([
+  "seed 数据，非 A2 注册链能力（证据必须原样标注）",
+]);
+
+const MAX_FREE_TEXT = 160;
+
+/** Remove approved labels so the ASCII check below only judges the remainder. */
+function stripApprovedLabels(value) {
+  return APPROVED_TEXT_LABELS.reduce((text, label) => text.split(label).join(""), value);
+}
+
+/**
+ * Evidence free text is a machine summary, not a transcript: reject ids,
+ * secrets, non-ASCII prose (outside approved labels) and oversized blobs.
+ */
+export function findTextViolations(value) {
+  const violations = findSecretHits(value).map((name) => `looks like ${name}`);
+  const remainder = stripApprovedLabels(value);
+  const nonAscii = remainder.match(/[^\x20-\x7E\n\t]/g);
+  if (nonAscii) {
+    // Report codepoints only - never the surrounding text (it may be the leak).
+    const points = [...new Set(nonAscii)].slice(0, 5).map((char) => `U+${char.codePointAt(0).toString(16).toUpperCase()}`);
+    violations.push(`contains non-ASCII text (${points.join(" ")}) (message body?)`);
+  }
+  if (value.length > MAX_FREE_TEXT) violations.push(`longer than ${MAX_FREE_TEXT} characters`);
+  return violations;
+}
 
 /** Count secret-shaped hits in a text blob; used by D8 and by the writer guard. */
 export function findSecretHits(text) {
@@ -103,15 +149,15 @@ function assertWhitelisted(record) {
       }
     }
     if (typeof value === "string") {
-      for (const name of findSecretHits(value)) {
-        throw new Error(`evidence value looks like ${name}; refusing to write it`);
+      for (const violation of findTextViolations(value)) {
+        throw new Error(`evidence key "${key}" ${violation}; refusing to write it`);
       }
     }
     if (Array.isArray(value)) {
       for (const item of value) {
         if (typeof item !== "string") throw new Error(`evidence key "${key}" must hold strings only`);
-        for (const name of findSecretHits(item)) {
-          throw new Error(`evidence value looks like ${name}; refusing to write it`);
+        for (const violation of findTextViolations(item)) {
+          throw new Error(`evidence key "${key}" ${violation}; refusing to write it`);
         }
       }
     }

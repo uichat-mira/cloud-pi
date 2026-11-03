@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Scenario D — 故障与安全（未授权 / 无效凭证 / 重复消息 / 重启 / 投递失败）验收脚本。
+ * Scenario D - 故障与安全（未授权 / 无效凭证 / 重复消息 / 重启 / 投递失败）验收脚本。
  *
  *   node scripts/agt-03x/d-failure-modes.mjs            # 离线可执行部分
  *   node scripts/agt-03x/d-failure-modes.mjs --dry-run   # 打印计划
@@ -61,6 +61,30 @@ function configFailClosed(timeoutMs) {
   return check("D2-offline", "pass", `exit=2 in ${result.durationMs}ms, no network attempted`);
 }
 
+/**
+ * Collect the string values of a structured evidence file. Scanning raw JSONL
+ * would flag harmless key/value boundaries (`..._reprobe_after_sdk_...`) as
+ * long tokens, so structured files are parsed and only values are inspected.
+ */
+function evidenceStrings(text, structured) {
+  if (!structured) return [text];
+  const values = [];
+  const harvest = (node) => {
+    if (typeof node === "string") values.push(node);
+    else if (Array.isArray(node)) node.forEach(harvest);
+    else if (node && typeof node === "object") Object.values(node).forEach(harvest);
+  };
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      harvest(JSON.parse(line));
+    } catch {
+      values.push(line);
+    }
+  }
+  return values;
+}
+
 function scanEvidenceDirs() {
   const targets = [join(ROOT, "poc", "evidence"), join(ROOT, "docs", "evidence")];
   const hits = [];
@@ -73,12 +97,15 @@ function scanEvidenceDirs() {
       else if (/\.(jsonl|md|json)$/.test(entry.name) && statSync(full).isFile()) {
         scanned += 1;
         const text = readFileSync(full, "utf8");
-        for (const name of findSecretHits(text)) hits.push(`${entry.name}:${name}`);
+        const structured = /\.(jsonl|json)$/.test(entry.name);
+        for (const value of evidenceStrings(text, structured)) {
+          for (const name of findSecretHits(value)) hits.push(`${entry.name}:${name}`);
+        }
       }
     }
   };
   for (const dir of targets) walk(dir);
-  return { scanned, hits };
+  return { scanned, hits: [...new Set(hits)] };
 }
 
 async function main() {
@@ -111,21 +138,21 @@ async function main() {
     return report(evidence, {
       scenario: SCENARIO,
       mode: "dry-run",
-      checks: [check("D1-D8", "blocker", "dry-run only — nothing executed")],
+      checks: [check("D1-D8", "blocker", "dry-run only - nothing executed")],
     }).exitCode;
   }
 
   const checks = [];
 
-  // D1 — 未授权/非 @/非文本/非 user 一律忽略，且不调用模型（飞书侧负例）
+  // D1 - 未授权/非 @/非文本/非 user 一律忽略，且不调用模型（飞书侧负例）
   const d1 = suiteCheck("D1-feishu", "policy+channel", ["tests/agt-029-policy.test.mjs", "tests/agt-029-channel.test.mjs"], { min: 16, timeoutMs });
   evidence.emit({ event: "suite", check: d1.check.check, status: d1.check.status, durationMs: d1.result.durationMs, detail: d1.check.detail });
   checks.push(d1.check);
 
-  // D1 wecom counterpart — requires t6.
+  // D1 wecom counterpart - requires t6.
   checks.push(check("D1-wecom", "blocker", "WeCom negative cases do not exist yet (t6)"));
 
-  // D2 — 无效配置 fail closed
+  // D2 - 无效配置 fail closed
   const d2 = configFailClosed(timeoutMs);
   evidence.emit({ event: "config-gate", check: d2.check, status: d2.status, detail: d2.detail });
   checks.push(d2);
@@ -134,16 +161,16 @@ async function main() {
   const missingFeishu = ["FEISHU_APP_ID", "FEISHU_APP_SECRET"].filter((name) => !process.env[name]);
   checks.push(
     missingFeishu.length > 0
-      ? check("D2-wrong-secret", "blocker", `missing env: ${missingFeishu.join(", ")} — wrong-secret variant not executed`)
+      ? check("D2-wrong-secret", "blocker", `missing env: ${missingFeishu.join(", ")} - wrong-secret variant not executed`)
       : check("D2-wrong-secret", "blocker", "not executed by this harness; run manually with a real app id and a wrong secret"),
   );
 
-  // D3 — 重复消息只产生一次运行（离线去重用例）
+  // D3 - 重复消息只产生一次运行（离线去重用例）
   const d3 = suiteCheck("D3", "dedupe", ["tests/agt-029-dedupe.test.mjs"], { min: 4, timeoutMs });
   evidence.emit({ event: "suite", check: d3.check.check, status: d3.check.status, durationMs: d3.result.durationMs, detail: d3.check.detail });
   checks.push(d3.check);
 
-  // D4 — 重启后调度/投递幂等，进行中 trigger 标 interrupted
+  // D4 - 重启后调度/投递幂等，进行中 trigger 标 interrupted
   const smoke = runCommand({ label: "api-smoke", argv: ["node", "scripts/agt-034/api-smoke.mjs"], timeoutMs: 120_000 });
   const smokeOk = smoke.exitCode === 0 && smoke.stdout.includes('"event":"result","ok":true');
   evidence.emit({ event: "runner", check: "D4-api", status: smokeOk ? "pass" : "fail", durationMs: smoke.durationMs, detail: `exit=${smoke.exitCode}` });
@@ -170,15 +197,15 @@ async function main() {
       : check("D4-scheduler", "fail", `exit=${poc.exitCode} interrupted=${interrupted} completed=${completed}`),
   );
 
-  // D5 — 有界重试 + 稳定错误码
+  // D5 - 有界重试 + 稳定错误码
   const d5 = suiteCheck("D5", "transport", ["tests/agt-033-transport.test.mjs"], { min: 10, timeoutMs });
   evidence.emit({ event: "suite", check: d5.check.check, status: d5.check.status, durationMs: d5.result.durationMs, detail: d5.check.detail });
   checks.push(d5.check);
 
-  // D6 — 企业微信 /stop 取消语义：t6 未交付
+  // D6 - 企业微信 /stop 取消语义：t6 未交付
   checks.push(check("D6", "blocker", "WeCom /stop cancellation cases do not exist yet (t6)"));
 
-  // D8 — 证据与日志本身不泄露
+  // D8 - 证据与日志本身不泄露
   const scan = scanEvidenceDirs();
   evidence.emit({ event: "scan", check: "D8", status: scan.hits.length === 0 ? "pass" : "fail", detail: `files=${scan.scanned} hits=${scan.hits.length}` });
   checks.push(

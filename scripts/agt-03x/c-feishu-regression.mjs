@@ -27,6 +27,7 @@ import {
   runCommand,
   writeUsage,
 } from "./lib/harness.mjs";
+import { fullSuiteVerdict } from "./lib/judge.mjs";
 
 const SCENARIO = "C";
 const USAGE = `usage: node scripts/agt-03x/c-feishu-regression.mjs [--offline] [--full] [--live]
@@ -59,16 +60,9 @@ const SUITES = Object.freeze([
 /**
  * The two Windows-only test defects recorded in baseline §4; cleared by t7.
  * TAP reports the enclosing describe name for the second one, so both the
- * parent and the inner title are accepted.
+ * parent and the inner title are accepted. The patterns and the expected failure
+ * count live in `lib/judge.mjs`, which is unit-tested by `self-test.mjs`.
  */
-const KNOWN_FAILURES = Object.freeze([
-  /resolveRunsRoot: explicit > env > default/,
-  /adapter: system prompt and cwd isolation/i,
-  /research policy reaches the model-visible system prompt/i,
-]);
-
-const BASELINE_TOTAL = 555;
-
 function tap(file, timeoutMs) {
   const result = runCommand({ label: file, argv: ["node", "--test", "--test-reporter=tap", file], timeoutMs });
   const text = `${result.stdout}\n${result.stderr}`;
@@ -135,22 +129,21 @@ function fullSuiteCheck(evidence, timeoutMs) {
   const text = `${result.stdout}\n${result.stderr}`;
   const summary = parseTestSummary(text);
   const failing = failingTests(text);
+  // Both the failure count and the failure names are asserted: a name-only
+  // check would accept a new failure whose title contains a known substring.
+  const verdict = summary
+    ? fullSuiteVerdict({ tests: summary.tests, fail: summary.fail, failing })
+    : check("C3", "fail", "full suite produced no TAP summary");
+  // The suite record carries the judged status (not the raw non-zero failure
+  // count), so an audited JSONL never shows "fail" next to a passing gate.
   evidence.emit({
     event: "suite",
     check: "C3",
-    status: summary && (summary.fail ?? 1) === 0 ? "pass" : "fail",
+    status: verdict.status,
     durationMs: summary?.durationMs ? Math.round(summary.durationMs) : 0,
     detail: `tests=${summary?.tests ?? 0} fail=${summary?.fail ?? "?"} exit=${result.exitCode}`,
   });
-  if (!summary) return check("C3", "fail", "full suite produced no TAP summary");
-  if ((summary.tests ?? 0) < BASELINE_TOTAL) {
-    return check("C3", "fail", `tests=${summary.tests} < baseline ${BASELINE_TOTAL}`);
-  }
-  const unknown = failing.filter((name) => !KNOWN_FAILURES.some((pattern) => pattern.test(name)));
-  if (unknown.length > 0) {
-    return check("C3", "fail", `failing set grew by ${unknown.length}: ${unknown.slice(0, 2).join(" | ")}`);
-  }
-  return check("C3", "pass", `tests=${summary.tests} fail=${summary.fail} (${failing.length} known Windows defects)`);
+  return verdict;
 }
 
 async function liveCheck(evidence, timeoutMs) {

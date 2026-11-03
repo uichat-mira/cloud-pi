@@ -11,9 +11,11 @@
  * 判定与退出码。任何 exit 0 的离线场景都会被判为失败（那意味着伪造了 pass）。
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { EXIT, ROOT, gitHead, nowIso, parseArgs, writeUsage } from "./lib/harness.mjs";
+import { EXIT, ROOT, createEvidence, gitHead, nowIso, parseArgs, writeUsage } from "./lib/harness.mjs";
+import { fullSuiteVerdict } from "./lib/judge.mjs";
 
 const USAGE = `usage: node scripts/agt-03x/self-test.mjs [--full] [--no-write] [--out <file>]`;
 
@@ -30,8 +32,7 @@ const CASES = [
   { name: "D/wecom-absent", argv: ["scripts/agt-03x/d-failure-modes.mjs"], expectExit: 3, expect: /"check":"D1-wecom","status":"blocker"/ },
 ];
 
-function runCase(testCase) {
-  const started = Date.now();
+function runCase(testCase) {  const started = Date.now();
   const result = spawnSync(process.execPath, testCase.argv, {
     cwd: ROOT,
     encoding: "utf8",
@@ -49,6 +50,73 @@ function runCase(testCase) {
     pass: exitOk && textOk && noPass,
     output,
   };
+}
+
+/**
+ * In-process regressions for the judge/writer itself. These exist because the
+ * external review found two ways the harness could *look* right and still let
+ * an unusable (or leaky) evidence file through:
+ *   1. the writer only checked keys/secret shapes, so a WeCom message id or a
+ *      chat message pasted into `detail`/`note` was written verbatim;
+ *   2. the C3 gate only checked failure *names*, so a new failure whose title
+ *      contained a known substring was silently accepted.
+ */
+function runUnitCases() {
+  const dir = mkdtempSync(join(tmpdir(), "agt-03x-unit-"));
+  const evidence = createEvidence(join(dir, "probe.jsonl"), { scenario: "unit" });
+  const rows = [];
+  const reject = (name, record, needle) => {
+    try {
+      evidence.emit(record);
+      rows.push({ name, pass: false, detail: "accepted (must be rejected)" });
+    } catch (error) {
+      rows.push({ name, pass: needle.test(error.message), detail: error.message });
+    }
+  };
+  const accept = (name, record) => {
+    try {
+      evidence.emit(record);
+      rows.push({ name, pass: true, detail: "accepted" });
+    } catch (error) {
+      rows.push({ name, pass: false, detail: error.message });
+    }
+  };
+  const c3 = (name, input, expected) => {
+    const verdict = fullSuiteVerdict(input);
+    rows.push({ name, pass: verdict.status === expected, detail: `${verdict.status}: ${verdict.detail}` });
+  };
+
+  // --- F-28-1: value shapes, not just key names ---------------------------
+  reject("writer/wecom-message-id", { event: "x", detail: "reply to wmAbCdEf123456 ok" }, /wecom_message_id/);
+  reject("writer/chinese-body", { event: "x", detail: "帮我查一下今天的新闻" }, /non-ASCII/);
+  reject("writer/feishu-message-id", { event: "x", detail: "om_1a2b3c4d5e6f" }, /feishu_message_id/);
+  reject("writer/union-id", { event: "x", detail: "on_9f8e7d6c5b4a" }, /feishu_union_id/);
+  reject("writer/long-mixed-token", { event: "x", detail: "AbCdEf0123456789GhIjKlMnOpQrStUvWx" }, /long_token/);
+  reject("writer/absolute-path", { event: "x", detail: "D:\\Users\\someone\\secret.txt" }, /absolute_path/);
+  reject("writer/oversized-text", { event: "x", detail: "a".repeat(200) }, /longer than 160/);
+  reject("writer/forbidden-key", { event: "x", messageId: "wm123" }, /not on the whitelist/);
+  accept("writer/seed-label", { event: "x", note: "seed 数据，非 A2 注册链能力（证据必须原样标注）" });
+  accept("writer/ascii-summary", { event: "x", detail: "tests=555 fail=2 exit=1 head=8efc250" });
+
+  // --- F-28-2: the C3 gate asserts the failure *count* -------------------
+  const known = [
+    "resolveRunsRoot: explicit > env > default",
+    "adapter: system prompt and cwd isolation through Pi",
+    "research policy reaches the model-visible system prompt",
+  ];
+  c3("judge/c3-baseline-pass", { tests: 555, fail: 2, failing: known }, "pass");
+  c3(
+    "judge/c3-third-failure-with-known-title",
+    { tests: 555, fail: 3, failing: [...known, "research policy reaches the model-visible system prompt for wecom"] },
+    "fail",
+  );
+  c3("judge/c3-known-defect-fixed", { tests: 555, fail: 1, failing: [known[0]] }, "fail");
+  c3("judge/c3-tests-dropped", { tests: 553, fail: 2, failing: known }, "fail");
+  c3("judge/c3-unknown-name", { tests: 555, fail: 2, failing: [known[0], "brand new failure"] }, "fail");
+  c3("judge/c3-no-summary", { tests: undefined, fail: undefined, failing: [] }, "fail");
+
+  rmSync(dir, { recursive: true, force: true });
+  return rows;
 }
 
 async function main() {
@@ -78,6 +146,8 @@ async function main() {
     results.push(runCase(testCase));
   }
 
+  const unitRows = runUnitCases();
+
   const lines = [
     "# AGT-03x 验收执行包离线自测（真实执行输出，非手写）",
     "",
@@ -98,22 +168,41 @@ async function main() {
   for (const row of results) {
     lines.push(`## ${row.name}`, "", `命令：\`node ${row.argv.join(" ")}\``, "", "```", row.output.trim(), "```", "");
   }
+  lines.push(
+    "## 判定器本身的内建回归（进程内，不 spawn）",
+    "",
+    "覆盖外审 F-28-1（写入器只校验键 → 现在同时校验值形态）与 F-28-2（C3 只看失败名 → 现在断言失败数量）。",
+    "",
+    "| 用例 | 结果 | 说明 |",
+    "| --- | --- | --- |",
+  );
+  for (const row of unitRows) {
+    lines.push(`| ${row.name} | ${row.pass ? "pass" : "FAIL"} | ${String(row.detail).replace(/\|/g, "\\|")} |`);
+  }
+  lines.push("");
   const report = `${lines.join("\n")}\n`;
 
-  const failures = results.filter((row) => !row.pass);
+  const subprocessFailures = results.filter((row) => !row.pass);
+  const unitFailures = unitRows.filter((row) => !row.pass);
   const out = options.out ?? join(ROOT, "docs", "evidence", "wecom-v1", "offline-selftest.txt");
   if (!options.noWrite) {
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, report, "utf8");
-    process.stdout.write(`offline self-test: ${results.length - failures.length}/${results.length} cases behaved as expected\n`);
+    process.stdout.write(
+      `offline self-test: ${results.length - subprocessFailures.length}/${results.length} cases + ` +
+        `${unitRows.length - unitFailures.length}/${unitRows.length} judge regressions behaved as expected\n`,
+    );
     process.stdout.write(`transcript: ${out}\n`);
   } else {
     process.stdout.write(report);
   }
-  for (const row of failures) {
+  for (const row of subprocessFailures) {
     process.stderr.write(`FAIL ${row.name}: exit=${row.exitCode} (expected ${row.expectExit})\n`);
   }
-  return failures.length === 0 ? EXIT.PASS : EXIT.FAIL;
+  for (const row of unitFailures) {
+    process.stderr.write(`FAIL ${row.name}: ${row.detail}\n`);
+  }
+  return subprocessFailures.length === 0 && unitFailures.length === 0 ? EXIT.PASS : EXIT.FAIL;
 }
 
 process.exitCode = await main();
