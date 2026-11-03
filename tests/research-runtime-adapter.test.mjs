@@ -136,8 +136,9 @@ export async function createAgentRuntime() {
   }
 });
 
-test("loadAgentRuntimePort still fails closed without a module", async () => {
-  await assert.rejects(() => loadAgentRuntimePort({ moduleSpecifier: null }), /not configured/);
+test("loadAgentRuntimePort fails closed for an explicitly unavailable module", async () => {
+  const missing = pathToFileURL(join(tmpdir(), `agt028-unavailable-${process.pid}.mjs`)).href;
+  await assert.rejects(() => loadAgentRuntimePort({ moduleSpecifier: missing }), /Cannot load agent runtime module/);
 });
 
 test("resolveRuntimeModuleSpecifier prefers an explicit module", () => {
@@ -145,7 +146,11 @@ test("resolveRuntimeModuleSpecifier prefers an explicit module", () => {
     resolveRuntimeModuleSpecifier("./my-runtime.mjs", DEFAULT_RUNTIME_MODULE),
     "./my-runtime.mjs",
   );
-  assert.equal(resolveRuntimeModuleSpecifier("  ", DEFAULT_RUNTIME_MODULE), null);
+  // Blank input chooses the sibling when AGT-027 has landed on this branch.
+  assert.equal(
+    resolveRuntimeModuleSpecifier("  ", DEFAULT_RUNTIME_MODULE),
+    resolveRuntimeModuleSpecifier(undefined, DEFAULT_RUNTIME_MODULE),
+  );
 });
 
 test("resolveRuntimeModuleSpecifier falls back only when the sibling exists", (t) => {

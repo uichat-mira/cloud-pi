@@ -472,7 +472,7 @@ describe("adversarial: secrets and the live boundary", () => {
     // report artifact under a cancelled status (low-risk observation, see doc).
   });
 
-  test("the live path fails closed without an AGT-027 runtime module and creates no run", async (t) => {
+  test("the live path fails closed for a missing runtime without creating a run", async (t) => {
     const rootDir = await tempRoot(t);
 
     await assert.rejects(executeResearch({ topic: "no runtime" }, { rootDir }), (error) => {
@@ -482,7 +482,6 @@ describe("adversarial: secrets and the live boundary", () => {
     });
     assert.deepEqual(await readdir(rootDir), [], "a failed-closed run must not create a run directory");
 
-    await assert.rejects(loadAgentRuntimePort({}), (error) => error.code === ERROR_CODE.RUNTIME_UNAVAILABLE);
     await assert.rejects(
       loadAgentRuntimePort({ moduleSpecifier: join(rootDir, "missing-runtime.mjs") }),
       (error) => error.code === ERROR_CODE.RUNTIME_UNAVAILABLE,
@@ -492,7 +491,7 @@ describe("adversarial: secrets and the live boundary", () => {
     delete env.RESEARCH_AGENT_RUNTIME_MODULE;
     const { stdout, stderr } = await execFileAsync(
       process.execPath,
-      [CLI, "--topic", "live fail closed", "--runs-dir", rootDir],
+      [CLI, "--topic", "live fail closed", "--runs-dir", rootDir, "--runtime-module", join(rootDir, "missing-runtime.mjs")],
       { env, cwd: dirname(CLI) },
     ).catch((error) => error);
     assert.equal(stdout ?? "", "");
