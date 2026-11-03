@@ -121,7 +121,7 @@ let timer;
 
 function matches(outcome) {
   if (outcome?.chatType !== options.chatType) return false;
-  if (options.expect === "reply") return outcome.action === "replied";
+  if (options.expect === "reply") return outcome.action === "replied" && outcome.replyDelivered !== false;
   return outcome.action === "ignored" && outcome.reason === options.expect.slice("ignored:".length);
 }
 
@@ -132,7 +132,7 @@ async function finish(ok, detail) {
   writeEvidence({ kind: "result", at: new Date().toISOString(), ok, ...detail });
   let drained = false;
   try {
-    drained = await service.stop({ timeoutMs: 10_000 });
+    drained = service ? await service.stop({ timeoutMs: 10_000 }) : false;
   } catch (error) {
     writeEvidence({ kind: "shutdown_error", code: String(error?.code ?? error?.name ?? "error") });
   }
