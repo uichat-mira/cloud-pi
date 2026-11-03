@@ -14,13 +14,17 @@
     "pretest": "node scripts/prepare-guanlan-fixture.mjs",
     "test": "node --test \"tests/**/*.test.mjs\"",
     "test:agent": "node --test \"tests/agt-027-*.test.mjs\"",
+    "test:feishu": "node --test \"tests/agt-029-*.test.mjs\"",
     "test:live": "node scripts/run-live-tests.mjs",
     "test:p0": "node --test tests/p0-pi-mcp.test.mjs",
+    "channel:feishu": "node --env-file-if-exists=.env src/channels/feishu/server.mjs",
+    "feishu:live": "node --env-file-if-exists=.env scripts/feishu-live-poc.mjs",
     "research": "node scripts/research.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.4.0",
     "@earendil-works/pi-coding-agent": "1.4.0",
+    "@larksuiteoapi/node-sdk": "1.76.0",
     "@mozilla/readability": "^0.6.0",
     "linkedom": "^0.18.15",
     "undici": "^6.29.1"
