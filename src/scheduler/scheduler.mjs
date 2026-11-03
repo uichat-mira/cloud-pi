@@ -16,9 +16,14 @@
  * and tool layer; the executor itself is never mocked.
  */
 import { randomBytes } from "node:crypto";
+import { rm } from "node:fs/promises";
 import { isTerminalStatus } from "../research/contracts.mjs";
 import { redactSecrets } from "../research/execute.mjs";
-import { readResearchRun, startResearch } from "../research/index.mjs";
+import {
+  normalizeResearchRequest,
+  readResearchRun,
+  startResearch,
+} from "../research/index.mjs";
 import {
   LIMITS,
   SCHEDULE_KIND,
@@ -41,6 +46,19 @@ import {
 import { createScheduleStore } from "./store.mjs";
 
 const DEFAULT_TICK_INTERVAL_MS = 30_000;
+
+/**
+ * Business fields a management caller may change in place. Identity, status,
+ * leases, trigger history and statistics are never writable through an update:
+ * lifecycle changes go through pause/enable and the scheduler's own state
+ * machine, so an API cannot forge a lease or skip a persisted occurrence.
+ */
+const UPDATABLE_SCHEDULE_FIELDS = new Set(["name", "timezone", "kind", "cron", "at", "request", "enabled"]);
+const TIMING_FIELDS = ["kind", "timezone", "cron", "at"];
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
 function resolveClock(nowOption) {
   if (typeof nowOption === "function") {
@@ -183,6 +201,188 @@ class Scheduler {
       await this._store.write(record);
       this._schedules.set(record.scheduleId, record);
       return cloneSchedule(record);
+    });
+  }
+
+  /**
+   * Change business fields of a stored schedule without bypassing the state
+   * machine. This is the minimal mutation a management API needs; it is not a
+   * general record editor.
+   *
+   * - Only `name`, `timezone`, `kind`, `cron`, `at`, `request` and `enabled`
+   *   are accepted. Unknown or internal fields are refused.
+   * - An in-flight run (`activeTrigger` or a live controller) fails closed with
+   *   `conflict`: writing the definition under an execution that will later
+   *   release its lease against the old object would leave a stale lease.
+   * - When only non-timing fields change, `nextRunAt`/`status` are preserved, so
+   *   a due-but-not-yet-claimed occurrence is not silently skipped.
+   * - A completed schedule can be edited only together with a new future
+   *   timing, which intentionally starts a fresh activation; history and stats
+   *   are kept as audit.
+   *
+   * @param {string} scheduleId
+   * @param {object} patch
+   */
+  async updateSchedule(scheduleId, patch) {
+    if (!isPlainObject(patch)) {
+      throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, "update requires a JSON object");
+    }
+    const fields = Object.keys(patch);
+    if (fields.length === 0) {
+      throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, "update requires at least one field");
+    }
+    const unsupported = fields.filter((field) => !UPDATABLE_SCHEDULE_FIELDS.has(field));
+    if (unsupported.length > 0) {
+      throw new SchedulerError(
+        SCHEDULER_ERROR.INVALID_REQUEST,
+        `unsupported schedule fields: ${unsupported.join(", ")}`,
+      );
+    }
+    if (patch.enabled !== undefined && typeof patch.enabled !== "boolean") {
+      throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, "enabled must be a boolean");
+    }
+
+    return this._withStateLock(async () => {
+      this._assertUsable();
+      const current = this._require(scheduleId);
+      if (current.activeTrigger) {
+        throw new SchedulerError(
+          SCHEDULER_ERROR.CONFLICT,
+          `schedule ${scheduleId} has an active run; wait for it to finish or cancel it before updating`,
+        );
+      }
+      if (this._controllers.has(scheduleId)) {
+        throw new SchedulerError(
+          SCHEDULER_ERROR.CONFLICT,
+          `schedule ${scheduleId} has an active run; wait for it to finish or cancel it before updating`,
+        );
+      }
+
+      const timingChanged = TIMING_FIELDS.some((field) => field in patch);
+      if (current.status === SCHEDULE_STATUS.COMPLETED && !timingChanged) {
+        throw new SchedulerError(
+          SCHEDULER_ERROR.CONFLICT,
+          `schedule ${scheduleId} is completed; provide a new future at/cron to update it`,
+        );
+      }
+
+      const nextKind = "kind" in patch ? patch.kind : current.kind;
+      if (nextKind !== SCHEDULE_KIND.ONCE && nextKind !== SCHEDULE_KIND.RECURRING) {
+        throw new SchedulerError(
+          SCHEDULER_ERROR.INVALID_REQUEST,
+          `kind must be "${SCHEDULE_KIND.ONCE}" or "${SCHEDULE_KIND.RECURRING}"`,
+        );
+      }
+      if ("at" in patch && nextKind !== SCHEDULE_KIND.ONCE) {
+        throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, "at is only valid for once schedules");
+      }
+      if ("cron" in patch && nextKind !== SCHEDULE_KIND.RECURRING) {
+        throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, "cron is only valid for recurring schedules");
+      }
+
+      let name = current.name;
+      if ("name" in patch) {
+        if (typeof patch.name !== "string") {
+          throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, "name must be a string");
+        }
+        name = patch.name.trim().slice(0, 200);
+      }
+
+      let request = current.request;
+      if ("request" in patch) {
+        try {
+          request = normalizeResearchRequest(patch.request, { now: this._now() }).request;
+        } catch (error) {
+          throw new SchedulerError(
+            SCHEDULER_ERROR.INVALID_REQUEST,
+            `invalid research request: ${error?.message ?? error}`,
+            { cause: error },
+          );
+        }
+      }
+
+      const candidate = cloneSchedule(current);
+      candidate.name = "name" in patch ? name : current.name;
+      candidate.request = request;
+
+      if (timingChanged) {
+        const input = {
+          scheduleId,
+          kind: nextKind,
+          timezone: "timezone" in patch ? patch.timezone : current.timezone,
+          request,
+          name,
+        };
+        if (nextKind === SCHEDULE_KIND.ONCE) input.at = "at" in patch ? patch.at : current.onceAt;
+        else input.cron = "cron" in patch ? patch.cron : current.cron;
+
+        let normalized;
+        try {
+          normalized = normalizeScheduleInput(input, { now: this._now() });
+        } catch (error) {
+          if (error instanceof SchedulerError) throw error;
+          throw new SchedulerError(
+            SCHEDULER_ERROR.INVALID_REQUEST,
+            `invalid schedule update: ${error?.message ?? error}`,
+            { cause: error },
+          );
+        }
+        candidate.kind = normalized.kind;
+        candidate.timezone = normalized.timezone;
+        candidate.cron = normalized.cron;
+        candidate.onceAt = normalized.onceAt;
+        candidate.onceAtUtc = normalized.onceAtUtc;
+        candidate.request = normalized.request;
+        candidate.name = normalized.name;
+        candidate.nextRunAt = normalized.nextRunAt;
+        if (current.status === SCHEDULE_STATUS.COMPLETED) {
+          candidate.status = SCHEDULE_STATUS.ACTIVE;
+          candidate.completedAt = null;
+        }
+      }
+
+      if (patch.enabled !== undefined) {
+        if (!patch.enabled) {
+          if (candidate.status !== SCHEDULE_STATUS.COMPLETED) candidate.status = SCHEDULE_STATUS.PAUSED;
+        } else if (candidate.status === SCHEDULE_STATUS.PAUSED) {
+          candidate.status = SCHEDULE_STATUS.ACTIVE;
+        }
+      }
+
+      await this._save(candidate);
+      this._schedules.set(scheduleId, candidate);
+      return cloneSchedule(candidate);
+    });
+  }
+
+  /**
+   * Remove a schedule and its persisted file. Deleting is refused while the
+   * schedule owns a lease or an execution controller: the running trigger would
+   * otherwise release into a schedule that no longer exists. The global run slot
+   * and other schedules are unaffected.
+   *
+   * @param {string} scheduleId
+   */
+  async deleteSchedule(scheduleId) {
+    return this._withStateLock(async () => {
+      this._assertUsable();
+      const schedule = this._require(scheduleId);
+      if (schedule.activeTrigger) {
+        throw new SchedulerError(
+          SCHEDULER_ERROR.CONFLICT,
+          `schedule ${scheduleId} has an active run; wait for it to finish or cancel it before deleting`,
+        );
+      }
+      if (this._controllers.has(scheduleId)) {
+        throw new SchedulerError(
+          SCHEDULER_ERROR.CONFLICT,
+          `schedule ${scheduleId} has an active run; wait for it to finish or cancel it before deleting`,
+        );
+      }
+      // The scheduler owns the file layout; the API never touches JSON files.
+      await rm(this._store.fileFor(scheduleId), { force: true });
+      this._schedules.delete(scheduleId);
+      return { scheduleId, deleted: true };
     });
   }
 
