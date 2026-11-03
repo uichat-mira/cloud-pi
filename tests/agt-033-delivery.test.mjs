@@ -18,7 +18,10 @@ import {
   DeliveryError,
   createDeliveryCoordinator,
 } from "../src/delivery/index.mjs";
-import { createFeishuTransport } from "../src/channels/feishu/transport.mjs";
+import {
+  createFeishuTransport,
+  createSendHttpInstance,
+} from "../src/channels/feishu/transport.mjs";
 import {
   RUN_ID,
   TWO_TARGETS,
@@ -216,6 +219,34 @@ describe("AGT-033 T2: bounded retry and error mapping", () => {
     const root = await tempRoot(t);
     let sdkCalls = 0;
     const httpDefaults = { timeout: 0 };
+    const baseHttp = {
+      defaults: httpDefaults,
+      request(options) {
+        sdkCalls += 1;
+        return new Promise((_, reject) => {
+          setTimeout(
+            () =>
+              reject(
+                Object.assign(new Error(`timeout of ${options.timeout}ms exceeded`), {
+                  code: "ECONNABORTED",
+                }),
+              ),
+            options.timeout,
+          );
+        });
+      },
+    };
+    const sendHttp = createSendHttpInstance(baseHttp, 40);
+    const sendClient = {
+      httpInstance: sendHttp,
+      im: {
+        message: {
+          create() {
+            return sendHttp.request({ url: "/open-apis/im/v1/messages", timeout: 60_000 });
+          },
+        },
+      },
+    };
     const transport = createFeishuTransport({
       config: {
         appId: "cli_test_0001",
@@ -224,17 +255,8 @@ describe("AGT-033 T2: bounded retry and error mapping", () => {
         allowedChatIds: ["oc_test_group_0001"],
       },
       onEvent: async () => {},
-      client: {
-        httpInstance: { defaults: httpDefaults },
-        im: {
-          message: {
-            create() {
-              sdkCalls += 1;
-              return new Promise(() => {});
-            },
-          },
-        },
-      },
+      client: { im: { message: { async create() { throw new Error("main client must not send"); } } } },
+      sendClient,
       sendTimeoutMs: 40,
     });
     const coordinator = createDeliveryCoordinator({
@@ -264,7 +286,7 @@ describe("AGT-033 T2: bounded retry and error mapping", () => {
     assert.equal(summary.targets[0].lastError.retryable, true);
     assert.match(summary.targets[0].lastError.message, /timed out/i);
     assert.ok(elapsed < 1500, `bounded timeout attempt budget took ${elapsed}ms`);
-    assert.equal(httpDefaults.timeout, 40);
+    assert.equal(httpDefaults.timeout, 0, "shared defaults are never mutated");
   });
 
   test("a retryable failure is retried and eventually sent within the budget", async (t) => {

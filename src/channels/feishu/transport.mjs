@@ -64,41 +64,58 @@ export function resolveSendTimeoutMs(value) {
   return numeric;
 }
 
-/**
- * Give the SDK's shared Axios instance a bounded timeout unless the caller
- * already configured one. `im.message.create` does not accept a per-call
- * timeout, so this is what actually aborts a stalled socket; the transport
- * race below still bounds callers when a fake/injected client ignores it.
- */
-function configureHttpTimeout(client, timeoutMs) {
-  const defaults = client?.httpInstance?.defaults;
-  if (defaults && (defaults.timeout === undefined || defaults.timeout === 0)) {
-    defaults.timeout = timeoutMs;
-  }
-}
-
 function isTimeoutError(error) {
   return (
     error?.code === "ECONNABORTED" ||
     error?.code === "ETIMEDOUT" ||
+    error?.code === "ERR_CANCELED" ||
     error?.name === "TimeoutError" ||
-    /timed out|timeout/i.test(String(error?.message ?? ""))
+    error?.name === "CanceledError" ||
+    /timed out|timeout|canceled|cancelled/i.test(String(error?.message ?? ""))
   );
 }
 
-function withSendTimeout(promise, timeoutMs) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      reject(
-        new FeishuSendError(`Feishu send timed out after ${timeoutMs}ms`, {
-          code: "feishu_send_timeout",
-          retryable: true,
-        }),
-      );
-    }, timeoutMs);
+/**
+ * Build the dedicated HTTP instance used only by the proactive-send client.
+ *
+ * The locked SDK's `im.message.create` has no per-call options for a timeout or
+ * signal, but its generated method always calls `this.httpInstance.request()`.
+ * This wrapper injects both on every request:
+ *
+ * - `timeout` is forced to the transport's value (even if a caller passed a
+ *   larger one), so Axios aborts the socket and rejects `ECONNABORTED`;
+ * - `signal` is a cancellable `AbortSignal.timeout()` (or the caller's own
+ *   signal), so a stalled request has an observable cancellation path.
+ *
+ * It never touches `defaults` of the shared instance, and reply/bot-info keep
+ * using the untouched main client.
+ */
+export function createSendHttpInstance(baseHttpInstance, timeoutMs) {
+  if (!baseHttpInstance || typeof baseHttpInstance.request !== "function") {
+    throw new TypeError("createSendHttpInstance requires an httpInstance.request()");
+  }
+  const timed = (options = {}) => ({
+    ...options,
+    timeout: timeoutMs,
+    signal: options.signal ?? AbortSignal.timeout(timeoutMs),
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  const call = (name, args) => {
+    const method = baseHttpInstance[name];
+    if (typeof method !== "function") {
+      throw new TypeError(`send httpInstance does not support ${name}()`);
+    }
+    return method.apply(baseHttpInstance, args);
+  };
+  return {
+    request: (options) => call("request", [timed(options)]),
+    get: (url, options) => call("get", [url, timed(options)]),
+    delete: (url, options) => call("delete", [url, timed(options)]),
+    head: (url, options) => call("head", [url, timed(options)]),
+    options: (url, options) => call("options", [url, timed(options)]),
+    post: (url, data, options) => call("post", [url, data, timed(options)]),
+    put: (url, data, options) => call("put", [url, data, timed(options)]),
+    patch: (url, data, options) => call("patch", [url, data, timed(options)]),
+  };
 }
 
 function businessRejection(error) {
@@ -141,6 +158,8 @@ function domainOf(config) {
  * @param {Function} options.onEvent async (flattenedEvent) => void
  * @param {Function} [options.log] structured diagnostic sink
  * @param {object} [options.client] injected official SDK client (tests only)
+ * @param {object} [options.sendClient] injected dedicated send client (tests
+ *   only); production builds one with its own bounded httpInstance
  * @param {number} [options.sendTimeoutMs] bounded single-request timeout
  *   (default: FEISHU_SEND_TIMEOUT_MS or 15000 ms)
  */
@@ -149,6 +168,7 @@ export function createFeishuTransport({
   onEvent,
   log = () => {},
   client: injectedClient,
+  sendClient: injectedSendClient,
   sendTimeoutMs: sendTimeoutOption,
 }) {
   if (typeof onEvent !== "function") throw new TypeError("createFeishuTransport requires onEvent()");
@@ -164,7 +184,21 @@ export function createFeishuTransport({
     });
 
   const sendTimeoutMs = resolveSendTimeoutMs(sendTimeoutOption);
-  configureHttpTimeout(client, sendTimeoutMs);
+  // A dedicated client keeps send timeouts out of the reply/bot-info/websocket
+  // client. Its httpInstance injects timeout/signal per request; the shared
+  // Axios defaults object is never mutated.
+  const sendingClient =
+    injectedSendClient ??
+    (injectedClient
+      ? injectedClient
+      : new Lark.Client({
+          appId: config.appId,
+          appSecret: config.appSecret,
+          appType: Lark.AppType.SelfBuild,
+          domain: domainOf(config),
+          loggerLevel: Lark.LoggerLevel.error,
+          httpInstance: createSendHttpInstance(client.httpInstance, sendTimeoutMs),
+        }));
 
   let wsClient;
   let botOpenId = config.botOpenId;
@@ -256,18 +290,15 @@ export function createFeishuTransport({
     assertSendInput({ receiveIdType, receiveId, text, uuid });
     let response;
     try {
-      response = await withSendTimeout(
-        client.im.message.create({
-          params: { receive_id_type: receiveIdType },
-          data: {
-            receive_id: receiveId,
-            msg_type: "text",
-            content: JSON.stringify({ text }),
-            ...(uuid ? { uuid } : {}),
-          },
-        }),
-        sendTimeoutMs,
-      );
+      response = await sendingClient.im.message.create({
+        params: { receive_id_type: receiveIdType },
+        data: {
+          receive_id: receiveId,
+          msg_type: "text",
+          content: JSON.stringify({ text }),
+          ...(uuid ? { uuid } : {}),
+        },
+      });
     } catch (error) {
       // The SDK can throw even for HTTP business rejections (AxiosError with
       // `response.data.code`), not only for network failures. Classify that
@@ -367,6 +398,7 @@ export function createFeishuTransport({
     stop,
     reply,
     send,
+    probeBotOpenId,
     getBotOpenId: () => botOpenId,
   };
 }

@@ -53,10 +53,13 @@
 
 ## 4. Live 之后的修复
 
-Live 主运行之后又加入了单次请求有界超时（`feishu_send_timeout`，默认 15s，只消耗既有
-`maxAttempts` 预算）和 SDK 抛错分类修复。为遵守“每个目标只发 1 条”，没有为了验证超时
-再次向真人/群发送；超时行为由 `tests/agt-033-transport.test.mjs` 与
-`tests/agt-033-delivery.test.mjs` 的挂起请求测试覆盖（有界耗时 + attempts 计数）。
+Live 主运行之后又加入了单次请求有界超时和 SDK 抛错分类修复。发送使用**专属
+`Lark.Client` + 专属 `httpInstance`**，逐请求注入 `timeout` 与可取消的
+`AbortSignal.timeout()`；不改共享 `defaultHttpInstance.defaults`，reply/bot info 不受
+影响。超时归为 `feishu_send_timeout`，只消耗既有 `maxAttempts` 预算。为遵守“每个目标
+只发 1 条”，没有为了验证超时再次向真人/群发送；超时/取消/迟到响应由
+`tests/agt-033-transport.test.mjs` 与 `tests/agt-033-delivery.test.mjs` 覆盖（有界耗时、
+attempts 计数、无迟到 message_id）。
 因此 Live 的送达/messageId 仍是上表事实，后续代码改动不改变已发生的发送。
 
 ## 5. 仍未验证 / 不在本卡范围

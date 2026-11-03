@@ -8,9 +8,11 @@
  */
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import * as Lark from "@larksuiteoapi/node-sdk";
 import {
   FeishuSendError,
   createFeishuTransport,
+  createSendHttpInstance,
 } from "../src/channels/feishu/transport.mjs";
 
 const CONFIG = Object.freeze({
@@ -26,9 +28,66 @@ function transportWith(fake) {
     config: CONFIG,
     onEvent: async () => {},
     client: fake.client,
+    sendClient: fake.sendClient,
     log: fake.log,
     sendTimeoutMs: fake.sendTimeoutMs,
   });
+}
+
+/** A fake SDK send client whose dedicated httpInstance is the production wrapper. */
+function fakeSendClient(baseHttp, timeoutMs, { callerTimeoutMs } = {}) {
+  const httpInstance = createSendHttpInstance(baseHttp, timeoutMs);
+  return {
+    httpInstance,
+    im: {
+      message: {
+        create(payload) {
+          return httpInstance.request({
+            url: "/open-apis/im/v1/messages",
+            method: "POST",
+            data: payload,
+            ...(callerTimeoutMs === undefined ? {} : { timeout: callerTimeoutMs }),
+          });
+        },
+      },
+    },
+  };
+}
+
+/** Axios-like fake: honors timeout by rejecting ECONNABORTED, then a late success. */
+function timeoutHttp({ lateMs = 120 } = {}) {
+  const state = { seen: [], aborted: false, lateMessageId: null };
+  const baseHttp = {
+    defaults: { timeout: 0 },
+    request(options) {
+      state.seen.push(options);
+      return new Promise((resolve, reject) => {
+        options.signal?.addEventListener(
+          "abort",
+          () => {
+            state.aborted = true;
+            reject(Object.assign(new Error("canceled"), { code: "ERR_CANCELED" }));
+          },
+          { once: true },
+        );
+        setTimeout(() => {
+          if (state.aborted) return;
+          state.aborted = true;
+          reject(
+            Object.assign(new Error(`timeout of ${options.timeout}ms exceeded`), {
+              code: "ECONNABORTED",
+            }),
+          );
+        }, options.timeout);
+        setTimeout(() => {
+          if (state.aborted) return;
+          state.lateMessageId = "om_late";
+          resolve({ code: 0, data: { message_id: "om_late" } });
+        }, lateMs);
+      });
+    },
+  };
+  return { baseHttp, state };
 }
 
 describe("AGT-033 T2: Feishu proactive send", () => {
@@ -114,20 +173,13 @@ describe("AGT-033 T2: Feishu proactive send", () => {
     );
   });
 
-  test("a hung SDK request is bounded by a timeout and classified as retryable", async () => {
-    const httpDefaults = { timeout: 0 };
+  test("the dedicated send httpInstance force-injects timeout and cancels late success", async () => {
+    const { baseHttp, state } = timeoutHttp();
+    const sendClient = fakeSendClient(baseHttp, 40, { callerTimeoutMs: 60_000 });
     const transport = transportWith({
+      sendClient,
+      client: { im: { message: { async create() { throw new Error("main client must not send"); } } } },
       sendTimeoutMs: 40,
-      client: {
-        httpInstance: { defaults: httpDefaults },
-        im: {
-          message: {
-            create() {
-              return new Promise(() => {});
-            },
-          },
-        },
-      },
     });
     const started = Date.now();
     await assert.rejects(
@@ -140,28 +192,100 @@ describe("AGT-033 T2: Feishu proactive send", () => {
     const elapsed = Date.now() - started;
     assert.ok(elapsed >= 30, `timeout fired too early: ${elapsed}ms`);
     assert.ok(elapsed < 1000, `timeout did not bound the call: ${elapsed}ms`);
-    assert.equal(httpDefaults.timeout, 40, "the SDK's axios instance gets the bounded timeout");
+    assert.equal(state.seen[0].timeout, 40, "a larger caller timeout is overridden");
+    assert.ok(state.seen[0].signal instanceof AbortSignal, "the request gets a cancellable signal");
+    assert.equal(baseHttp.defaults.timeout, 0, "the underlying defaults are untouched");
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.equal(state.aborted, true);
+    assert.equal(state.lateMessageId, null, "no late message_id is produced after the timeout");
   });
 
-  test("an SDK axios timeout error is classified as a retryable send timeout", async () => {
-    const transport = transportWith({
-      client: {
-        im: {
-          message: {
-            async create() {
-              throw Object.assign(new Error("timeout of 40ms exceeded"), { code: "ECONNABORTED" });
+  test("a fake request that never settles is cancelled through its signal", async () => {
+    let aborted = false;
+    let resolved = false;
+    const baseHttp = {
+      defaults: { timeout: 0 },
+      request(options) {
+        setTimeout(() => {}, 200); // keep the event loop alive while the fake stalls
+        return new Promise((_, reject) => {
+          options.signal.addEventListener(
+            "abort",
+            () => {
+              aborted = true;
+              reject(Object.assign(new Error("canceled"), { code: "ERR_CANCELED" }));
             },
-          },
-        },
+            { once: true },
+          );
+        }).then((value) => {
+          resolved = true;
+          return value;
+        });
       },
+    };
+    const transport = transportWith({
+      sendClient: fakeSendClient(baseHttp, 40),
+      client: { im: { message: { async create() { throw new Error("main client must not send"); } } } },
+      sendTimeoutMs: 40,
     });
+    const started = Date.now();
     await assert.rejects(
-      transport.send({ receiveIdType: "open_id", receiveId: "ou_person1", text: "x" }),
+      transport.send({ receiveIdType: "chat_id", receiveId: "oc_test_group_0001", text: "x" }),
       (error) =>
         error instanceof FeishuSendError &&
         error.code === "feishu_send_timeout" &&
         error.retryable === true,
     );
+    assert.equal(aborted, true);
+    assert.equal(resolved, false);
+    assert.ok(Date.now() - started < 1000);
+  });
+
+  test("transport creation does not mutate the shared SDK httpInstance defaults", () => {
+    const makeClient = () =>
+      new Lark.Client({
+        appId: "cli_test_0001",
+        appSecret: "not-a-real-secret",
+        domain: Lark.Domain.Feishu,
+      });
+    const before = makeClient();
+    const other = makeClient();
+    assert.equal(before.httpInstance.defaults.timeout, 0);
+    createFeishuTransport({ config: CONFIG, onEvent: async () => {}, sendTimeoutMs: 40 });
+    assert.equal(before.httpInstance.defaults.timeout, 0);
+    assert.equal(other.httpInstance.defaults.timeout, 0);
+    assert.equal(makeClient().httpInstance.defaults.timeout, 0);
+  });
+
+  test("reply and bot info keep using the untouched main client", async () => {
+    const seen = [];
+    const mainClient = {
+      httpInstance: { defaults: { timeout: 0 } },
+      async request(options) {
+        seen.push(options);
+        return { code: 0, bot: { open_id: "ou_bot" } };
+      },
+      im: {
+        message: {
+          async reply(payload) {
+            return { code: 0, data: { message_id: `om_reply_${payload.path.message_id}` } };
+          },
+        },
+      },
+    };
+    const transport = createFeishuTransport({
+      config: CONFIG,
+      onEvent: async () => {},
+      client: mainClient,
+      sendClient: fakeSendClient(timeoutHttp().baseHttp, 40),
+      sendTimeoutMs: 40,
+    });
+    assert.equal(await transport.probeBotOpenId(), "ou_bot");
+    const reply = await transport.reply("om_incoming", "hi");
+    assert.equal(reply.messageId, "om_reply_om_incoming");
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].timeout, undefined);
+    assert.equal(seen[0].signal, undefined);
+    assert.equal(mainClient.httpInstance.defaults.timeout, 0);
   });
 
   test("an SDK-thrown HTTP business rejection is classified, not treated as a network error", async () => {
