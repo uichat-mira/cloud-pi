@@ -106,15 +106,17 @@ transport 据此立刻以 `auth_failed` 拒绝 `start()`，而不是干等连接
 
 ## 6. 未决与已知限制
 
-1. **W1（`deliveryTargets` 类型词表 + `SCHEDULER_CONTRACT_VERSION` 1→2）不在本卡实现。**
-   lead 在 2026-11-04 裁决采用 W1，但 t6 合同同时要求"未改动 scheduler/delivery/api 的既有合同"，
-   两者互斥。本卡选择遵守合同：`scheduler`/`delivery` 零改动，因此
-   - 定时研究**还不能**投递到企业微信目标；
-   - `transport.send()` 已实现能力与限制（群聊可发、单聊因 SDK 缺陷拒绝），但**没有**接线到投递链。
-   W1 需要单独的工作项或明确覆盖 t6 合同后才能落地。
-2. **Live 需要真实凭证**：凭证由维护者写入本机私有文件，**只有** `npm run wecom:live`
-   会按 `KEY=VALUE` 读入进程环境变量；值不写入 `.env`、代码、fixture、日志或异常消息。
-   离线测试一律用假值。
+1. **W1 已落地（合同层），投递执行仍不在本卡。** 按 lead 2026-11-04 裁决：
+   `deliveryTargets` 增加 `wecom_user` / `wecom_chat` 两种目标，`SCHEDULER_CONTRACT_VERSION` 1→2，
+   旧 v1 记录兼容读（见 §9 兼容矩阵）。约束遵守：未改 `src/delivery/*` 的既有默认行为、未改
+   `DELIVERY_CONTRACT_VERSION`、未把 wecom 目标塞进 `^ou_`/`^oc_` 分支。
+   但 `src/delivery/coordinator.mjs` 目前只能向飞书发送，因此调度中出现 wecom 目标时会被显式
+   拒绝并记录 `unsupported_target_type`（**不会**把 wecom id 交给飞书 transport）。
+   **一次定时研究终态主动投递到企业微信的 live 尚未执行**：投递执行器接线属于后续工作项，
+   本卡把它列为 blocker 交 t12/后续任务，不假装已通。
+2. **Live 需要真实凭证**：凭证由维护者写入本机私有文件，**只有** `npm run wecom:live` /
+   `npm run wecom:wait-inbound` 会按 `KEY=VALUE` 读入进程环境变量；值不写入 `.env`、代码、
+   fixture、日志或异常消息。离线测试一律用假值。
 3. **去重与已知会话都是进程内**：重启或多实例后失效；持久化属于投递/会话工作项。
 4. **群聊 `@` 判定依赖显示名**：机器人改名、群昵称、`@所有人` 会影响判定；无法解析时记
    `mention_required`，不猜测。
@@ -128,10 +130,11 @@ transport 据此立刻以 `auth_failed` 拒绝 `start()`，而不是干等连接
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
-| 通道离线测试 | `npm run test:wecom` | 61 passed / 0 failed（7 个测试文件：config、events/policy/dedupe、channel/text/sessions、transport、service/lock、runtime、live 脚本） |
+| 通道离线测试 | `npm run test:wecom` | 71 passed / 0 failed（8 个测试文件：config、events/policy/dedupe、channel/text/sessions、transport、service/lock、runtime、live 脚本、W1 合同） |
 | 全仓回归 | `npm test` | 见 PR 描述（含既有飞书、调度、API、投递测试） |
 | 配置校验入口 | `npm run wecom:check` | 有凭证时 exit 0 并输出脱敏配置摘要；无凭证 exit 2 且列出缺失字段 |
-| 真实链路 | `npm run wecom:live` | 见 §8；结果写入 PR 证据表（成功或失败都如实记录） |
+| **真实链路（已执行）** | `npm run wecom:live` | 见 §8.1：真实入站 → 真实模型 → 平台接受回复，2.7s |
+| 定时投递 | — | **未执行（blocker）**：投递执行器尚未接线 wecom 目标，见 §6.1 |
 
 真实证据只写白名单投影：`action/status/runId/segments/耗时` + 哈希 id，不写正文与原始标识。
 
@@ -160,6 +163,69 @@ node scripts/agt-036/wecom-live.mjs --secrets <path> --env-file <path> --timeout
 
 - **单连接**：平台同一机器人只允许一条长连接，运行前必须确认没有其它进程/队友占用
   （新连接会把旧连接踢下线，旧连接收到 `disconnected_event`）。
-- **不证明投递**：`wecom:live` 只覆盖"入站 → 回复"。定时研究主动投递需要 W1（见 §6.1）。
+- **不证明投递**：`wecom:live` 只覆盖"入站 → 回复"。定时研究主动投递的执行器接线尚未完成（见 §6.1）。
 - **不持久化聊天 run**：`runId` 由 `src/runtime.mjs` 运行时生成，聊天 run 目前不落盘
   （run 落盘/`runId` 链路属于 AGT-037 trace 工作项），因此"读回"是进程内 outcome 而非 run store。
+
+### `npm run wecom:wait-inbound`
+
+维护者控时模式（t12 场景 A 的可控入口）：连上后只等一条真实入站，拿到任何终态结果就退出，
+不要求回复被投递成功。
+
+```bash
+# 窗口由调用方决定；收到入站立即返回，不空转
+npm run wecom:wait-inbound -- --timeout-ms 600000
+```
+
+退出码：`0` 处理到一条入站（结果见 JSONL），`1` 窗口内无入站或连接失败，`2` 配置/参数错误。
+证据同时写 stdout 与 `--evidence` 指定的 JSONL（默认 `.work/wecom-channel/live-evidence.jsonl`）。
+
+## 8.1 真实链路执行记录（2026-11-04）
+
+命令：`npm run wecom:live -- --env-file D:\cloud-pi\.env --timeout-ms 1800000`
+
+| 字段 | 值 |
+| --- | --- |
+| 结果 | `action:"replied"`, `ok:true`, 退出码 0 |
+| `runId` | `5075459b-66bf-48b0-828c-b8ad00b80a01` |
+| 模型 provider / model | `mira-ai` / `deepseek-v4.1-flash-od`（配置值，非密钥） |
+| usage 输入 / 输出 token | **未采集**：该次运行用的是加入 token 投影之前的构建；新构建的 outcome 已带 `usage.{input,output,total}` 并由离线用例覆盖 |
+| 回复分段 | 1 段（未截断），单段即完整回复，**非流式**（一次 `replyStream(finish=true)`） |
+| 平台接受 | SDK 收到回执 `Reply ack received`；新构建把 `errcode` 投影为 `platformErrcode` |
+| 端到端耗时 | 2726 ms（入站 → 回复被平台接受） |
+| 会话类型 | `single`（单聊），`from_is_open_userid=false`（明文 `userid`，仅用于会话定位，**不映射** Cloud Account） |
+| 连接 | `wss://openws.work.weixin.qq.com` 直连（无代理），握手 ~160ms，认证 ~130ms，心跳 30s |
+| 入站顺序 | `event.enter_chat` 后约 3s 才 `aibot_msg_callback` |
+| 脱敏 | 消息 id / chat id / userid 全部经 `hashId()`；无正文、无原始标识、无 secret |
+
+**Trace 可读回性（如实）**：该 `runId` 只在本次进程的 outcome 与日志里；聊天 run 目前不写 run store，
+Management API 的 run/delivery 查询只覆盖研究 run。因此"runId → API 读回"这条链**尚不成立**，
+属于 AGT-037 trace 的缺口，不在本卡伪装成已通。
+
+## 9. W1：deliveryTargets 扩展与 `SCHEDULER_CONTRACT_VERSION` 1→2 兼容读
+
+目标词表（`src/scheduler/contracts.mjs`）：
+
+| `type` | 平台 | id 规则 | 说明 |
+| --- | --- | --- | --- |
+| `open_id` | 飞书 | `^ou_[A-Za-z0-9]+$` | AGT-033 原样保留 |
+| `chat_id` | 飞书 | `^oc_[A-Za-z0-9_-]+$` | AGT-033 原样保留 |
+| `wecom_user` | 企业微信 | `^[A-Za-z0-9_@.-]{1,64}$` | 单聊 `userid`；拒绝 `ou_`/`oc_` 前缀（跨平台串用） |
+| `wecom_chat` | 企业微信 | `^[A-Za-z0-9_+/=@.-]{1,128}$` | 群 `chatid`；同上拒绝飞书前缀 |
+
+未改动的东西（约束遵守证据）：`^ou_`/`^oc_` 两条正则与飞书拒绝分支保持不变；
+`DELIVERY_CONTRACT_VERSION` 未动；飞书投递默认行为未改；未新增投递存储。
+
+兼容矩阵（`tests/agt-036-w1-contracts.test.mjs` 逐条覆盖）：
+
+| 磁盘记录版本 | 含 wecom 目标 | 可读 | 读后是否改写 | 备注 |
+| --- | --- | --- | --- | --- |
+| 1 | 否（唯一真实历史形态） | 是 | 否，原样返回 v1 | 旧文件不会因读一次就变成 v2 |
+| 1（人工编辑塞入 wecom） | 是 | 是 | 否 | 类型校验与版本无关，词典只增不减 |
+| 2（新写入） | 可选 | 是 | — | `normalizeScheduleInput` 写 `contractVersion: 2` |
+| 3（未来） | — | 否 | — | `parse_error`，启动即失败而不是静默丢调度 |
+
+投递侧现状：`src/delivery/coordinator.mjs` 只向飞书发送，因此调度里出现 wecom 目标时会在
+发送前被过滤，并以 `reason:"unsupported_target_type"` 返回（只含 wecom 目标时），或与飞书目标
+并存时只投递飞书部分。**不会**把 wecom id 交给飞书 transport。把 wecom 目标真正投递出去需要
+投递执行器接线（后续工作项），本卡不声称已完成。

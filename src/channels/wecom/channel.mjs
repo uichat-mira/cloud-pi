@@ -140,7 +140,7 @@ export function createWecomChannel({
   async function safeReply(frame, text) {
     try {
       const result = await reply(frame, text);
-      return { ok: true, messageId: result?.messageId };
+      return { ok: true, messageId: result?.messageId, errcode: result?.errcode };
     } catch (error) {
       log({
         level: "error",
@@ -192,13 +192,15 @@ export function createWecomChannel({
     const { segments, truncated } = splitForSend(text, segment);
     let delivered = 0;
     let replyMessageId;
+    let errcode;
     for (const part of segments) {
       const sent = await safeReply(frame, part);
       if (!sent.ok) break;
       delivered += 1;
       replyMessageId = sent.messageId ?? replyMessageId;
+      errcode = typeof sent.errcode === "number" ? sent.errcode : errcode;
     }
-    return { delivered, total: segments.length, truncated, replyMessageId };
+    return { delivered, total: segments.length, truncated, replyMessageId, errcode };
   }
 
   function buildReplyText(record) {
@@ -210,6 +212,18 @@ export function createWecomChannel({
     if (status === "cancelled") return WECOM_REPLIES.cancelled;
     if (status === "timeout") return WECOM_REPLIES.timeout;
     return `${WECOM_REPLIES.failure}（${safeErrorCode(record)}）`;
+  }
+
+  /** Token accounting projection: numbers only, no prompt or credential material. */
+  function usageOf(record) {
+    const usage = record?.usage;
+    if (!usage || typeof usage !== "object") return undefined;
+    const pick = (value) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
+    return Object.freeze({
+      input: pick(usage.input),
+      output: pick(usage.output),
+      total: pick(usage.total),
+    });
   }
 
   async function runOne(event, kind, routeText, epoch) {
@@ -274,12 +288,17 @@ export function createWecomChannel({
         kind,
         status: typeof record?.status === "string" ? record.status : "failed",
         runId: typeof record?.runId === "string" ? record.runId : undefined,
+        // Token accounting only: never the prompt, the provider credentials or the
+        // rendered system prompt.
+        usage: usageOf(record),
         durationMs: Date.now() - started,
         segments: sent.total,
         segmentsDelivered: sent.delivered,
         truncated: sent.truncated || undefined,
         replyDelivered: sent.delivered > 0,
         replyMessageId: sent.replyMessageId,
+        // Platform acknowledgement code of the last accepted segment (0 = ok).
+        platformErrcode: sent.errcode,
         ...baseOutcome(event),
       });
     } catch (error) {

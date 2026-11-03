@@ -168,6 +168,33 @@ test("live: an unknown --expect mode is a usage error", async () => {
   assert.equal(JSON.parse(err.text().trim()).reason, "invalid_expect");
 });
 
+test("live: --wait-inbound accepts the first inbound outcome (t12 mode)", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "wecom-live-wait-"));
+  const out = capture();
+  const err = capture();
+  const code = await main({
+    argv: ["--wait-inbound", "--timeout-ms", "5000", "--evidence", join(dir, "evidence.jsonl")],
+    env: { WECOM_BOT_ID: "bot-x", WECOM_BOT_SECRET: "secret-x" },
+    stdout: out.stream,
+    stderr: err.stream,
+    serviceOptions: {
+      stateDir: join(dir, "state"),
+      modelConfig: { fake: true },
+      createClient: () => fakeClient({ message: true }),
+      createRuntime: () => ({
+        run: async () => ({ runId: "run-wait-1", status: "succeeded", text: "ok" }),
+        dispose: () => {},
+      }),
+    },
+  });
+  assert.equal(code, 0, `stderr: ${err.text()}`);
+  const result = JSON.parse(out.text().trim().split("\n").pop());
+  assert.equal(result.expect, "any");
+  assert.equal(result.ok, true);
+  assert.equal(result.action, "replied");
+  assert.equal(result.runId, "run-wait-1");
+});
+
 test("live: no inbound message within the window is a reported failure", async () => {
   const dir = mkdtempSync(join(tmpdir(), "wecom-live-timeout-"));
   const out = capture();

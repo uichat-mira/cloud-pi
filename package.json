@@ -28,6 +28,7 @@
     "channel:wecom": "node --env-file-if-exists=.env src/channels/wecom/server.mjs",
     "wecom:check": "node --env-file-if-exists=.env src/channels/wecom/server.mjs --check",
     "wecom:live": "node scripts/agt-036/wecom-live.mjs",
+    "wecom:wait-inbound": "node scripts/agt-036/wecom-live.mjs --wait-inbound",
     "collaboration:evidence": "node scripts/agt-035/live-collaboration-evidence.mjs",
     "scheduler:poc": "node scripts/scheduler-poc-evidence.mjs"
   },

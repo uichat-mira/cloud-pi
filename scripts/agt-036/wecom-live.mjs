@@ -82,6 +82,7 @@ function parseArgs(argv) {
     expect: "reply",
     evidenceFile: DEFAULT_EVIDENCE_FILE,
     help: false,
+    waitInbound: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -94,6 +95,7 @@ function parseArgs(argv) {
     else if (arg === "--timeout-ms") options.timeoutMs = Number(next());
     else if (arg === "--expect") options.expect = next();
     else if (arg === "--evidence") options.evidenceFile = next();
+    else if (arg === "--wait-inbound") options.waitInbound = true;
     else if (arg === "--help" || arg === "-h") options.help = true;
     else options.unknown = arg;
   }
@@ -109,6 +111,8 @@ export function usage() {
     "  --timeout-ms <n>     how long to wait for an inbound message (default 180000)",
     "  --expect reply|any   reply (default) requires a delivered answer; any accepts",
     "                       any processed inbound outcome",
+    "  --wait-inbound       hold the connection and report the first inbound outcome",
+    "                       (alias for --expect any; keep the window short)",
     "  --evidence <path>    JSONL evidence file (default <repo>/.work/wecom-channel/live-evidence.jsonl)",
     "",
     "The command subscribes the bot's long connection, waits for one real inbound",
@@ -116,16 +120,20 @@ export function usage() {
   ].join("\n");
 }
 
-function evidenceOf(outcome) {
+function evidenceOf(outcome, model) {
   return {
     ok: outcome.action === "replied" && outcome.replyDelivered === true,
     chatType: outcome.chatType,
     status: outcome.status,
     runId: typeof outcome.runId === "string" ? outcome.runId : null,
+    // Model identity is configuration, never a credential.
+    model: { provider: model?.provider ?? null, model: model?.model ?? null },
+    usage: outcome.usage ? { input: outcome.usage.input, output: outcome.usage.output, total: outcome.usage.total } : null,
     segments: outcome.segments ?? 1,
     segmentsDelivered: outcome.segmentsDelivered ?? undefined,
     durationMs: outcome.durationMs,
     replyDelivered: outcome.replyDelivered === true,
+    platformErrcode: typeof outcome.platformErrcode === "number" ? outcome.platformErrcode : null,
     inboundMessage: outcome.messageId ? hashId(outcome.messageId) : undefined,
     inboundChat: outcome.chatId ? hashId(outcome.chatId) : undefined,
   };
@@ -147,6 +155,10 @@ export async function main({
   serviceOptions = {},
 } = {}) {
   const options = parseArgs(argv);
+  // `--wait-inbound` is the maintainer-controlled mode: hold the one allowed long
+  // connection and report whatever the first real inbound message produces,
+  // without requiring a delivered answer.
+  if (options.waitInbound && !argv.includes("--expect")) options.expect = "any";
   const write = (stream, payload) => stream.write(`${JSON.stringify(payload)}\n`);
 
   if (options.help) {
@@ -247,7 +259,15 @@ export async function main({
     return 1;
   }
 
-  const payload = { phase: "result", expect: options.expect, action: result.action, ...evidenceOf(result) };
+  const payload = {
+    phase: "result",
+    expect: options.expect,
+    action: result.action,
+    ...evidenceOf(result, {
+      provider: merged.CLOUD_PI_MODEL_PROVIDER_ID,
+      model: merged.CLOUD_PI_MODEL_ID,
+    }),
+  };
   // `--expect any` verifies that a real inbound message reached the channel even
   // when the answer itself could not be delivered.
   const ok = options.expect === "any" ? true : payload.ok;

@@ -15,6 +15,7 @@ import {
   createScheduler,
   createScheduleStore,
   makeDedupeKey,
+  SCHEDULER_CONTRACT_VERSION,
   SchedulerError,
   TRIGGER_STATUS,
 } from "../src/scheduler/index.mjs";
@@ -84,7 +85,7 @@ test("T2 persisted definition reloads in a new scheduler instance", async (t) =>
   assert.equal(loaded.nextRunAt, "2026-11-03T01:00:00.000Z");
   assert.equal(loaded.timezone, "Asia/Shanghai");
   assert.equal(loaded.activeTrigger, null);
-  assert.equal(loaded.contractVersion, 1);
+  assert.equal(loaded.contractVersion, SCHEDULER_CONTRACT_VERSION);
 
   const raw = JSON.parse(await readFile(join(stateDir, "schedules", "reload-daily.json"), "utf8"));
   assert.equal(raw.scheduleId, "reload-daily");

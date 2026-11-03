@@ -51,6 +51,28 @@ function buildChannel(overrides = {}) {
   return { channel, sent, replies, outcomes };
 }
 
+test("channel: the outcome carries token usage and the platform acknowledgement, nothing else", async () => {
+  const { channel, outcomes } = buildChannel({
+    runTurn: async () => ({
+      status: "succeeded",
+      text: "答",
+      runId: "run-usage-1",
+      usage: { input: 12, output: 34, cacheRead: 0, cacheWrite: 0, total: 46, cost: 0.0001 },
+    }),
+    reply: async () => ({ replyId: "reply-1", errcode: 0 }),
+  });
+
+  channel.handleEvent(singleFrame());
+  await channel.whenIdle();
+
+  const outcome = outcomes.find((entry) => entry.action === "replied");
+  assert.ok(outcome);
+  assert.deepEqual({ ...outcome.usage }, { input: 12, output: 34, total: 46 });
+  assert.equal(outcome.platformErrcode, 0);
+  // No prompt, text or credential material leaks into the outcome projection.
+  assert.deepEqual(Object.keys(outcome.usage).sort(), ["input", "output", "total"]);
+});
+
 test("channel: one accepted message runs the model exactly once and replies in place", async () => {
   const calls = [];
   const { channel, sent, replies, outcomes } = buildChannel({

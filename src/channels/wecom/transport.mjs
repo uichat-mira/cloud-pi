@@ -266,17 +266,19 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       // internally; passing `frame.headers` instead produces an empty req_id and
       // the platform answers `846605 invalid req_id` — measured in the real
       // long-connection smoke, so this is a verified trap, not a guess.
-      await withTimeout(
+      const ack = await withTimeout(
         Promise.resolve(client.replyStream(frame, streamId, content, true)),
         config.replyTimeoutMs,
         "reply_timeout",
       );
+      recordSend(reqId);
+      // The SDK resolves only on a platform acknowledgement, so a resolved call is
+      // an accepted delivery; the code is reported for the evidence projection.
+      return { replyId: streamId, errcode: typeof ack?.errcode === "number" ? ack.errcode : 0 };
     } catch (error) {
       if (error instanceof WecomTransportError) throw error;
       throw new WecomTransportError("reply_failed", String(error?.message ?? error), { retryable: false });
     }
-    recordSend(reqId);
-    return { replyId: streamId };
   }
 
   /**
