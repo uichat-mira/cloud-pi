@@ -384,6 +384,13 @@ credential or private data.
   for the POC and for AGT-027’s single-runtime constraint.
 - Atomic rename without `fsync` is not power-loss durable; a production store
   needs a durability decision (fsync, SQLite or a managed database).
+- A failed `_save` can leave the in-memory schedule already mutated (lease
+  applied, trigger appended) while disk still holds the previous version. The
+  instance then disagrees with disk until it is restarted; this POC has no
+  write-ahead record or in-memory rollback.
+- After a hard exit the scheduler recovers its lease as `interrupted`, but
+  AGT-028’s own `run.json` may keep reporting `running` indefinitely, since the
+  two stores are not reconciled by this card.
 - The wall clock is the source of truth; a backward clock jump can make a
   schedule appear not due. Host time sync is assumed.
 - A completely unresponsive runtime port can exceed the executor deadline
