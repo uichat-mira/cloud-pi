@@ -1,12 +1,13 @@
 # AGT-033 · 定时研究的多目标飞书主动投递
 
-Status: 实现与自动化验证完成；Draft PR target `dev`；**Live 待真人窗口**（见 §10）。
+Status: 实现、自动化验证与 Live 验证均完成；真实个人/群各 1 条主动投递、
+幂等重放零新增、失败隔离 partial；Draft PR target `dev`（不合并、不部署，见 §10）。
 Owning Issue: [#15](https://github.com/uichat-mira/cloud-pi/issues/15)。
 Base: `origin/dev` at `fad03f8`（AGT-028/029/030 已合入）。Branch:
 `feat/agt-033-scheduler-delivery`。
 
 本文是 AGT-033 的设计、合同、测试与证据索引。它不声称已合并、已部署或已具备生产
-多实例 exactly-once；尚未执行的 Live 项在 §10 明确标注。
+多实例 exactly-once；Live 结果与仍未验证的边界在 §10 明确标注。
 
 ## 1. 目标与边界
 
@@ -180,9 +181,14 @@ await scheduler.createSchedule({
 - 每段最多 4000 Unicode code point，最多 3 段；每段带 `（i/n）` 前缀。超长报告在第 3
   段截断并附加 `…（报告超出单次投递上限，已截断；完整报告见 run <runId>）`。
   分段在段落边界优先，绝不拆 surrogate pair；同一个 run 不会产生无限消息。
+- 单次飞书请求有界超时：默认 15s，可用 `FEISHU_SEND_TIMEOUT_MS` 或构造参数
+  `sendTimeoutMs` 覆盖（1–120s）。超时归类为 `feishu_send_timeout`、`retryable=true`，
+  只消耗既有 `maxAttempts` 预算；同时给 SDK 共享 Axios 实例设置默认 timeout（原先为
+  0/unbounded），让真正挂起的 socket 被中止，transport 的 race 只做最后兜底。
 - 每个目标总尝试次数 `maxAttempts=3`（可配置），重试间隔默认 250ms；仅当错误标记
   `retryable=true` 才重试：
   - 飞书网络/协议异常 → `feishu_network_error`（可重试）；
+  - 单次请求超时 → `feishu_send_timeout`（可重试，且受 `maxAttempts` 约束）；
   - 飞书业务码 `99991400`（请求频率限制）→ 可重试；
   - 其它业务码（无效 receive id、无权限等）→ 终态，避免对坏目标刷 API；
   - 未知错误 → 终态 `internal_error`；
@@ -192,13 +198,13 @@ await scheduler.createSchedule({
 
 ## 9. 测试与本地证据
 
-新增测试（`node --test tests/agt-033-*.test.mjs`，56 tests）：
+新增测试（`node --test tests/agt-033-*.test.mjs`，59 tests）：
 
 | 文件 | 覆盖 |
 | --- | --- |
 | `tests/agt-033-contracts.test.mjs` | destination schema/未知字段拒绝/去重/上限；schedule 持久化与篡改 fail-closed；旧记录兼容；`runId+destination` 幂等键；五态策略；长文本段数/码点/截断标识/surrogate；接收人不可由额外字段注入 |
-| `tests/agt-033-transport.test.mjs` | 官方 SDK `im.message.create` 参数形状（open_id/chat_id）；`reply` 回归；返回业务码与 SDK 抛出的 HTTP 业务拒绝（AxiosError）分类；网络错误；缺 `message_id`；无效 destination 在网络前失败 |
-| `tests/agt-033-delivery.test.mjs` | pending 先落盘；sent 持久字段；重复 callback/重启/并发 callback 不重发；记录篡改 fail-closed；单目标失败隔离；report missing；有界 retry/exhausted/non-retryable/unknown error；长报告分段与段级续传；报告文本无法改 recipient；无目标/interrupted/no-runId 不投递 |
+| `tests/agt-033-transport.test.mjs` | 官方 SDK `im.message.create` 参数形状（open_id/chat_id）；`reply` 回归；返回业务码与 SDK 抛出的 HTTP 业务拒绝（AxiosError）分类；有界单次超时（挂起请求被中止/归类/耗时上界）；网络错误；缺 `message_id`；无效 destination 在网络前失败 |
+| `tests/agt-033-delivery.test.mjs` | pending 先落盘；sent 持久字段；重复 callback/重启/并发 callback 不重发；记录篡改 fail-closed；单目标失败隔离；report missing；有界 retry/exhausted/non-retryable/unknown error；挂起 transport 超时只消耗 2 次有界 attempts 且总耗时有界；长报告分段与段级续传；报告文本无法改 recipient；无目标/interrupted/no-runId 不投递 |
 | `tests/agt-033-integration.test.mjs` (T3) | **真实** `createScheduler` → 真实 AGT-028 `startResearch()` → 真实 run store/`readResearchRun` → 真实 coordinator/store → 假 Feishu transport；completed/partial/failed/cancelled 全链路；重启/重复回调不重发；崩溃后启动 reconcile 只补发一次未投递的终态 run；失败隔离（research 仍 succeeded）；报告注入不改目标；executor 在 runId 前失败不投递 |
 
 本地可复现证据：`node scripts/agt-033/local-delivery-evidence.mjs` 输出
@@ -207,7 +213,7 @@ await scheduler.createSchedule({
 Feishu 为 fake sendMessage，无真实网络）。覆盖 4 个场景：双目标成功 + 重复回调/重启
 零新增发送；单目标失败隔离；有界 retry 与耗尽；长报告 3 段且重放零新增。
 
-回归：`npm test` 从基线 399 tests 增至 455 tests（+56），0 fail；AGT-029/030 的
+回归：`npm test` 从基线 399 tests 增至 458 tests（+59），0 fail；AGT-029/030 的
 scheduler 与 Feishu 测试全部保留。
 
 ## 10. Live（T4）与未验证项
