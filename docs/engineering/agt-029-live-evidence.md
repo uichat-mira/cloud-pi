@@ -2,6 +2,7 @@
 
 > 状态：**私聊与授权群 @ 真实往返通过**（2026-11-03，Asia/Shanghai）。
 > 被测实现：`feat/agt-029-feishu-channel`，基线 `dev@9a8bf1f`；PR #12。
+> Live 运行 commit：`722236f`；发布时 PR head 见 PR（此后仅 Sonar/文档修复，运行路径不变）。
 > 原始 JSONL：
 > [私聊](../../poc/evidence/agt-029-live-p2p.jsonl) ·
 > [群 @](../../poc/evidence/agt-029-live-group.jsonl) ·
