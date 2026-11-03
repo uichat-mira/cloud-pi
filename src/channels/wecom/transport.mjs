@@ -157,7 +157,20 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
         throw new WecomTransportError("client_create_failed", "the SDK client could not be created");
       }
 
+      // The platform sends `event.enter_chat` about three seconds before the
+      // first `aibot_msg_callback`. We only record it; replying to a welcome
+      // event would need that event's own req_id.
+      attach(client, "event.enter_chat", (frame) => {
+        note("wecom_transport_enter_chat", {
+          chatType: frame?.body?.chattype,
+          chatId: frame?.body?.chatid ? hashId(frame.body.chatid) : undefined,
+        });
+      });
       attach(client, "message", (frame) => {
+        // NOTE: the frame itself must be forwarded. `client.replyStream(frame, …)`
+        // reads `frame.headers.req_id`; handing it `frame.headers` yields an empty
+        // req_id and the platform rejects the reply with `846605 invalid req_id`
+        // (observed in the real smoke, not inferred).
         try {
           onEvent?.({ frame, type: frame?.body?.msgtype ?? "unknown" });
         } catch (error) {
@@ -249,6 +262,10 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
     }
 
     try {
+      // Pass the WHOLE callback frame. The SDK reads `frame.headers.req_id`
+      // internally; passing `frame.headers` instead produces an empty req_id and
+      // the platform answers `846605 invalid req_id` — measured in the real
+      // long-connection smoke, so this is a verified trap, not a guess.
       await withTimeout(
         Promise.resolve(client.replyStream(frame, streamId, content, true)),
         config.replyTimeoutMs,

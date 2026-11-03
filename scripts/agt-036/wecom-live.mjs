@@ -21,7 +21,7 @@
  *  - does not prove scheduler delivery (that needs the delivery work item) and
  *    does not persist the chat run (chat-run persistence is AGT-037).
  */
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +34,9 @@ const REPO_ROOT = resolve(HERE, "..", "..");
 export const DEFAULT_SECRETS_FILE = join(homedir(), ".mira-secrets", "wecom.env");
 export const DEFAULT_MODEL_ENV_FILE = join(REPO_ROOT, ".env");
 export const DEFAULT_TIMEOUT_MS = 180_000;
+/** Redacted JSONL evidence: only the projection below ever lands on disk. */
+export const DEFAULT_EVIDENCE_FILE = join(REPO_ROOT, ".work", "wecom-channel", "live-evidence.jsonl");
+export const EXPECT_MODES = Object.freeze(["reply", "any"]);
 
 /**
  * Parse a `KEY=VALUE` file. Comments and blanks are skipped, `export ` prefixes
@@ -76,6 +79,8 @@ function parseArgs(argv) {
     secretsFile: DEFAULT_SECRETS_FILE,
     modelEnvFile: DEFAULT_MODEL_ENV_FILE,
     timeoutMs: DEFAULT_TIMEOUT_MS,
+    expect: "reply",
+    evidenceFile: DEFAULT_EVIDENCE_FILE,
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -87,6 +92,8 @@ function parseArgs(argv) {
     if (arg === "--secrets") options.secretsFile = next();
     else if (arg === "--env-file") options.modelEnvFile = next();
     else if (arg === "--timeout-ms") options.timeoutMs = Number(next());
+    else if (arg === "--expect") options.expect = next();
+    else if (arg === "--evidence") options.evidenceFile = next();
     else if (arg === "--help" || arg === "-h") options.help = true;
     else options.unknown = arg;
   }
@@ -100,6 +107,9 @@ export function usage() {
     "  --secrets <path>     credentials file (default ~/.mira-secrets/wecom.env)",
     "  --env-file <path>    model configuration file (default <repo>/.env)",
     "  --timeout-ms <n>     how long to wait for an inbound message (default 180000)",
+    "  --expect reply|any   reply (default) requires a delivered answer; any accepts",
+    "                       any processed inbound outcome",
+    "  --evidence <path>    JSONL evidence file (default <repo>/.work/wecom-channel/live-evidence.jsonl)",
     "",
     "The command subscribes the bot's long connection, waits for one real inbound",
     "message, answers it with the real Agent runtime and reports a redacted result.",
@@ -151,6 +161,19 @@ export async function main({
     write(stderr, { ok: false, phase: "usage", reason: "invalid_timeout" });
     return 2;
   }
+  if (!EXPECT_MODES.includes(options.expect)) {
+    write(stderr, { ok: false, phase: "usage", reason: "invalid_expect", allowed: EXPECT_MODES });
+    return 2;
+  }
+
+  const appendEvidence = (entry) => {
+    try {
+      mkdirSync(dirname(options.evidenceFile), { recursive: true });
+      appendFileSync(options.evidenceFile, `${JSON.stringify({ ts: new Date().toISOString(), ...entry })}\n`);
+    } catch {
+      // Evidence persistence must never break the live run itself.
+    }
+  };
 
   const fromFiles = loadEnvFiles([options.modelEnvFile, options.secretsFile]);
   const merged = { ...fromFiles, ...env };
@@ -170,6 +193,7 @@ export async function main({
   const answered = new Promise((resolvePromise) => {
     settle = resolvePromise;
   });
+  const TERMINAL_ACTIONS = new Set(["replied", "failed", "cancelled", "stopped"]);
 
   let service;
   try {
@@ -178,7 +202,7 @@ export async function main({
       log: (entry) => write(stdout, { ts: new Date().toISOString(), ...entry }),
       onOutcome: (outcome) => {
         outcomes.push(outcome);
-        if (outcome.action === "replied" || outcome.action === "failed") settle(outcome);
+        if (TERMINAL_ACTIONS.has(outcome.action)) settle(outcome);
       },
       ...serviceOptions,
     });
@@ -195,13 +219,18 @@ export async function main({
     return 1;
   }
 
-  write(stderr, {
-    ok: true,
+  const connected = {
     phase: "connected",
     authenticated: service.describe().transport?.state === "authenticated",
+    expect: options.expect,
+  };
+  write(stderr, {
+    ok: true,
+    ...connected,
     waitingForInboundMs: options.timeoutMs,
     instruction: "Send one message to the bot in WeCom now.",
   });
+  appendEvidence(connected);
 
   let timer;
   const timeout = new Promise((resolvePromise) => {
@@ -212,14 +241,21 @@ export async function main({
 
   if (result === "timeout") {
     await service.stop().catch(() => {});
-    write(stderr, { ok: false, phase: "wait_inbound", reason: "no_inbound_message", accepted: outcomes.length });
+    const payload = { ok: false, phase: "wait_inbound", reason: "no_inbound_message", handled: outcomes.length };
+    write(stderr, payload);
+    appendEvidence(payload);
     return 1;
   }
 
-  const payload = evidenceOf(result);
+  const payload = { phase: "result", expect: options.expect, action: result.action, ...evidenceOf(result) };
+  // `--expect any` verifies that a real inbound message reached the channel even
+  // when the answer itself could not be delivered.
+  const ok = options.expect === "any" ? true : payload.ok;
+  const final = { ...payload, ok };
   await service.stop().catch(() => {});
-  write(payload.ok ? stdout : stderr, { ts: new Date().toISOString(), event: "wecom_live_result", ...payload });
-  return payload.ok ? 0 : 1;
+  write(ok ? stdout : stderr, { ts: new Date().toISOString(), event: "wecom_live_result", ...final });
+  appendEvidence(final);
+  return ok ? 0 : 1;
 }
 
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -110,7 +110,7 @@ test("live: one inbound message is answered and the evidence is redacted", async
   const err = capture();
   const client = fakeClient();
   const code = await main({
-    argv: ["--secrets", secretsFile, "--env-file", modelEnvFile, "--timeout-ms", "5000"],
+    argv: ["--secrets", secretsFile, "--env-file", modelEnvFile, "--timeout-ms", "5000", "--evidence", join(dir, "evidence.jsonl")],
     env: {},
     stdout: out.stream,
     stderr: err.stream,
@@ -148,6 +148,24 @@ test("live: one inbound message is answered and the evidence is redacted", async
   assert.equal(result.runId, "run-live-1");
   assert.equal(result.replyDelivered, true);
   assert.match(result.inboundChat, /^id:[0-9a-f]{8}$/);
+
+  // The JSONL evidence file is the same whitelist projection: no credentials, no
+  // raw platform identifiers, no message body.
+  const evidence = readFileSync(join(dir, "evidence.jsonl"), "utf8");
+  assert.ok(evidence.length > 0);
+  assert.ok(!evidence.includes("secret-from-file"));
+  assert.ok(!evidence.includes("live-msg-1"));
+  assert.ok(!evidence.includes("live-user-1"));
+  assert.ok(!evidence.includes("你好，我是 Mira。"));
+  assert.ok(evidence.includes("run-live-1"));
+});
+
+test("live: an unknown --expect mode is a usage error", async () => {
+  const out = capture();
+  const err = capture();
+  const code = await main({ argv: ["--expect", "nonsense"], env: {}, stdout: out.stream, stderr: err.stream });
+  assert.equal(code, 2);
+  assert.equal(JSON.parse(err.text().trim()).reason, "invalid_expect");
 });
 
 test("live: no inbound message within the window is a reported failure", async () => {
@@ -155,7 +173,7 @@ test("live: no inbound message within the window is a reported failure", async (
   const out = capture();
   const err = capture();
   const code = await main({
-    argv: ["--env-file", join(dir, "none.env"), "--timeout-ms", "1000"],
+    argv: ["--env-file", join(dir, "none.env"), "--timeout-ms", "1000", "--evidence", join(dir, "evidence.jsonl")],
     env: { WECOM_BOT_ID: "bot-x", WECOM_BOT_SECRET: "secret-x" },
     stdout: out.stream,
     stderr: err.stream,

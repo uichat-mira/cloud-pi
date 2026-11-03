@@ -35,7 +35,9 @@ class FakeClient extends EventEmitter {
       this.disconnected = true;
     };
     this.replyStream = async (frame, streamId, content, finish) => {
-      this.replies.push({ reqId: frame?.headers?.req_id, streamId, content, finish });
+      // Record the argument as-is: the SDK needs the WHOLE frame, so a test that
+      // narrowed it to frame.headers would hide the 846605 trap.
+      this.replies.push({ frame, reqId: frame?.headers?.req_id, streamId, content, finish });
     };
     this.sendMessage = async (chatId, body) => {
       this.messages.push({ chatId, body });
@@ -56,17 +58,21 @@ test("transport: start authenticates, forwards messages, and replies with finish
   assert.equal(started.authenticated, true);
   assert.equal(transport.isAuthenticated, true);
 
-  client.emit("message", frame("req-7"));
+  const inbound = frame("req-7");
+  client.emit("message", inbound);
   assert.equal(events.length, 1);
   assert.equal(events[0].frame.headers.req_id, "req-7");
   assert.equal(events[0].type, "text");
 
-  const result = await transport.reply(frame("req-7"), "第一条回复");
+  const result = await transport.reply(inbound, "第一条回复");
   assert.equal(client.replies.length, 1);
   assert.equal(client.replies[0].content, "第一条回复");
   assert.equal(client.replies[0].finish, true);
   assert.match(client.replies[0].streamId, /^req-7-\d+$/);
   assert.equal(result.replyId, client.replies[0].streamId);
+  // The whole frame must reach the SDK: a narrowed `frame.headers` argument makes
+  // the SDK send an empty req_id and the platform answers 846605.
+  assert.equal(client.replies[0].frame, inbound);
 
   await transport.stop();
   assert.equal(client.disconnected, true);

@@ -47,9 +47,9 @@
 | `WECOM_REPLY_MAX_BYTES` | 否 | `20000` | 单段字节预算，上限 20480 |
 | `WECOM_REPLY_TIMEOUT_MS` | 否 | `15000` | 单次发送/回复的硬超时 |
 
-`WECOM_WS_URL` 故意不写死：SDK 源码的默认端点是 `wss://openws.work.weixin.qq.com`，
-而任务转述里出现过 `wss://openws.weixin.qq.com`。本实现不硬编码任何一方，缺省交给 SDK，
-需要覆盖时用该变量显式指定（并在 Live 时以真实握手结果为准记录）。
+`WECOM_WS_URL` 故意不写死：**实测**真实订阅端点是 `wss://openws.work.weixin.qq.com`（直连，不走代理；
+`aibot_subscribe` 返回 `errcode:0 / Authentication successful`，实测 ws_connected 192ms、subscribed 380ms），
+与 SDK 源码默认值一致。实现仍不硬编码，缺省交给 SDK，需要覆盖时用该变量显式指定。
 
 ## 3. 启动
 
@@ -71,6 +71,9 @@ npm run wecom:live
 transport 据此立刻以 `auth_failed` 拒绝 `start()`，而不是干等连接超时。
 
 ## 4. 一条消息的处理路径
+
+实测的入站顺序：先 `event.enter_chat`，约 **3 秒后**才有 `aibot_msg_callback`；回复必须用
+**callback 那一帧**的 `req_id`（不是 enter_chat 的）。
 
 1. `transport` 收到 SDK 的 `message` 事件 → 同步交给 `channel.handleEvent()`（**不 await 模型**，
    协议回执属于 SDK/transport，模型耗时不影响回执）。
@@ -97,7 +100,9 @@ transport 据此立刻以 `auth_failed` 拒绝 `start()`，而不是干等连接
 | 协议回执 5s（SDK 硬编码） | 回复超时 `WECOM_REPLY_TIMEOUT_MS`（默认 15s）单向兜底；超时**不重发**，避免重复投递 |
 | 主动推送需先有入站 | `sessions.mjs` 记录 `lastInboundAt`；未知会话返回 `no_prior_inbound`，不盲目试发 |
 | SDK 缺 `chat_type` | `send()` 对单聊目标直接拒绝（`chat_type_unsupported`），避免被平台按群聊误投 |
-| 身份边界 | `userid`/`open_userid` 只做通道级识别，**不映射** Cloud Account / Guanlan consumer / 工具权限 |
+| 回复要整帧不要 headers | `replyStream(frame, …)` 必须传**整个 callback frame**：SDK 内部读 `frame.headers.req_id`，只传 `frame.headers` 会得到空 `req_id`，平台返回 `846605 invalid req_id`（真实冒烟实测，测试用 `assert.equal(client.replies[0].frame, inbound)` 钉住） |
+| 单连接互踢 | 新订阅会踢掉旧连接（旧连接收到 `disconnected_event`）；运行前必须确认没有其它进程/队友占用 |
+| 身份边界 | `userid`/`open_userid` 只做通道级识别，**不映射** Cloud Account / Guanlan consumer / 工具权限。实测本机器人 `from_is_open_userid=false`（明文 `userid`，超管创建），实现两者都按不透明 id 处理 |
 
 ## 6. 未决与已知限制
 
