@@ -17,7 +17,7 @@
 import { isValidRunId } from "../research/run-store.mjs";
 import { readResearchRun } from "../research/index.mjs";
 import { redactSecrets } from "../research/execute.mjs";
-import { normalizeDeliveryTargets } from "../scheduler/contracts.mjs";
+import { isFeishuDeliveryTargetType, normalizeDeliveryTargets } from "../scheduler/contracts.mjs";
 import {
   DELIVERY_CONTRACT_VERSION,
   DELIVERY_ERROR,
@@ -316,14 +316,22 @@ export function createDeliveryCoordinator({
       );
     }
     const rawTargets = input.deliveryTargets ?? input.schedule?.deliveryTargets;
-    const targets = normalizeDeliveryTargets(rawTargets);
+    const allTargets = normalizeDeliveryTargets(rawTargets);
+    // W1 widened the shared vocabulary, but this coordinator can only send to
+    // Feishu. A WeCom target is therefore refused here instead of being handed to
+    // the Feishu transport, where an opaque id would either fail or — worse —
+    // silently address something else.
+    const targets = allTargets.filter((target) => isFeishuDeliveryTargetType(target.type));
+    const unsupportedTargets = allTargets.length - targets.length;
     const plan = planDelivery({
       researchStatus: input.researchStatus ?? null,
       triggerStatus: input.triggerStatus ?? null,
     });
 
     if (targets.length === 0) {
-      return baseSummary(input, { reason: "no_delivery_targets" });
+      return baseSummary(input, {
+        reason: unsupportedTargets > 0 ? "unsupported_target_type" : "no_delivery_targets",
+      });
     }
     if (plan.kind === DELIVERY_KIND.NONE) {
       return baseSummary(input, { reason: plan.reason ?? "not_deliverable" });

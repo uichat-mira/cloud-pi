@@ -24,6 +24,9 @@ import { createFeishuAgentRunner, createFeishuResearchRunner } from "./runtime.m
  * @param {Function} [options.createTransport] injection (tests)
  * @param {Function} [options.createAgentRunner] injection (tests)
  * @param {Function} [options.createResearchRunner] injection (tests)
+ * @param {object} [options.chatRuns] recorder that persists chat runs into the run
+ *   store (`createChatRunRecorder()`); omitted means chat runs are not persisted
+ * @param {() => string} [options.generateRunId] run-store compatible id generator
  */
 export async function startFeishuService({
   env = process.env,
@@ -31,12 +34,14 @@ export async function startFeishuService({
   onOutcome,
   runtimeOptions = {},
   researchOptions = {},
+  chatRuns,
+  generateRunId,
   createTransport = createFeishuTransport,
   createAgentRunner = createFeishuAgentRunner,
   createResearchRunner = createFeishuResearchRunner,
 } = {}) {
   const config = loadFeishuConfig(env);
-  const agent = createAgentRunner({ env, ...runtimeOptions });
+  const agent = createAgentRunner({ env, generateRunId, ...runtimeOptions });
   const research = createResearchRunner({ env, log, ...researchOptions });
   let transport;
   let channel;
@@ -59,7 +64,14 @@ export async function startFeishuService({
       runResearch: research.runResearch,
       reply: transport.reply,
       log,
-      onOutcome,
+      onOutcome: (outcome) => {
+        // Persistent chat runs (AGT-037 trace): same run store, same schema.
+        // Best effort — never let a storage problem change a delivered reply.
+        if (chatRuns && outcome?.runId && (outcome.action === "replied" || outcome.action === "failed")) {
+          void chatRuns.record(outcome, { channel: "feishu" });
+        }
+        onOutcome?.(outcome);
+      },
     });
 
     const started = await transport.start();

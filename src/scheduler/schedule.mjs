@@ -16,12 +16,14 @@ import {
   LIMITS,
   MISSED_RUN_POLICY,
   SCHEDULER_CONTRACT_VERSION,
+  SCHEDULER_CONTRACT_VERSIONS,
   SCHEDULER_ERROR,
   SCHEDULE_KIND,
   SCHEDULE_STATUS,
   SchedulerError,
   generateScheduleId,
   isScheduleStatus,
+  isSupportedSchedulerContractVersion,
   isValidScheduleId,
   normalizeDeliveryTargets,
 } from "./contracts.mjs";
@@ -366,8 +368,10 @@ export function assertScheduleShape(record, { expectScheduleId } = {}) {
     throw new SchedulerError(SCHEDULER_ERROR.PARSE_ERROR, `invalid schedule record: ${reason}`);
   };
   if (!isPlainObject(record)) invalid("not a JSON object");
-  if (record.contractVersion !== SCHEDULER_CONTRACT_VERSION) {
-    invalid(`unsupported contractVersion ${JSON.stringify(record.contractVersion)}`);
+  if (!isSupportedSchedulerContractVersion(record.contractVersion)) {
+    invalid(
+      `unsupported contractVersion ${JSON.stringify(record.contractVersion)}; readable versions are ${SCHEDULER_CONTRACT_VERSIONS.join(", ")}`,
+    );
   }
   if (!isValidScheduleId(record.scheduleId)) invalid("missing or malformed scheduleId");
   if (expectScheduleId && record.scheduleId !== expectScheduleId) {

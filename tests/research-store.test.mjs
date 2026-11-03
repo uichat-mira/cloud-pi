@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   ARTIFACT,
   STORE_ERROR,
@@ -50,8 +50,14 @@ const RUN_B = "r-20261102T100000-bbbbbb";
 const RUN_C = "r-20261102T110000-cccccc";
 
 test("resolveRunsRoot: explicit > env > default", () => {
-  assert.equal(resolveRunsRoot({ rootDir: "/tmp/explicit", env: { RESEARCH_RUNS_DIR: "/tmp/from-env" } }), "/tmp/explicit");
-  assert.equal(resolveRunsRoot({ env: { RESEARCH_RUNS_DIR: "/tmp/from-env" } }), "/tmp/from-env");
+  // Compare against `resolve()`-normalized expectations: a POSIX literal such as
+  // "/tmp/explicit" is <drive>:\tmp\explicit on Windows, and the documented
+  // contract is "always absolute", not "always POSIX".
+  assert.equal(
+    resolveRunsRoot({ rootDir: "/tmp/explicit", env: { RESEARCH_RUNS_DIR: "/tmp/from-env" } }),
+    resolve("/tmp/explicit"),
+  );
+  assert.equal(resolveRunsRoot({ env: { RESEARCH_RUNS_DIR: "/tmp/from-env" } }), resolve("/tmp/from-env"));
   assert.match(resolveRunsRoot({ env: {} }), /[/\\]\.work[/\\]research-runs$/);
 });
 

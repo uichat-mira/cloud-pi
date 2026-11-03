@@ -252,6 +252,27 @@ export function toRunView(run) {
     sourcesSummary: projectSourcesSummary(run.sourcesSummary),
     citations: projectCitations(run.citations),
     errors: projectErrors(run.errors),
+    // Additive chat fields (AGT-037): a chat turn is stored in the same run store,
+    // so its channel facts must be readable through the same route. Research runs
+    // keep `chat: null` and their existing fields are unchanged.
+    chat:
+      typeof run.channel === "string"
+        ? {
+            channel: run.channel,
+            chatType: typeof run.chatType === "string" ? run.chatType : null,
+            chatIdMasked: typeof run.chatIdMasked === "string" ? run.chatIdMasked : null,
+            usage: projectUsage(run.usage),
+            reply: isObject(run.reply)
+              ? {
+                  delivered: run.reply.delivered === true,
+                  segments: Number.isFinite(run.reply.segments) ? run.reply.segments : null,
+                  segmentsDelivered: Number.isFinite(run.reply.segmentsDelivered)
+                    ? run.reply.segmentsDelivered
+                    : null,
+                }
+              : null,
+          }
+        : null,
     artifacts: {
       report: typeof run.paths?.report === "string",
       sources: typeof run.paths?.sources === "string",

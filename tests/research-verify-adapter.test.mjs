@@ -19,7 +19,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSyn
 import { sendHtml, sendJson, startFixtureServer } from "./helpers/fixture-server.mjs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fauxAssistantMessage } from "@earendil-works/pi-ai/providers/faux";
 import {
@@ -199,7 +199,13 @@ describe("adapter: system prompt and cwd isolation through Pi", () => {
     // cwd is a fresh empty temp dir, never the repository, and removed afterwards.
     assert.notEqual(sentinel.cwd, process.cwd());
     assert.ok(sentinel.cwdReal.startsWith(realpathSync(tmpdir())), `cwd must be under tmpdir (${sentinel.cwdReal})`);
-    assert.ok(relative(REPO_ROOT, sentinel.cwd).startsWith(".."), "cwd must not be inside the repository");
+    // `relative()` returns an absolute path when the two paths are on different
+    // Windows drives, so "escapes the repository" is "absolute or starts with ..".
+    const cwdRelativeToRepo = relative(REPO_ROOT, sentinel.cwd);
+    assert.ok(
+      isAbsolute(cwdRelativeToRepo) || cwdRelativeToRepo.startsWith(".."),
+      `cwd must not be inside the repository (${cwdRelativeToRepo})`,
+    );
     assert.deepEqual(sentinel.cwdEntries, [], "the temp cwd must be empty so no AGENTS.md is loaded");
     assert.equal(sentinel.hasAgentsFile, false);
     assert.equal(sentinel.hasAgentsFileAtRun, false, "a repository AGENTS.md must not appear in the research cwd");

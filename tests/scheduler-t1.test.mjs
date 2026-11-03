@@ -17,6 +17,7 @@ import {
   makeDedupeKey,
   nextCronOccurrence,
   resolveOnceInstant,
+  SCHEDULER_CONTRACT_VERSION,
   SchedulerError,
   TRIGGER_STATUS,
 } from "../src/scheduler/index.mjs";
@@ -289,7 +290,7 @@ test("T1 persisted JSON uses the frozen schema and has no temp files", async (t)
   });
   const raw = await readFile(join(root, "scheduler", "schedules", "schema-daily.json"), "utf8");
   const parsed = JSON.parse(raw);
-  assert.equal(parsed.contractVersion, 1);
+  assert.equal(parsed.contractVersion, SCHEDULER_CONTRACT_VERSION);
   assert.equal(parsed.missedRunPolicy, "coalesce_one");
   assert.equal(parsed.nextRunAt, "2026-11-03T01:00:00.000Z");
   const files = await import("node:fs/promises").then((fs) =>

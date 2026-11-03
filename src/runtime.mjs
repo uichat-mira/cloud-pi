@@ -153,6 +153,8 @@ function normalizePatterns(value, name) {
  * @param {string} [options.cwd] session working directory; default: `process.cwd()`
  * @param {object} [options.modelRuntime] injected Pi ModelRuntime (tests)
  * @param {object} [options.model] injected Pi model (tests)
+ * @param {() => string} [options.generateRunId] run id generator; pass one that
+ *   matches the run-store pattern so a non-research run stays readable by id
  */
 export async function createAgentRuntime(options = {}) {
   const usingProcessEnv = !options.config && (options.env ?? process.env) === process.env;
@@ -169,6 +171,8 @@ export async function createAgentRuntime(options = {}) {
   const customTools = Array.isArray(options.customTools) ? [...options.customTools] : [];
   const extensionFactories = Array.isArray(options.extensionFactories) ? [...options.extensionFactories] : [];
   const cwd = options.cwd ?? process.cwd();
+  // Injected run id generator; defaults to a random UUID inside `run()`.
+  const generateRunId = options.generateRunId;
 
   let ownedModelRuntime;
   let modelRuntime = options.modelRuntime;
@@ -209,7 +213,11 @@ export async function createAgentRuntime(options = {}) {
         throw new TypeError("runOptions.timeoutMs must be a positive number");
       }
 
-      const runId = randomUUID();
+      // Channel and research runs share one id space (AGT-037 trace): callers that
+      // persist runs into the run store pass `generateRunId` so a chat runId is
+      // readable from `/v1/runs/<id>` like a research runId. The default stays a
+      // random UUID for callers that never persist.
+      const runId = typeof generateRunId === "function" ? generateRunId() : randomUUID();
       const startedAt = Date.now();
       const capture = { records: new Map(), order: [] };
 
