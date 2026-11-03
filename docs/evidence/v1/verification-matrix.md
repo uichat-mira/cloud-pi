@@ -544,3 +544,30 @@ $ npm run check
   **全部 unchanged**，只有散文 UUID 变 `id:xxxxxxxx`（预期）——"过度脱敏"这一风险不成立。
 
 > 判定影响：G16 由「未强制」改为「已强制」是 **captain 授权的状态回填**，其余 §2–§4 行、§6 判定一处未动。
+
+### C.12 t29（WeCom 会话授权闸门）已合并 `8324146`：三条复核全过
+
+- **启动闸门（真起入口进程，不是只跑单测）**：`node src/entry/main.mjs --channels wecom --check`
+  - `GUANLAN_MCP_URL` 存在 + 两个白名单全空 → **exit 2**，`code=wecom_config_error`，`fields` 点名
+    `WECOM_ALLOWED_USER_IDS`/`WECOM_ALLOWED_CHAT_IDS`，消息里写明"以维护者委托身份读"与"**不是** Cloud Auth 授权"；
+  - 填一个合法 id → **exit 0**，`wecom_session_authorization enforced:true allowedUserCount:1`；
+  - 纯对话部署（无外部工具、无白名单）→ **exit 0**，`enforced:false`（默认放开没有被误伤）。
+  - 另外实跑了一次**真实启动**（不是 `--check`）：`--api-port 0` 下同样 exit 2、`phase:"channels"` 拒绝建通道。
+- **零调用**：非名单用户 / 未配置群 / 群内未 @ → `runTurn` **0 次**、不产生 run 记录；
+  `wecom_channel_outcome` 三条分别 `user_not_allowed`、`chat_not_allowed`、`mention_required`，
+  标识符全部 `id:<8hex>` 投影；原始 userid/chatid 只在内存 outcome 里（`chatIdMasked` 落盘前过 `hashId`，
+  `senderUserId` 根本不落盘），日志与 run store 都看不到原文。
+- **文档 §2.1 措辞**：明确"白名单 = 本进程的**本地会话授权**，**不是** Cloud Auth 授权，不授予账户/consumer/工具权限；
+  工具返回什么仍由工具端身份与资源授权决定"；§13 把"真实单聊/群聊主动投递"继续标**未验证（blocker）**，
+  没有把"未验证"写成"已验证"。
+- **边界不变**：t29 只回答"谁能触发"，不改变"以谁的身份读"；真实入站触发仍挂 A-4 四条件等维护者。
+
+> 判定影响：本节只追加事实，§2–§4 与 G0–G16 判定一处未动。矩阵至此只剩 **t12（A-4）** 一项待真实维护者动作。
+- **附：D8 现状（dev@`8324146` 实测，**红**）**：`files=76 hits=3`，三条全是**误报**——
+  `docs/evidence/agt-03x-external-review/cloud-auth-claims.json:long_token`（命中 ID 字面量 `A46-contract-test-no-session-material`）、
+  `cloud-mcp-guanlan-claims.json:long_token`（`G57-product-design-agent-propose`）、
+  `agt-03x-external-review.md:pem`（该行本身在**列举扫描模式** `-----BEGIN`）。这三份都是我 7f100b8 移进
+  `docs/evidence/` 的复核材料，随后被 D8 的自指扫描命中，属"扫描器读到自己描述的规则"。
+  影响：`self-test --full` 的 full-suite verdict 会因此判红（C.8 当时是 64 文件 0 命中，之后文件数增长到 76）。
+  修复建议（未在本 PR 动，避免混入证据改动）：① 模式描述行改写（`-----BEGIN` 拆成 `- - - - -BEGIN` 或写"私钥 PEM 头"）；
+  ② 两个 claim ID 改短名或加前缀白名单；③ 或给 D8 加"证据文档内模式枚举行"豁免。**不影响 t12 的产品结论，但会挡住任何以 full-suite 为准的验收。**
