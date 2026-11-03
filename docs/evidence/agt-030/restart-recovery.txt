@@ -1,0 +1,437 @@
+
+> cloud-pi@0.1.0 scheduler:poc
+> node scripts/scheduler-poc-evidence.mjs
+
+========================================================================
+AGT-030 scheduler POC local restart/recovery evidence
+========================================================================
+node: v22.23.2
+TZ: UTC (child processes); schedule timezone: Asia/Shanghai
+evidence root: /var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L
+
+========================================================================
+Scenario A: definitions survive a clean process restart
+========================================================================
+$ node scripts/scheduler-poc-child.mjs --phase seed --created-at 2026-11-03T00:55:00Z --now 2026-11-03T01:00:00Z
+{
+  "phase": "seed",
+  "now": "2026-11-03T01:00:00.000Z",
+  "stateDir": "/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/clean-restart/scheduler",
+  "runsDir": "/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/clean-restart/runs",
+  "node": "v22.23.2",
+  "schedules": [
+    {
+      "scheduleId": "poc-daily",
+      "kind": "recurring",
+      "timezone": "Asia/Shanghai",
+      "cron": "0 9 * * *",
+      "status": "active",
+      "nextRunAt": "2026-11-04T01:00:00.000Z",
+      "lastRun": {
+        "dedupeKey": "poc-daily@2026-11-03T01:00:00.000Z",
+        "scheduledFor": "2026-11-03T01:00:00.000Z",
+        "runId": "r-20261103T010000-4fe0d6",
+        "status": "succeeded",
+        "researchStatus": "completed",
+        "startedAt": "2026-11-03T01:00:00.000Z",
+        "finishedAt": "2026-11-03T01:00:00.000Z",
+        "durationMs": 6
+      },
+      "activeTrigger": null,
+      "stats": {
+        "triggers": 1,
+        "succeeded": 1,
+        "partial": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "timeout": 0,
+        "interrupted": 0,
+        "missed": 0,
+        "duplicatesSkipped": 0
+      },
+      "triggers": [
+        {
+          "dedupeKey": "poc-daily@2026-11-03T01:00:00.000Z",
+          "scheduledFor": "2026-11-03T01:00:00.000Z",
+          "status": "succeeded",
+          "researchStatus": "completed",
+          "runId": "r-20261103T010000-4fe0d6",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": false,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "runId": "r-20261103T010000-4fe0d6",
+      "status": "completed",
+      "topic": "研究最近 48 小时 AI Agent 工程进展（scheduler POC 证据）",
+      "createdAt": "2026-11-03T01:00:00.000Z",
+      "finishedAt": "2026-11-03T01:00:00.000Z",
+      "reportChars": 244
+    }
+  ],
+  "firstTick": {
+    "triggered": 1
+  }
+}
+done state=/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/clean-restart/scheduler
+
+$ node scripts/scheduler-poc-child.mjs --phase resume --now 2026-11-04T01:00:00Z
+{
+  "phase": "resume",
+  "now": "2026-11-04T01:00:00.000Z",
+  "stateDir": "/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/clean-restart/scheduler",
+  "runsDir": "/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/clean-restart/runs",
+  "node": "v22.23.2",
+  "schedules": [
+    {
+      "scheduleId": "poc-daily",
+      "kind": "recurring",
+      "timezone": "Asia/Shanghai",
+      "cron": "0 9 * * *",
+      "status": "active",
+      "nextRunAt": "2026-11-05T01:00:00.000Z",
+      "lastRun": {
+        "dedupeKey": "poc-daily@2026-11-04T01:00:00.000Z",
+        "scheduledFor": "2026-11-04T01:00:00.000Z",
+        "runId": "r-20261104T010000-b59db8",
+        "status": "succeeded",
+        "researchStatus": "completed",
+        "startedAt": "2026-11-04T01:00:00.000Z",
+        "finishedAt": "2026-11-04T01:00:00.000Z",
+        "durationMs": 5
+      },
+      "activeTrigger": null,
+      "stats": {
+        "triggers": 2,
+        "succeeded": 2,
+        "partial": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "timeout": 0,
+        "interrupted": 0,
+        "missed": 0,
+        "duplicatesSkipped": 0
+      },
+      "triggers": [
+        {
+          "dedupeKey": "poc-daily@2026-11-03T01:00:00.000Z",
+          "scheduledFor": "2026-11-03T01:00:00.000Z",
+          "status": "succeeded",
+          "researchStatus": "completed",
+          "runId": "r-20261103T010000-4fe0d6",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": false,
+          "error": null
+        },
+        {
+          "dedupeKey": "poc-daily@2026-11-04T01:00:00.000Z",
+          "scheduledFor": "2026-11-04T01:00:00.000Z",
+          "status": "succeeded",
+          "researchStatus": "completed",
+          "runId": "r-20261104T010000-b59db8",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": false,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "runId": "r-20261104T010000-b59db8",
+      "status": "completed",
+      "topic": "研究最近 48 小时 AI Agent 工程进展（scheduler POC 证据）",
+      "createdAt": "2026-11-04T01:00:00.000Z",
+      "finishedAt": "2026-11-04T01:00:00.000Z",
+      "reportChars": 244
+    },
+    {
+      "runId": "r-20261103T010000-4fe0d6",
+      "status": "completed",
+      "topic": "研究最近 48 小时 AI Agent 工程进展（scheduler POC 证据）",
+      "createdAt": "2026-11-03T01:00:00.000Z",
+      "finishedAt": "2026-11-03T01:00:00.000Z",
+      "reportChars": 244
+    }
+  ],
+  "afterRecovery": [
+    {
+      "scheduleId": "poc-daily",
+      "kind": "recurring",
+      "timezone": "Asia/Shanghai",
+      "cron": "0 9 * * *",
+      "status": "active",
+      "nextRunAt": "2026-11-05T01:00:00.000Z",
+      "lastRun": {
+        "dedupeKey": "poc-daily@2026-11-04T01:00:00.000Z",
+        "scheduledFor": "2026-11-04T01:00:00.000Z",
+        "runId": "r-20261104T010000-b59db8",
+        "status": "succeeded",
+        "researchStatus": "completed",
+        "startedAt": "2026-11-04T01:00:00.000Z",
+        "finishedAt": "2026-11-04T01:00:00.000Z",
+        "durationMs": 5
+      },
+      "activeTrigger": null,
+      "stats": {
+        "triggers": 2,
+        "succeeded": 2,
+        "partial": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "timeout": 0,
+        "interrupted": 0,
+        "missed": 0,
+        "duplicatesSkipped": 0
+      },
+      "triggers": [
+        {
+          "dedupeKey": "poc-daily@2026-11-03T01:00:00.000Z",
+          "scheduledFor": "2026-11-03T01:00:00.000Z",
+          "status": "succeeded",
+          "researchStatus": "completed",
+          "runId": "r-20261103T010000-4fe0d6",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": false,
+          "error": null
+        },
+        {
+          "dedupeKey": "poc-daily@2026-11-04T01:00:00.000Z",
+          "scheduledFor": "2026-11-04T01:00:00.000Z",
+          "status": "succeeded",
+          "researchStatus": "completed",
+          "runId": "r-20261104T010000-b59db8",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": false,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "duplicateTickTriggered": 0,
+  "note": "recovery runs before the first tick; a duplicate tick starts nothing"
+}
+process-exit-ok state-dir=/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/clean-restart/scheduler
+done state=/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/clean-restart/scheduler
+
+========================================================================
+Scenario B: a hard exit mid-run is recovered as interrupted, then the next fire runs
+========================================================================
+$ node scripts/scheduler-poc-child.mjs --phase crash --created-at 2026-11-03T00:55:00Z --now 2026-11-03T01:00:00Z
+child exit code: 42 (expected hard exit)
+{
+  "phase": "crash",
+  "now": "2026-11-03T01:00:00.000Z",
+  "note": "about to exit hard while the research run is still marked running",
+  "schedule": {
+    "scheduleId": "poc-crash",
+    "kind": "recurring",
+    "timezone": "Asia/Shanghai",
+    "cron": "0 9 * * *",
+    "status": "active",
+    "nextRunAt": "2026-11-04T01:00:00.000Z",
+    "lastRun": null,
+    "activeTrigger": {
+      "dedupeKey": "poc-crash@2026-11-03T01:00:00.000Z",
+      "scheduledFor": "2026-11-03T01:00:00.000Z",
+      "claimedAt": "2026-11-03T01:00:00.000Z",
+      "runId": "r-20261103T010000-6326a7"
+    },
+    "stats": {
+      "triggers": 1,
+      "succeeded": 0,
+      "partial": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "timeout": 0,
+      "interrupted": 0,
+      "missed": 0,
+      "duplicatesSkipped": 0
+    },
+    "triggers": [
+      {
+        "dedupeKey": "poc-crash@2026-11-03T01:00:00.000Z",
+        "scheduledFor": "2026-11-03T01:00:00.000Z",
+        "status": "started",
+        "researchStatus": null,
+        "runId": "r-20261103T010000-6326a7",
+        "catchUp": false,
+        "missedCount": 0,
+        "recovery": false,
+        "error": null
+      }
+    ]
+  },
+  "runs": [
+    {
+      "runId": "r-20261103T010000-6326a7",
+      "status": "running",
+      "topic": "研究最近 48 小时 AI Agent 工程进展（crash 证据）",
+      "createdAt": "2026-11-03T01:00:00.000Z",
+      "finishedAt": null,
+      "reportChars": 0
+    }
+  ]
+}
+
+$ node scripts/scheduler-poc-child.mjs --phase resume --now 2026-11-04T01:00:00Z
+{
+  "phase": "resume",
+  "now": "2026-11-04T01:00:00.000Z",
+  "stateDir": "/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/crash-recovery/scheduler",
+  "runsDir": "/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/crash-recovery/runs",
+  "node": "v22.23.2",
+  "schedules": [
+    {
+      "scheduleId": "poc-crash",
+      "kind": "recurring",
+      "timezone": "Asia/Shanghai",
+      "cron": "0 9 * * *",
+      "status": "active",
+      "nextRunAt": "2026-11-05T01:00:00.000Z",
+      "lastRun": {
+        "dedupeKey": "poc-crash@2026-11-04T01:00:00.000Z",
+        "scheduledFor": "2026-11-04T01:00:00.000Z",
+        "runId": "r-20261104T010000-f24194",
+        "status": "succeeded",
+        "researchStatus": "completed",
+        "startedAt": "2026-11-04T01:00:00.000Z",
+        "finishedAt": "2026-11-04T01:00:00.000Z",
+        "durationMs": 5
+      },
+      "activeTrigger": null,
+      "stats": {
+        "triggers": 2,
+        "succeeded": 1,
+        "partial": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "timeout": 0,
+        "interrupted": 1,
+        "missed": 0,
+        "duplicatesSkipped": 0
+      },
+      "triggers": [
+        {
+          "dedupeKey": "poc-crash@2026-11-03T01:00:00.000Z",
+          "scheduledFor": "2026-11-03T01:00:00.000Z",
+          "status": "interrupted",
+          "researchStatus": "running",
+          "runId": "r-20261103T010000-6326a7",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": true,
+          "error": {
+            "code": "interrupted",
+            "message": "scheduler restarted while run r-20261103T010000-6326a7 was still marked running; the run may be orphaned",
+            "at": "2026-11-04T01:00:00.000Z"
+          }
+        },
+        {
+          "dedupeKey": "poc-crash@2026-11-04T01:00:00.000Z",
+          "scheduledFor": "2026-11-04T01:00:00.000Z",
+          "status": "succeeded",
+          "researchStatus": "completed",
+          "runId": "r-20261104T010000-f24194",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": false,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "runId": "r-20261104T010000-f24194",
+      "status": "completed",
+      "topic": "研究最近 48 小时 AI Agent 工程进展（crash 证据）",
+      "createdAt": "2026-11-04T01:00:00.000Z",
+      "finishedAt": "2026-11-04T01:00:00.000Z",
+      "reportChars": 244
+    },
+    {
+      "runId": "r-20261103T010000-6326a7",
+      "status": "running",
+      "topic": "研究最近 48 小时 AI Agent 工程进展（crash 证据）",
+      "createdAt": "2026-11-03T01:00:00.000Z",
+      "finishedAt": null,
+      "reportChars": 0
+    }
+  ],
+  "afterRecovery": [
+    {
+      "scheduleId": "poc-crash",
+      "kind": "recurring",
+      "timezone": "Asia/Shanghai",
+      "cron": "0 9 * * *",
+      "status": "active",
+      "nextRunAt": "2026-11-05T01:00:00.000Z",
+      "lastRun": {
+        "dedupeKey": "poc-crash@2026-11-04T01:00:00.000Z",
+        "scheduledFor": "2026-11-04T01:00:00.000Z",
+        "runId": "r-20261104T010000-f24194",
+        "status": "succeeded",
+        "researchStatus": "completed",
+        "startedAt": "2026-11-04T01:00:00.000Z",
+        "finishedAt": "2026-11-04T01:00:00.000Z",
+        "durationMs": 5
+      },
+      "activeTrigger": null,
+      "stats": {
+        "triggers": 2,
+        "succeeded": 1,
+        "partial": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "timeout": 0,
+        "interrupted": 1,
+        "missed": 0,
+        "duplicatesSkipped": 0
+      },
+      "triggers": [
+        {
+          "dedupeKey": "poc-crash@2026-11-03T01:00:00.000Z",
+          "scheduledFor": "2026-11-03T01:00:00.000Z",
+          "status": "interrupted",
+          "researchStatus": "running",
+          "runId": "r-20261103T010000-6326a7",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": true,
+          "error": {
+            "code": "interrupted",
+            "message": "scheduler restarted while run r-20261103T010000-6326a7 was still marked running; the run may be orphaned",
+            "at": "2026-11-04T01:00:00.000Z"
+          }
+        },
+        {
+          "dedupeKey": "poc-crash@2026-11-04T01:00:00.000Z",
+          "scheduledFor": "2026-11-04T01:00:00.000Z",
+          "status": "succeeded",
+          "researchStatus": "completed",
+          "runId": "r-20261104T010000-f24194",
+          "catchUp": false,
+          "missedCount": 0,
+          "recovery": false,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "duplicateTickTriggered": 0,
+  "note": "recovery runs before the first tick; a duplicate tick starts nothing"
+}
+process-exit-ok state-dir=/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/crash-recovery/scheduler
+done state=/var/folders/fb/9xrmkmd55534jz_116_6vlg40000gp/T/cloud-pi-agt-030-evidence-Z7fe2L/crash-recovery/scheduler
+
+POC evidence complete: no real model or network call was made.
