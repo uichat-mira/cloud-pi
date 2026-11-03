@@ -249,6 +249,14 @@ try {
     } else {
       evidence.failedClosedByRule = evidence.health.ok ? null : "mcp_server_unavailable";
       evidence.ok = evidence.health.ok === false;
+      // The product rule fails this run even though the model finished. The
+      // evidence must say "failed" too, or the trace shows a success with an
+      // error attached to it. The raw runtime status stays observable.
+      if (evidence.failedClosedByRule) {
+        evidence.run.runtimeStatus = evidence.run.status;
+        evidence.run.status = "failed";
+        evidence.run.failureReason = "mcp_server_unavailable";
+      }
     }
     exitCode = evidence.ok ? 0 : 1;
   }
