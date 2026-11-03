@@ -1,0 +1,408 @@
+[
+  {
+    "id": "G01-issuer-const",
+    "file": "src/mcp/config.ts",
+    "from": 23,
+    "to": 23,
+    "re": "mira:cloud-auth"
+  },
+  {
+    "id": "G02-audience-const",
+    "file": "src/mcp/config.ts",
+    "from": 24,
+    "to": 24,
+    "re": "mira:cloud-guanlan"
+  },
+  {
+    "id": "G03-read-scope",
+    "file": "src/mcp/config.ts",
+    "from": 10,
+    "to": 10,
+    "re": "guanlan\\.read"
+  },
+  {
+    "id": "G04-write-scope",
+    "file": "src/mcp/config.ts",
+    "from": 11,
+    "to": 21,
+    "re": "guanlan\\.write"
+  },
+  {
+    "id": "G05-oauth-issuer",
+    "file": "src/mcp/config.ts",
+    "from": 41,
+    "to": 43,
+    "re": "CLOUD_AUTH_ISSUER|AUTH_ISSUER"
+  },
+  {
+    "id": "G06-jwks-config",
+    "file": "src/mcp/config.ts",
+    "from": 82,
+    "to": 86,
+    "re": "jwks|JWKS"
+  },
+  {
+    "id": "G07-audience-validation",
+    "file": "src/mcp/config.ts",
+    "from": 88,
+    "to": 96,
+    "re": "mcp_audience_not_guanlan"
+  },
+  {
+    "id": "G08-required-scopes",
+    "file": "src/mcp/config.ts",
+    "from": 98,
+    "to": 103,
+    "re": "requiredScopes|guanlan\\.read"
+  },
+  {
+    "id": "G09-consumer-claim-default",
+    "file": "src/mcp/config.ts",
+    "from": 105,
+    "to": 106,
+    "re": "consumer_id"
+  },
+  {
+    "id": "G10-scopes-supported",
+    "file": "src/mcp/config.ts",
+    "from": 123,
+    "to": 134,
+    "re": "scopes_supported|scopesSupported"
+  },
+  {
+    "id": "G11-jwks-remote",
+    "file": "src/mcp/auth.ts",
+    "from": 63,
+    "to": 63,
+    "re": "createRemoteJWKSet"
+  },
+  {
+    "id": "G12-jwtverify-options",
+    "file": "src/mcp/auth.ts",
+    "from": 68,
+    "to": 75,
+    "re": "jwtVerify"
+  },
+  {
+    "id": "G13-alg-eddsa",
+    "file": "src/mcp/auth.ts",
+    "from": 72,
+    "to": 72,
+    "re": "EdDSA"
+  },
+  {
+    "id": "G14-clock-tolerance",
+    "file": "src/mcp/auth.ts",
+    "from": 73,
+    "to": 73,
+    "re": "clockTolerance"
+  },
+  {
+    "id": "G15-required-claims",
+    "file": "src/mcp/auth.ts",
+    "from": 68,
+    "to": 79,
+    "re": "requiredClaims"
+  },
+  {
+    "id": "G16-scope-parse",
+    "file": "src/mcp/auth.ts",
+    "from": 41,
+    "to": 55,
+    "re": "scope"
+  },
+  {
+    "id": "G17-sub-validate",
+    "file": "src/mcp/auth.ts",
+    "from": 81,
+    "to": 81,
+    "re": "sub"
+  },
+  {
+    "id": "G18-consumer-validate",
+    "file": "src/mcp/auth.ts",
+    "from": 82,
+    "to": 86,
+    "re": "consumer"
+  },
+  {
+    "id": "G19-invalid-token",
+    "file": "src/mcp/auth.ts",
+    "from": 77,
+    "to": 79,
+    "re": "invalid_token"
+  },
+  {
+    "id": "G20-keyset-injection",
+    "file": "src/mcp/auth.ts",
+    "from": 28,
+    "to": 36,
+    "re": "keySet"
+  },
+  {
+    "id": "G21-principal-shape",
+    "file": "src/mcp/auth.ts",
+    "from": 8,
+    "to": 18,
+    "re": "consumerId|accountId"
+  },
+  {
+    "id": "G22-fixture-not-deployable",
+    "file": "src/mcp/auth.ts",
+    "from": 102,
+    "to": 121,
+    "re": "FIXTURE|fixture"
+  },
+  {
+    "id": "G23-require-bearer",
+    "file": "src/mcp/server.ts",
+    "from": 305,
+    "to": 310,
+    "re": "requireBearerAuth|resource"
+  },
+  {
+    "id": "G24-host-origin-validation",
+    "file": "src/mcp/server.ts",
+    "from": 326,
+    "to": 329,
+    "re": "hostHeaderValidation|originValidation"
+  },
+  {
+    "id": "G25-not-found",
+    "file": "src/mcp/server.ts",
+    "from": 320,
+    "to": 324,
+    "re": "not_found|404"
+  },
+  {
+    "id": "G26-body-limit",
+    "file": "src/mcp/server.ts",
+    "from": 51,
+    "to": 51,
+    "re": "256|KiB|limit"
+  },
+  {
+    "id": "G27-body-limit-2",
+    "file": "src/mcp/server.ts",
+    "from": 313,
+    "to": 313,
+    "re": "256|limit"
+  },
+  {
+    "id": "G28-tool-param-limit",
+    "file": "src/mcp/server.ts",
+    "from": 133,
+    "to": 133,
+    "re": "100"
+  },
+  {
+    "id": "G29-tool-registration",
+    "file": "src/mcp/server.ts",
+    "from": 136,
+    "to": 246,
+    "re": "guanlan_news_recent|guanlan_news_decide|guanlan_whoami"
+  },
+  {
+    "id": "G30-whoami-handler",
+    "file": "src/mcp/server.ts",
+    "from": 172,
+    "to": 191,
+    "re": "whoami|accountId"
+  },
+  {
+    "id": "G31-decide-write-scope",
+    "file": "src/mcp/server.ts",
+    "from": 203,
+    "to": 213,
+    "re": "guanlan_decision_forbidden|write"
+  },
+  {
+    "id": "G32-decision-forbidden-code",
+    "file": "src/mcp/capabilities.ts",
+    "from": 73,
+    "to": 75,
+    "re": "guanlan_decision_forbidden"
+  },
+  {
+    "id": "G33-principal-unavailable-code",
+    "file": "src/mcp/capabilities.ts",
+    "from": 86,
+    "to": 87,
+    "re": "guanlan_principal_unavailable"
+  },
+  {
+    "id": "G34-state-version-doc",
+    "file": "src/mcp/capabilities.ts",
+    "from": 135,
+    "to": 140,
+    "re": "stateVersion"
+  },
+  {
+    "id": "G35-expected-version",
+    "file": "src/mcp/capabilities.ts",
+    "from": 181,
+    "to": 182,
+    "re": "expectedVersion"
+  },
+  {
+    "id": "G36-default-status-filter",
+    "file": "src/mcp/capabilities.ts",
+    "from": 38,
+    "to": 41,
+    "re": "unread|pending"
+  },
+  {
+    "id": "G37-cas-upsert",
+    "file": "src/consumption.ts",
+    "from": 478,
+    "to": 504,
+    "re": "expectedVersion|version"
+  },
+  {
+    "id": "G38-replay-detect",
+    "file": "src/consumption.ts",
+    "from": 583,
+    "to": 597,
+    "re": "replayed|last_operation_id|operation_conflict"
+  },
+  {
+    "id": "G39-version-conflict",
+    "file": "src/consumption.ts",
+    "from": 569,
+    "to": 580,
+    "re": "version_conflict"
+  },
+  {
+    "id": "G40-storage-failure",
+    "file": "src/consumption.ts",
+    "from": 524,
+    "to": 551,
+    "re": "storage_failure"
+  },
+  {
+    "id": "G41-migration-0004-version",
+    "file": "migrations/0004_consumer_news_state.sql",
+    "from": 34,
+    "to": 36,
+    "re": "version"
+  },
+  {
+    "id": "G42-migration-0004-no-fk",
+    "file": "migrations/0004_consumer_news_state.sql",
+    "from": 7,
+    "to": 9,
+    "re": "CREATE TABLE|consumer"
+  },
+  {
+    "id": "G43-migration-0003-lengths",
+    "file": "migrations/0003_guanlan_accounts.sql",
+    "from": 4,
+    "to": 20,
+    "re": "128"
+  },
+  {
+    "id": "G44-migration-0003-consumers",
+    "file": "migrations/0003_guanlan_accounts.sql",
+    "from": 11,
+    "to": 20,
+    "re": "consumer"
+  },
+  {
+    "id": "G45-app-mcp-only",
+    "file": "src/app.ts",
+    "from": 25,
+    "to": 34,
+    "re": "mcp_not_configured"
+  },
+  {
+    "id": "G46-app-no-rest",
+    "file": "src/app.ts",
+    "from": 36,
+    "to": 38,
+    "re": "not_found|404"
+  },
+  {
+    "id": "G47-wrangler-placeholder",
+    "file": "wrangler.jsonc",
+    "from": 3,
+    "to": 15,
+    "re": "do-not-deploy"
+  },
+  {
+    "id": "G48-runtime-issuer",
+    "file": "src/mcp/runtime.ts",
+    "from": 66,
+    "to": 66,
+    "re": "issuer"
+  },
+  {
+    "id": "G49-runtime-cache",
+    "file": "src/mcp/runtime.ts",
+    "from": 48,
+    "to": 76,
+    "re": "cache|Map"
+  },
+  {
+    "id": "G50-service-principal-error",
+    "file": "src/mcp/service.ts",
+    "from": 557,
+    "to": 565,
+    "re": "principal_unavailable|principal"
+  },
+  {
+    "id": "G51-service-unread-view",
+    "file": "src/mcp/service.ts",
+    "from": 498,
+    "to": 521,
+    "re": "stateVersion"
+  },
+  {
+    "id": "G52-check-sh",
+    "file": "scripts/check.sh",
+    "from": 11,
+    "to": 18,
+    "re": "check|typecheck|test"
+  },
+  {
+    "id": "G53-fixture-tokens",
+    "file": "tests/mcp-fixtures.ts",
+    "from": 24,
+    "to": 43,
+    "re": "FIXTURE_TOKENS"
+  },
+  {
+    "id": "G54-mcp-auth-test-claims",
+    "file": "tests/mcp-auth.test.mjs",
+    "from": 265,
+    "to": 297,
+    "re": "resource|audience"
+  },
+  {
+    "id": "G55-mcp-auth-test-403",
+    "file": "tests/mcp-auth.test.mjs",
+    "from": 109,
+    "to": 116,
+    "re": "insufficient_scope|403"
+  },
+  {
+    "id": "G56-gln011-doc-notarget",
+    "file": "docs/engineering/gln-011-subscription-mutations.md",
+    "from": 4,
+    "to": 4,
+    "re": "订阅|MCP"
+  },
+  {
+    "id": "G57-product-design-agent-propose",
+    "file": "docs/product-design.md",
+    "from": 157,
+    "to": 157,
+    "re": "订阅|提议|Agent"
+  },
+  {
+    "id": "G58-canary-scope",
+    "file": "docs/engineering/gln-003-cloudflare-canary.md",
+    "from": 4,
+    "to": 4,
+    "re": "0001|0002|health"
+  }
+]
