@@ -134,6 +134,11 @@ function evidenceOf(outcome, model) {
     durationMs: outcome.durationMs,
     replyDelivered: outcome.replyDelivered === true,
     platformErrcode: typeof outcome.platformErrcode === "number" ? outcome.platformErrcode : null,
+    // Two-phase projection: which phase this line is and how the answer left.
+    phase: outcome.phase ?? undefined,
+    delivery: outcome.delivery ?? undefined,
+    requestId: outcome.requestId ?? undefined,
+    ackMs: typeof outcome.ackMs === "number" ? outcome.ackMs : null,
     inboundMessage: outcome.messageId ? hashId(outcome.messageId) : undefined,
     inboundChat: outcome.chatId ? hashId(outcome.chatId) : undefined,
   };

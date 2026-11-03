@@ -62,7 +62,12 @@ export function createWecomService({
   channel = createWecomChannel({
     runTurn: (input) => runner.runTurn(input),
     runResearch,
+    // Phase 1 answers inside the callback (`req_id`), phase 2 pushes the finished
+    // answer with `aibot_send_msg` on the same long connection.
     reply: (frame, text) => transport.reply(frame, text),
+    push: (input) => transport.send(input),
+    sessions,
+    ack: { enabled: config.ackEnabled, text: config.ackText },
     policy: {
       botName: config.botName,
       allowedUserIds: config.allowedUserIds,

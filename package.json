@@ -37,6 +37,8 @@
     "wecom:wait-inbound": "node scripts/agt-036/wecom-live.mjs --wait-inbound",
     "delivery:live": "node --env-file-if-exists=.env scripts/agt-036/delivery-live.mjs",
     "delivery:self-test": "node scripts/agt-036/delivery-live.mjs --self-test",
+    "two-phase:live": "node --env-file-if-exists=.env scripts/agt-036/two-phase-live.mjs",
+    "two-phase:self-test": "node scripts/agt-036/two-phase-live.mjs --self-test",
     "collaboration:evidence": "node scripts/agt-035/live-collaboration-evidence.mjs",
     "scheduler:poc": "node scripts/scheduler-poc-evidence.mjs"
   },

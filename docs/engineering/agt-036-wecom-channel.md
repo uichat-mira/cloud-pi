@@ -16,10 +16,10 @@
 | `policy.mjs` | 模型调用之前的路由判定（fail-closed）：非用户来源、非文本、单聊白名单、群聊必须先 `@<botName>` |
 | `dedupe.mjs` | 有界进程内去重（`msgid`，TTL 24h，上限 2048），在异步工作之前同步预留 |
 | `text.mjs` | 按 **UTF-8 字节** 分段（平台上限 20480 B），不切断多字节字符 |
-| `channel.mjs` | 每会话串行队列、`/stop` 取消、`/research` 注入、分段回复、结构化 outcome |
+| `channel.mjs` | 每会话串行队列、`/stop` 取消、`/research` 注入、**两段式回复**（立即 ack + 完成后 `aibot_send_msg` 推送）、分段回复、结构化 outcome |
 | `runtime.mjs` | 唯一的 Agent 执行面：`createAgentRuntime()` + 私有临时工作目录 + 空工具集 |
-| `transport.mjs` | 官方 SDK 薄封装：订阅/心跳/重连交给 SDK；本层负责回复帧、字节上限、频率限制、单聊推送拒绝、超时 |
-| `sessions.mjs` | 已知会话登记（`lastInboundAt`）：主动推送只允许已有入站会话 |
+| `transport.mjs` | 官方 SDK 薄封装：订阅/心跳/重连交给 SDK；本层负责回复帧、字节上限、频率限制、`chat_type` 显式透传、超时 |
+| `sessions.mjs` | 已知会话登记（命名空间键 `wecom:user:` / `wecom:group:`）：主动推送只允许已有入站会话 |
 | `instance.mjs` | 单实例锁：每机器人只允许一条长连接，第二个进程必须启动失败而不是把第一个踢掉 |
 | `service.mjs` / `server.mjs` / `index.mjs` | 装配、进程入口（JSON 行日志、退出码 0/1/2）、公开导出 |
 
@@ -45,6 +45,8 @@
 | `WECOM_HEARTBEAT_INTERVAL_MS` | 否 | `30000` | 官方建议 30s |
 | `WECOM_CONNECT_TIMEOUT_MS` | 否 | `20000` | 未完成认证即判启动失败 |
 | `WECOM_REPLY_MAX_BYTES` | 否 | `20000` | 单段字节预算，上限 20480 |
+| `WECOM_ACK_ENABLED` | 否 | `true` | 两段式 ack 开关；关闭退回"一次回调一次回复"（详见 §12） |
+| `WECOM_ACK_TEXT` | 否 | `已收到，正在处理…` | ack 文案（模板，非密钥） |
 | `WECOM_REPLY_TIMEOUT_MS` | 否 | `15000` | 单次发送/回复的硬超时 |
 
 `WECOM_WS_URL` 故意不写死：**实测**真实订阅端点是 `wss://openws.work.weixin.qq.com`（直连，不走代理；
@@ -329,13 +331,99 @@ npm run delivery:live -- --inbound-timeout-ms=600000
 缺口里，投递记录的 operator 视图与证据会把**原始 userid** 暴露出去。`maskDestination()` 现在检测
 "掩码后与原文相同"并回退到 `hashId()`（`id:xxxxxxxx`）。飞书 id 都远长于窗口，行为不变。
 
-## 12. 尚未验证 / 遗留
+## 12. 两段式回复：先 ack，再主动推送
+
+### 12.1 为什么必须两段
+
+回调帧里的 `req_id` 是**一次性、短时**的回复句柄：`replyStream(frame, …)` 只能在它过期前用它。
+实测（2026-11-04，t26 群聊观测）里，回调回复窗口只有数秒量级，而一次真实模型/研究运行常常是秒级到分钟级。
+把"等模型跑完再 `replyStream`"当成唯一出口，等于把长任务判死。
+
+因此通道改成两段：
+
+```text
+入站回调 ──┬─► phase 1  ack：立刻 replyStream(frame, "已收到，正在处理…")
+           │            （同一 req_id，秒内完成；<WECOM_ACK_TEXT> 可配）
+           └─► 排队运行（同一会话串行，/stop 可取消）
+                     │
+                     └─► phase 2  final：aibot_send_msg → 同一会话（chat_type 显式）
+```
+
+两条证据行（`phase: "ack"` / `phase: "final"`）带**同一个 `requestId`（回调 `req_id`）**和同一个
+哈希后的 `messageId`，可以无需求助第二个追踪系统就对起来。
+
+### 12.2 通道与目标（不凭空构造）
+
+| 入站 | 会话键 | `chat_type` |
+| --- | --- | --- |
+| 单聊 | `wecom:user:<userid>` | `1` |
+| 群聊 | `wecom:group:<chatid>` | `2` |
+
+- 推送目标**只来自产生这条入站的会话**：`channel.pushSegments()` 先查已知会话表
+  （`assertDeliverable({chatId, chatType})`），不通过就**不碰网络**，终态 `action=failed`、
+  `reason=no_prior_inbound`、`platformCode=93006`（平台"会话未知"语义）。会话键带命名空间，
+  同一字符串同时是 userid 和 chatid 时不会串。
+- 已知会话表仍由 service 在 `accepted` 时写入；通道自己**不写**，避免"自己给自己授权"。
+- 只有 `push` 已接线时才启用两段式；没有 push 的老路径（例如只注入 `reply` 的调用方）保持
+  "一次回调一次回复"，行为不变。
+
+### 12.3 字节预算（20480 / 40058）
+
+- 平台限制是 **UTF-8 字节**：`markdown.content ≤ 20480`。`splitForSend()` 按码点走、按字节停，
+  默认预算 20000（留续段后缀空间），单段永不跨 UTF-8 序列。
+- 推送前再显式校验一次 `Buffer.byteLength(segment) > 20480`：超限不硬发，报
+  `segment_too_large` + `platformCode=40058`（平台"内容超长"语义），并在可能时降级为分段。
+- `src/delivery/format.mjs` 的**按码点**默认值未改：飞书通道与投递契约不受影响。
+
+### 12.4 配置项
+
+| 环境变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `WECOM_ACK_ENABLED` | `true` | 关闭后退回"一次回调一次回复"（只适合秒回场景） |
+| `WECOM_ACK_TEXT` | `已收到，正在处理…` | ack 文案；按字节同样受 20480 限制 |
+| `WECOM_REPLY_MAX_BYTES` | `20000` | 单段预算（上限 20480） |
+
+**没有**实现"1.5 秒内完成就不发 ack"的合并模式：它需要"先跑模型、超时再回 ack"的反向时序，
+一旦模型比阈值慢就会**同时**触发 ack 和 final，用户仍会看到两条消息，却多了一条"可能不发"的
+不确定路径。默认不做，风险记录在此；若后续要做，应作为**默认关闭**的开关并补一条真实链路证据。
+
+### 12.5 离线验收
+
+```bash
+npm run test:wecom        # 105 个用例，含本节的 19 个
+```
+
+新增覆盖（`tests/agt-036-two-phase.test.mjs`、`tests/agt-036-two-phase-live.test.mjs`）：
+
+- ack 在模型返回**之前**发出（用 deferred 卡住模型，断言此时只有 ack）；
+- 群聊先剥 `@Mira` 再进模型；`@MiraBot` 不算提到 `Mira`（无模糊匹配）；
+- 剥离后为空 → 不调模型、直接在回调里回提示（`phase=hint`）；
+- 无已知会话 → 推送被拒（`93006`），网络零调用；
+- 长回答按字节分段，每段 ≤ 20480，emoji 不被劈开；
+- 单聊/群聊 `chat_type` 分别为 `1`/`2`（`tests/agt-036-live.test.mjs` 走真实 service 装配）；
+- 限流等推送异常映射为类型化失败码。
+
+### 12.6 真实链路验收入口
+
+```bash
+# 维护者：窗口内给机器人发一条消息（群或单聊均可）
+npm run two-phase:live -- --inbound-timeout-ms 600000 --expect-chat-type group
+# 自检（进程内假客户端；输出 real:false，不算 live 证据）
+npm run two-phase:self-test
+```
+
+判定：`ack` 行 `action=acked` 且 `ackMs ≤ --ack-deadline-ms`（默认 5000）；`final` 行
+`delivery=push`、`replyDelivered=true`；两行 `requestId` 相同。证据写到
+`.work/wecom-channel/two-phase-evidence.jsonl`（只含白名单投影与哈希 id）。
+
+## 13. 尚未验证 / 遗留
 
 | 项 | 状态 | 说明 |
 | --- | --- | --- |
 | **单聊主动投递（真实企业微信）** | **未验证（blocker）** | 代码路径 + 通道认证已就绪；2026-11-04 03:20–03:40 的 20 分钟窗口内无任何真实入站，harness 以退出码 1 诚实结束（未建调度、未发消息）。需维护者在窗口内给机器人发任意一条消息后重跑 `npm run delivery:live` |
 | 群聊主动投递 | 未验证 | 需要维护者提供一个测试群并把机器人拉进群；`wecom_chat` 分支离线已覆盖 |
-| 群内 `@` 前缀 | 未实现 | 属 t27（`@` 剥离与两段式 ack），本卡不重复实现 |
+| **两段式 ack→push（真实企业微信）** | **未验证（blocker）** | 离线链路 + 真实 service 装配（假客户端）全绿；真实群/单聊窗口内无入站，`two-phase:live` 未能产出 ack/final 两条真实证据。需维护者窗口内发一条消息后重跑 `npm run two-phase:live` |
+| 群内 `@` 前缀与空消息提示 | 已实现（离线） | 剥 `@<WECOM_BOT_NAME>`、无模糊匹配、剥离后为空回提示；真实群聊窗口未触发 |
 | 未知会话持久化 | 未做 | 已知会话表仍是进程内存；重启后需重新入站或显式开 `WECOM_DELIVERY_ALLOW_UNKNOWN_SESSION` |
 | 验收判据对接 | 已就绪 | dev 的 `scripts/agt-03x/b-scheduled-research-delivery.mjs` 是**只读裁判**（读 Management API + 磁盘），本卡的 harness 是**生产者**；`--offline` 自检 7/7 通过。裁判的 B2 还要求研究链路真的调用 Guanlan MCP 工具，属 t9/t28 的真实 Guanlan 接线范围 |
 
