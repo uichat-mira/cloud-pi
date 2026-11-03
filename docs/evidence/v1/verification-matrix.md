@@ -454,3 +454,37 @@ $ npm run check
 | guanlan `npm run check`、cloud-auth `pnpm run check` | **本轮未重跑** | 两仓自 B.6 无改动；本机 guanlan 无 `node_modules`（G3/G9 同类限制） |
 
 > 判读提醒：命令"能跑通"只证明**工具链可用**，不证明产品验收；判定仍以 §0 / §4 为准。
+
+## 附录 D：最小前置清单（把 t12 从 blocker 推到可执行）
+
+> 只写**路径级**需求，不写任何值。维护者按"动作"一列逐条做，就能让左侧命令从 blocker 变成可执行。
+> "没有它时的终点"是**实测**，不是估计。
+
+| # | 命令 / 场景 | 需要哪个凭证（路径级） | 维护者要做的一个动作 | 没有它时能跑到哪一步（实测） |
+| --- | --- | --- | --- | --- |
+| 1 | `npm run wecom:check` | `~/.mira-secrets/wecom.env`：`WECOM_BOT_ID`、`WECOM_BOT_SECRET`（可选 `WECOM_BOT_NAME`） | 把机器人凭据写进该文件（或传 `--secrets <path>`） | **已跑到终点**：exit 2 + `wecom_config_error`，`fields` 精确列出缺哪两个变量（fail-closed 已验证） |
+| 2 | `npm run wecom:wait-inbound`（A 场景入站） | 同上 | 用手机给机器人发一条单聊（"hi" 即可） | 无凭证：exit 2（**实测**）；有凭证但没人发消息时的超时行为**未验证**（不想在无凭证下猜）。**脚本只收不发** |
+| 3 | `npm run wecom:live`（A 场景真实驱动） | 第 1 行 + `D:\cloud-pi\.env` 的 `CLOUD_PI_MODEL_*`（provider / baseURL / model / key 共 6 项） | 同上，并同意一次真实模型计费 | 无凭证：启动即 exit 2；有凭证无入站：等待（不会自己造消息） |
+| 4 | `node scripts/agt-03x/a-wecom-live-reply.mjs --api … --evidence-in …` | 第 2/3 行产出的 `poc/evidence/agt-036-live.jsonl` + `GET /v1/runs/:runId` 可达 | 发一条消息（产生一个 run） | 无 JSONL / 无 runId：**blocker exit 3**（脚本设计如此，缺证据绝不返回 pass） |
+| 5 | `node scripts/agt-03x/b-scheduled-research-delivery.mjs --api … --schedule-id …` | 已真实触发过一次的 schedule + 对应 `run.json` | 在管理 API 建一个 schedule 并等它触发 | **当前到不了**：投递协调器只认飞书目标（`src/delivery/coordinator.mjs:324`），WeCom 目标被显式拒绝 → 依赖 t25 |
+| 6 | `node scripts/agt-03x/c-feishu-regression.mjs --live` | `D:\cloud-pi\.env`：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`ALLOWED_CHAT_IDS` | 授权一个测试群，并同意"发一条真实飞书消息" | 离线部分（C1/C2/C5/C6）**已可跑**；`--live` 无凭证 → blocker |
+| 7 | Guanlan 现签：`node %TEMP%\gln013-t23\mint.mjs …` | 非生产 Cloud Auth 的登录态 `%TEMP%\gln013-t23\session.txt`（维护者登录产物，不在仓库） | 在 `127.0.0.1:8788` 实例上完成一次登录，产出 `session.txt` | 无 session：`mint.mjs` 打印 `issue failed: <status>` 后 exit 1（状态码**未实测**，因当前 session 有效）；令牌文件缺失/过期：`mcp_credential_unavailable`（已实测） |
+| 8 | cloud-pi #30：`npm run mcp:probe` / `mcp:live` | `GUANLAN_MCP_URL`（隔离 Worker）、令牌文件路径（`GUANLAN_MCP_TOKEN_FILE`）、`GUANLAN_MCP_PROXY` | 给 Worker URL 与代理端口（**已具备**） | 无 env：`guanlan_mcp_config_error` exit 1；其余我已跑通（probe/live/expired/forged/audience 五种） |
+| 9 | 无需外部凭证：`api:smoke`、`entry-smoke`、`d-failure-modes`、`self-test --full`、六个 `test:*`、`npm test` | — | — | 已到 L1/L2（C.9 有逐条结果） |
+| 10 | guanlan `npm run check`、cloud-auth `pnpm run check` | 本机依赖（`node_modules` / `pnpm`） | 本机装依赖即可（无需凭证） | guanlan 本机缺 `node_modules` → 以 Ubuntu CI 为准；auth 已跑 204/136 |
+
+**维护者最短路径（3 个动作 + 1 次合并）**：
+① 往 `~/.mira-secrets/wecom.env` 写两行凭据；② 用手机给机器人发一条消息；③ 授权一个飞书测试群并允许发一条消息；
+④ 合并 t25（投递接线）——①②③ 解锁场景 A/C，④ 解锁场景 B。做完这四件，t12 的 A/B/C 就不再是 blocker。
+
+### D.1 附带的生成物保护结论（回应"确认 .gitignore 覆盖"）
+
+- 结论：**`.gitignore` 帮不上忙**——`docs/evidence/wecom-v1/offline-selftest.txt` 与 `poc/evidence/*.jsonl`
+  是**已跟踪（tracked）的证据文件**（`git ls-files` 可证），忽略规则对已跟踪文件无效。
+- 现在的风险是"跑一次自检就改写 tracked 证据"，而不是"未跟踪文件被误提交"。
+- 正确做法（三选一，都不改仓库语义）：
+  1. 复核用 `--out %TEMP%\selftest-<ts>.txt`（脚本原生支持 `--out`，`--no-write` 则完全不写）；
+  2. 跑完立刻 `git checkout -- docs/evidence/wecom-v1/offline-selftest.txt poc/evidence/*.jsonl`（我本轮就是这么做的）；
+  3. 要在仓库里留新证据时，**只在专门的分支/PR 里**更新，并让 diff 可见。
+- 建议（留给下一任顺手做）：在 `docs/evidence/wecom-v1/README.md` §7 加一句"`--full` 会重写 tracked transcript，
+  复核请用 `--out`"，比改 `.gitignore` 有效。
