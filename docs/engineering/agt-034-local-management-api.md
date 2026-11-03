@@ -6,6 +6,9 @@ Owning Issue: [#16](https://github.com/uichat-mira/cloud-pi/issues/16).
 Base: `origin/dev` at `fad03f8` (AGT-030 Scheduler and AGT-028 Research merged;
 AGT-033 delivery is **not** in this baseline).
 Branch: `feat/agt-034-local-management-api`.
+Draft PR: [#19](https://github.com/uichat-mira/cloud-pi/pull/19) → `dev`
+(head `d553123`). CI on that head: `test` pass, SonarCloud pass, CodeRabbit
+skipped; checks are evidence, not merge authority.
 
 This document records what the API actually does, how it stays a thin control
 plane, the exact local smoke evidence, and what remains unproven. It does not
