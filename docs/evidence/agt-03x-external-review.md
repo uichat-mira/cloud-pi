@@ -42,7 +42,7 @@
 | --- | --- | --- |
 | #134 | run `41674544974`：T1 Unit / T2 Contract / T3 Runtime / Static / Docker Runtime / Mira Gate 全 `success`；SonarCloud `success`；CodeRabbit `skipped` | 一致。正文与文档都没有宣称产品测试通过是本卡的证据（文档 §9 明写「未执行任何测试，引用测试文件只是现状覆盖」） |
 | #27 | run `41674550969`：`Repository Contract`（job 内执行 `bash scripts/check.sh`）/ `Branch Policy` / `Mira Gate` 全 `success` | 一致。文档 §0 明确写 `bash scripts/check.sh` **本机未执行**、CI 是权威环境 —— 而 CI 确实跑了并绿 |
-| #21 | `80a28d1` 上 `test` job `success`、SonarCloud `success`；`7765f92`（本轮校准）CI 另行重跑，判定以最终 head 为准 | 一致。PR 正文只列本机实测数字，未把 CI 当验收 |
+| #21 | `80a28d1` 与校准后的 `7765f92`：`test` job（run `41678146575`）与 SonarCloud 均 `success`；本次外审提交 `0a16e73` 的 CI run `41678746051` 同样 `success` | 一致。PR 正文只列本机实测数字，未把 CI 当验收 |
 
 > 没有任何一份交付把「未跑的测试」写成通过。
 
