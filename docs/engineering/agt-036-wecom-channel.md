@@ -515,8 +515,8 @@ API 字段"）。验收清单 T31-R1 若要按 run 记录抽检，需要单独�
 ### 13.4 离线验收
 
 ```bash
-npm test            # 723 个用例
-npm run test:wecom  # 124 个用例，含本节 9 个
+npm test            # 724 个用例
+npm run test:wecom  # 125 个用例，含本节 10 个
 ```
 
 新增覆盖（`tests/agt-036-experience-copy.test.mjs`）：提示词按 `chatType` 选择且群聊更短、

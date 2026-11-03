@@ -300,7 +300,34 @@ export function createWecomChannel({
       fireAck(event, startedAt);
     }, ackMergeMs);
     if (typeof timer.unref === "function") timer.unref();
-    pendingAckTimers.set(key, { timer, startedAt });
+    pendingAckTimers.set(key, { timer, startedAt, chatId: event.chatId });
+  }
+
+  /**
+   * Drop every ack still waiting in `chatId`'s merge window.
+   *
+   * Used when the conversation stops the work (`/stop`, shutdown): an ack that
+   * arrives after "已停止当前任务。" would be a second, contradictory message.
+   */
+  function cancelAcksForChat(chatId, reason) {
+    if (chatId === undefined) return 0;
+    let cancelled = 0;
+    for (const [key, pendingAck] of pendingAckTimers) {
+      if (pendingAck.chatId !== chatId) continue;
+      clearTimeout(pendingAck.timer);
+      pendingAckTimers.delete(key);
+      cancelled += 1;
+    }
+    if (cancelled > 0) {
+      emit({
+        action: "ack_suppressed",
+        phase: "ack",
+        reason,
+        mergeMs: ackMergeMs,
+        chatIdHash: hashId(chatId),
+      });
+    }
+    return cancelled;
   }
 
   /**
@@ -648,6 +675,7 @@ export function createWecomChannel({
         return emit({ action: "cancelled", reason: "stop_command", status: "cancelled", ...baseOutcome(event) });
       }
       log({ level: "error", event: "wecom_run_failed", code: String(error?.code ?? error?.name ?? "error") });
+      cancelPendingAck(event, { durationMs: Date.now() - started });
       const sent = await deliver(event, WECOM_REPLIES.failure);
       return emit({
         action: "failed",
@@ -671,6 +699,8 @@ export function createWecomChannel({
     epochs.set(event.chatId, (epochs.get(event.chatId) ?? 0) + 1);
     const queued = queues.get(event.chatId);
     if (queued) dropQueued(queued);
+    // A pending ack for the stopped message must not arrive after the stop reply.
+    cancelAcksForChat(event.chatId, "stopped_before_answer");
     if (active) {
       active.stopped = true;
       active.controller.abort();

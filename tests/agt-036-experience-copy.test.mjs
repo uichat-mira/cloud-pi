@@ -257,6 +257,34 @@ test("ack: a slow chat and a research command are acknowledged, with the long-ta
   await research.channel.dispose();
 });
 
+test("ack: /stop cancels a pending ack so nothing follows the stop reply", async () => {
+  const { channel, replies, outcomes } = buildChannel({
+    ack: { mergeMs: 5_000 },
+    runTurn: async ({ signal }) =>
+      new Promise((resolve) => {
+        signal.addEventListener("abort", () => resolve({ status: "cancelled", text: "" }), { once: true });
+      }),
+  });
+
+  channel.handleEvent({ frame: singleFrame({ text: "慢慢查", msgId: "m1" }) });
+  await settle();
+  assert.equal(replies.length, 0, "the ack is still inside its merge window");
+
+  channel.handleEvent({ frame: singleFrame({ text: "/stop", msgId: "m2" }) });
+  await channel.whenIdle();
+  await settle();
+
+  assert.deepEqual(
+    replies.map((reply) => reply.text),
+    [WECOM_REPLIES.stopped],
+  );
+  const suppressed = outcomes.find(
+    (entry) => entry.action === "ack_suppressed" && entry.reason === "stopped_before_answer",
+  );
+  assert.ok(suppressed);
+  await channel.dispose();
+});
+
 test("copy: an empty model answer asks again instead of showing a placeholder", async () => {
   const { channel, pushes } = buildChannel({ runTurn: async () => ({ status: "succeeded", text: "   " }) });
   channel.handleEvent({ frame: singleFrame() });
