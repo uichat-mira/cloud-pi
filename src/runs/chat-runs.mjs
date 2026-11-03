@@ -11,8 +11,26 @@
  * are never written. A chat run stores a masked chat id and token counts only.
  */
 import { join } from "node:path";
+import { hashId } from "../channels/wecom/config.mjs";
 import { CONTRACT_VERSION, RUN_STATUS } from "../research/contracts.mjs";
 import { createRunStore, isValidRunId, resolveRunsRoot } from "../research/run-store.mjs";
+
+/**
+ * A channel-outcome chat id is the platform's own identifier (`userid`, `chatid`,
+ * `open_id`); it is never written as-is. Enterprise `userid` values are stable
+ * employee identifiers, so this uses the repository's truncated-hash helper
+ * rather than a head/tail mask.
+ *
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function maskedChatId(value) {
+  if (typeof value !== "string" || value.length === 0) return null;
+  // Already-projected ids (`id:…`) are kept verbatim so re-projection stays idempotent.
+  if (value.startsWith("id:")) return value;
+  const hashed = hashId(value);
+  return hashed.startsWith("id:") ? hashed : `id:${hashed}`;
+}
 
 /** Channel outcome status → persisted run status. */
 const STATUS_MAP = Object.freeze({
@@ -62,17 +80,19 @@ export function toChatRunRecord({ outcome, channel, now = () => new Date() }) {
     // Additive channel facts (the research keys above are unchanged).
     channel,
     chatType: typeof outcome?.chatType === "string" ? outcome.chatType : null,
-    chatIdMasked: typeof outcome?.chatId === "string" ? outcome.chatId : null,
+    chatIdMasked: maskedChatId(outcome?.chatId),
     reply: {
       delivered: outcome?.replyDelivered === true,
       segments: Number.isFinite(outcome?.segments) ? outcome.segments : null,
       segmentsDelivered: Number.isFinite(outcome?.segmentsDelivered) ? outcome.segmentsDelivered : null,
     },
+    // Same token vocabulary as a research run's `runtime.usage`, so the API
+    // projection (`inputTokens`/`outputTokens`/`totalTokens`) applies unchanged.
     usage: usage
       ? {
-          input: Number.isFinite(usage.input) ? usage.input : 0,
-          output: Number.isFinite(usage.output) ? usage.output : 0,
-          total: Number.isFinite(usage.total) ? usage.total : 0,
+          inputTokens: Number.isFinite(usage.input) ? usage.input : 0,
+          outputTokens: Number.isFinite(usage.output) ? usage.output : 0,
+          totalTokens: Number.isFinite(usage.total) ? usage.total : 0,
         }
       : null,
     paths: { ...BASE_PATHS },

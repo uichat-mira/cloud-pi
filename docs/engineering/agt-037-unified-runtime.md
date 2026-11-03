@@ -60,7 +60,24 @@ AGT-037 的「全链路 Trace」只有一个要求：**同一个 `runId` 能从�
 - 为了让聊天 `runId` 能被 run store 寻址，`createAgentRuntime()` 接受可注入的 `generateRunId`（默认仍是 `randomUUID()`），通道运行器把它透传下去。**这没有新增存储平台，也没有第二个 id 空间**：`GET /v1/runs/<id>` 对研究与聊天 run 是同一个路由。
 - 研究与聊天共用 `/v1/runs/:id` 的既有视图；研究响应字段不变（`toRunView` 对缺失字段容错），因此既有调用方无需改动。
 
-真实链路证据的配对方式（t12 场景 A）：`npm run wecom:live` 打印的结果行里带 `runId`，紧接着 `curl /v1/runs/<同一个 runId>` 能取到记录。**在拿到维护者机器人凭据并实际跑通之前，这条配对不算被验证**；本卡只用测试证明「同一 runId 在 store/API/触发/投递之间一致」。
+真实链路证据的配对方式（t12 场景 A）：`npm run wecom:live` 打印的结果行里带 `runId`，紧接着 `curl /v1/runs/<同一个 runId>` 能取到记录。
+
+**已验证（2026-11-04，真实企业微信单聊）**：统一入口以真实凭证启动（`--channels wecom`），维护者发一条单聊消息 →
+
+```text
+wecom_channel_outcome action=replied runId=r-20261103T182348-e476ad status=succeeded
+  durationMs=2510 segments=1 segmentsDelivered=1 replyDelivered=true platformErrcode=0
+GET /v1/runs/r-20261103T182348-e476ad → 200
+  {runId:"r-20261103T182348-e476ad", status:"completed", durationMs:2510,
+   request:{topic:"chat message"},
+   chat:{channel:"wecom", chatType:"single", chatIdMasked:"id:2365fc21",
+         usage:{inputTokens:200,outputTokens:6,totalTokens:718},
+         reply:{delivered:true,segments:1,segmentsDelivered:1}}}
+```
+
+同一 `runId` 从通道结果行到 run store 到管理 API 全程一致，且聊天字段可读。原始 WeCom `userid` 从不落盘（只存 `hashId` 后的 `id:…`）。
+
+**投影是加法的**：`toRunView()` 新增 `chat` 字段，仅当记录带 `channel` 时填充；研究 run 的 `chat` 为 `null`，既有研究字段与响应不变。
 
 ## 7. 幂等
 
@@ -76,10 +93,10 @@ AGT-037 的「全链路 Trace」只有一个要求：**同一个 `runId` 能从�
 
 ## 9. 已知边界（不夸大）
 
-1. **群 `@` 与企业微信主动推送**：真实观测表明群消息没有结构化 mention，只有正文前缀 `@<bot 显示名>`；且 `req_id` 限时，长任务必须「ack + 最终推送」两段式。这是 AGT-036 的修正范围，将作为 follow-up PR 落地：ack 由通道层立即发（不等 runtime），最终结果用 `aibot_send_msg` 主动推送，目标只能来自已有入站会话。本卡入口无需改动即可承载该形态。
-2. **调度投递到企业微信目标**：当前投递协调器只支持飞书目标（AGT-036 W1 已让 WeCom 目标被明确拒绝而不是误投）。WeCom 目标的投递接线是后续卡。
-3. **真实机器人凭据**：维护者提供前，t12 的真实端到端验收无法进行；`npm run start:check` 与 `--channels none` 形态可先验证配置与生命周期。
-4. **Windows 信号投递**：见第 5 节。
+1. **群 `@` 与企业微信主动推送**：真实观测表明群消息没有结构化 mention，只有正文前缀 `@<bot 显示名>`；且 `req_id` 限时，长任务必须「ack + 最终推送」两段式。这是 AGT-036 的修正范围，已派为独立工作项（t27）：ack 由通道层立即发（不等 runtime），最终结果用 `aibot_send_msg` 主动推送，目标只能来自已有入站会话。本卡入口无需改动即可承载该形态。
+2. **调度投递到企业微信目标**：当前投递协调器只支持飞书目标（AGT-036 W1 已让 WeCom 目标被明确拒绝而不是误投）。WeCom 目标的投递接线是后续卡（t25）。
+3. **真实机器人凭据**：已由维护者提供并用于第 6 节的真实单聊验证；群 `@` 仍需测试群与 `WECOM_BOT_NAME`（已配置 `Mira`）。
+4. **Windows 信号投递**：见第 5 节。真实运行时的 drain 用 `scripts/agt-037/live-drain.mjs`（同一 `app.stop()`，真 WeCom 连接 + 真 API）验证：`drained:true, channels:{wecom:true}, exitCode:0`。
 
 ## 10. 验证
 

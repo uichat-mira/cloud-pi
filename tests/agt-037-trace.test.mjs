@@ -1,6 +1,5 @@
-/**
- * AGT-037 T3/T4: one `runId` spans channel run → run store → schedule trigger →
- * delivery record, and the loopback management API resolves the same run.
+﻿/**
+ * AGT-037 T3/T4: one `runId` spans channel run 鈫?run store 鈫?schedule trigger 鈫? * delivery record, and the loopback management API resolves the same run.
  *
  * The external platform boundary (Feishu send, model call) is faked; the run
  * store, the scheduler, the delivery store/coordinator and the API are real.
@@ -32,7 +31,7 @@ test("chat runs: the record reuses the run-store schema and stores no content", 
     runId: "r-20261104T010000-abcdef",
     durationMs: 1234,
     chatType: "single",
-    chatId: "id:9f8e7d",
+    chatId: "dj-fixture-user",
     replyDelivered: true,
     segments: 2,
     segmentsDelivered: 2,
@@ -43,13 +42,15 @@ test("chat runs: the record reuses the run-store schema and stores no content", 
   assert.equal(record.status, "completed");
   assert.equal(record.request.topic, "chat message");
   assert.equal(record.request.channel, "wecom");
-  assert.deepEqual(record.usage, { input: 11, output: 22, total: 33 });
+  assert.deepEqual(record.usage, { inputTokens: 11, outputTokens: 22, totalTokens: 33 });
   assert.equal(record.reply.delivered, true);
   assert.equal(record.durationMs, 1234);
   // No message body, sender id or raw chat id anywhere in the record.
   const serialized = JSON.stringify(record);
   assert.equal(serialized.includes("hello"), false);
-  assert.equal(record.chatIdMasked, "id:9f8e7d");
+  // The channel outcome carries the platform's raw id; only its hash may persist.
+  assert.match(record.chatIdMasked, /^id:[0-9a-f]+$/);
+  assert.equal(record.chatIdMasked.includes("fixture"), false, "a raw chat id must never reach the run store");
 
   // A run id the store cannot address is refused rather than re-keyed.
   assert.equal(toChatRunRecord({ outcome: { ...outcome, runId: "not-a-run-id" }, channel: "wecom" }), null);
@@ -94,7 +95,7 @@ test("chat runs: a recorded turn is readable from the same run store by id", asy
   );
 });
 
-test("trace: schedule trigger → run → delivery all carry one runId and the API reads it back", async (t) => {
+test("trace: schedule trigger 鈫?run 鈫?delivery all carry one runId and the API reads it back", async (t) => {
   const root = await tempDir(t);
   const runsDir = join(root, "runs");
   const clock = createFakeClock("2026-11-03T00:00:00Z");
@@ -158,6 +159,38 @@ test("trace: schedule trigger → run → delivery all carry one runId and the A
   const runView = await get(`/runs/${runId}`);
   assert.equal(runView.status, 200);
   assert.equal(runView.body.data.run.runId, runId);
+
+  // The chat facts are part of the same projection (AGT-037): without them the
+  // runId would be readable but the record would not prove it was a chat turn.
+  const chatRecord = await (async () => {
+    const recorder = createChatRunRecorder({ rootDir: runsDir, env: {} });
+    const id = await recorder.record(
+      {
+        status: "succeeded",
+        runId: "r-20261103T010500-abcdef",
+        durationMs: 7,
+        chatType: "single",
+        chatId: "djtest-user",
+        replyDelivered: true,
+        segments: 1,
+        segmentsDelivered: 1,
+        usage: { input: 2, output: 3, total: 5 },
+      },
+      { channel: "wecom" },
+    );
+    assert.equal(id, "r-20261103T010500-abcdef");
+    const view = await get(`/runs/${id}`);
+    return { status: view.status, run: view.body?.data?.run };
+  })();
+  assert.equal(chatRecord.status, 200);
+  assert.equal(chatRecord.run.chat.channel, "wecom");
+  assert.equal(chatRecord.run.chat.chatType, "single");
+  assert.equal(chatRecord.run.chat.reply.delivered, true);
+  assert.deepEqual(chatRecord.run.chat.usage, { inputTokens: 2, outputTokens: 3, totalTokens: 5 });
+  assert.match(chatRecord.run.chat.chatIdMasked, /^id:[0-9a-f]+$/);
+  assert.equal(JSON.stringify(chatRecord.run).includes("djtest-user"), false);
+  // A research run keeps `chat: null`: the projection is additive, not a rewrite.
+  assert.equal(runView.body.data.run.chat, null);
 
   const scheduleView = await get("/schedules/trace-daily");
   assert.equal(scheduleView.status, 200);
