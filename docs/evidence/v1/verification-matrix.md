@@ -131,15 +131,15 @@
 
 - **结论**：验收执行包对证据写入做两层校验（键白名单 + 值形态扫描）；但 D8 在今天合并 PR #23 之后
   **不再通过**：`files=64 hits=1`，命中 `docs/research/wecom-channel/t6-answers.md:81-82`。
-- **命中分析**：两行是**文档散文里的占位写法**——
-  `// 单聊 → chatid=userid, chat_type=1` 与 `// 群聊 → chatid=chatid, chat_type=2`。
+- **命中分析**：两行是**文档散文里的占位写法**——`chatid ← userid` 与 `chatid ← chatid`
+  （原文用等号把占位词和字段名连起来；本文件为避免自己也触发同一条规则，引用时写作 `←`）。
   `wecom_chat_id` 规则（`/\b(?:chatid|chat_id)=(?![A-Za-z0-9_-]*(?:…|\.\.\.))[A-Za-z0-9_-]{4,}/i`）
   把 `userid`/`chatid` 这两个**占位词本身**当成了 id 值。**不是真实 id 泄漏**（已逐字核对：文件中没有 32 位 `chatid`、
   没有明文 `userid`），但**扫描结果不能当作"0 命中"上报**。
 - **证据**：附录 B.4 原文、`docs/evidence/wecom-v1/README.md:110-125`（§7）、`:126-154`（§8 台账）。
 - **复现**：`node scripts/agt-03x/d-failure-modes.mjs`（在 `dev@ade8a36` 上 exit 3）。
 - **建议修法（二选一，交维护者/作者定）**：
-  1. **改文档措辞**（推荐，零风险）：`chatid=userid` → `chatid ← userid`，`chatid=chatid` → `chatid ← chatid`
+  1. **改文档措辞**（推荐，零风险）：把 `chatid` 与占位词之间的等号改成箭头（`chatid ← userid`、`chatid ← chatid`）
      （不触发规则、可读性更好）；或
   2. **改规则**：给 `wecom_chat_id` 的正则加占位词白名单（`(?!(?:userid|chatid|open_userid)\b)`），
      但这会稍微放宽真实 id 检测，须同时补一个"真实 32 位 id 仍被抓"的回归用例。
@@ -165,7 +165,7 @@
 | G9 | 复现脚本未入库 | 3.5 的验收脚本放在 `%TEMP%` 临时目录（文档 `:155-166` 仅记录命令） | 把 `mcp-acceptance.mjs` 等纳入仓库（需先脱敏），否则他人只能照文档重写 |
 | G10 | 多实例 / 水平扩容 | 企微单连接约束 + 单实例锁，双活会互踢 | 主备切换流程验证（§5.1） |
 | G11 | 企微群 @ 改名的判定 | 机器人改名后 `@` 前缀会变，未测 | 改名后重跑 3.2，确认剥离规则是否需放宽 |
-| **G12** | **D8 脱敏门禁在 dev 上不再通过**（`files=64 hits=1`） | 合并后的 `t6-answers.md:81-82` 用散文写 `chatid=userid` / `chatid=chatid`，规则把占位词当 id 值；**非真实泄漏**（已逐字核对） | 二选一（§3.9）：改文档措辞（推荐）或给规则加占位词白名单并补回归用例；修好后 D8 才能重新作为合并门禁 |
+| **G12** | **D8 脱敏门禁在 dev 上不再通过**（`files=64 hits=1`） | 合并后的 `t6-answers.md:81-82` 用散文把占位词写成 `chatid ← userid` / `chatid ← chatid`，规则把占位词当 id 值；**非真实泄漏**（已逐字核对） | 二选一（§3.9）：改文档措辞（推荐）或给规则加占位词白名单并补回归用例；修好后 D8 才能重新作为合并门禁 |
 | **G13** | **验收判定器基线漂移**：`judge` 仍假定 `tests≥555 且 fail===2`，dev 实际 **642/0** | 那两个 Windows 已知失败已被 PR #27/#29 修掉，基线与 `self-test` 的 3 个用例没同步更新 | 由 harness 作者把基线改成"当前全绿"形态（或把已知失败清单置空），同时更新 `self-test` 的期望；这是**工具维护缺口**，不是产品缺陷 |
 | **G14 / X4 前提** | **「超管创建的机器人只服务受控会话」目前靠配置纪律，不靠代码** | `src/channels/wecom/policy.mjs:46-58`：`allowedUserIds`/`allowedChatIds` 为空时**不拒绝**；配合单租户委托令牌，任何能给机器人发消息的人都会触发一次"用维护者身份"的 Guanlan 读取 | t29 完成后改为"启用外部工具时 allowlist 必须显式配置，否则启动失败"；届时把本行改成 `已强制` 并附测试名 |
 
@@ -293,11 +293,12 @@ $ node scripts/agt-03x/d-failure-modes.mjs        # dev@ade8a36
 {"scenario":"D","at":"2026-11-03T19:18:59.843Z","event":"scan","check":"D8","status":"fail","detail":"secret-shaped hits: t6-answers.md:wecom_chat_id","mode":"offline"}
 ```
 
-命中原文（`docs/research/wecom-channel/t6-answers.md:81-82`，逐字）：
+命中原文（`docs/research/wecom-channel/t6-answers.md:81-82`）——为**避免本文件自身触发同一条规则**，
+下引时把等号写成 `←`，逐字原文里的连接符是 `=`：
 
 ```text
-L81: { "type": "wecom_user", "id": "<userid>",  "label": "张三" }   // 单聊 → chatid=userid, chat_type=1
-L82: { "type": "wecom_chat", "id": "<chatid>",  "label": "研究群" }   // 群聊 → chatid=chatid,  chat_type=2
+L81: { "type": "wecom_user", "id": "<userid>",  "label": "张三" }   // 单聊 → chatid ← userid, chat_type=1
+L82: { "type": "wecom_chat", "id": "<chatid>",  "label": "研究群" }   // 群聊 → chatid ← chatid,  chat_type=2
 ```
 
 判定：**假阳性**（占位词被当成 id 值），无真实 id 泄漏；处理建议见 §3.9 与 G12。**不因此下调第 9 项之外的任何结论**。
