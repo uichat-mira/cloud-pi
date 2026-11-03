@@ -488,3 +488,5 @@ $ npm run check
   3. 要在仓库里留新证据时，**只在专门的分支/PR 里**更新，并让 diff 可见。
 - 建议（留给下一任顺手做）：在 `docs/evidence/wecom-v1/README.md` §7 加一句"`--full` 会重写 tracked transcript，
   复核请用 `--out`"，比改 `.gitignore` 有效。
+- **给下一任的一句话**：`.gitignore` 拦不住对**已跟踪**证据的改写——能拦住它的只有 `--out` / `--no-write`，
+  以及"要留新证据就走独立分支/PR 让 diff 可见"。不要用"加一条忽略规则"来假装这个问题已经解决。
