@@ -90,6 +90,18 @@ AGT-035 只补这一层，并且不碰任何已合并合同：
 - 管理 API：`GET /v1/runs/:runId/delivery` 200，逐目标读回 `status/attempts/
   deliveryKind/messageId`；读回期间发送守卫触发 **0** 次。
 
+### 4.3 第三轮：只投群、脚本自校验全绿
+
+- 目标：`--group-only`，1 个目标（群），无需维护者再发私聊。
+- 研究：`completed_with_errors`，86,076ms，报告 7,748 字符，114,923 tokens，
+  错误码 `budget_exceeded`（token 预算到顶，不是网络或工具失败）。
+- 投递：1/1 `sent`，`deliveryKind=report_partial`，2 段，`attempts=1`。
+- 幂等：`2 → 2`；管理 API 读回 200 且 `ok=true`、`deliveryCapability=true`。
+
+**结论**：当前研究循环的稳定终态是 `partial`（模型持续研究直到预算/轮次边界，
+而不是自行 finish），因此 `partial` 是这一路径的诚实常态，不是偶发异常；
+要拿到 `completed` 全绿样本需要先改研究层的收尾指令，属 AGT-028 范围。
+
 ## 5. 复现
 
 ```bash
@@ -109,7 +121,8 @@ RESEARCH_HTTPS_PROXY=http://127.0.0.1:1080 \
 
 ## 6. 未证明 / 已知限制
 
-- 本轮部分完成：研究报告按 `partial` 投递（`model_error`），尚无 `completed` 全绿样本。
+- 本轮三份样本均为 `partial`（`model_error` / `budget_exceeded`），尚无 `completed`
+  全绿样本；报告内容完整可读，状态标注如实反映失败轮次。
 - 出网依赖代理：直连外网会超时并把运行预算耗尽；这是环境事实，不是本卡代码路径，
   但复现 Live 研究时必须显式设置 `RESEARCH_HTTPS_PROXY`。
 - 研究卡点未在 `src/research/` 侧定位（该模块已合并，本卡未修改）：需要单独缺口卡
