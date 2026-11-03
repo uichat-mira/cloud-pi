@@ -144,7 +144,7 @@ Internal API (`createScheduler(options)`):
 | Operation | Method | Notes |
 | --- | --- | --- |
 | create | `createSchedule(input)` | Validates and writes atomically; computes first fire. |
-| load | `createScheduler()` / `load()` | Loads every definition; no timer starts. |
+| load | `createScheduler()` / `load()` | **Startup/idle-only.** Loads every definition; no timer starts. Returns `scheduler_busy` while the tick loop runs or a run/tick is in flight instead of hot-reloading the in-memory map. |
 | enable | `enable(id)` | Recomputes after `now`; records a `missed` audit trigger if a window was skipped. |
 | pause | `pause(id)` | Stops firing; keeps `nextRunAt` for visibility. |
 | run-now | `runNow(id)` | Starts one run immediately; works while paused/completed; does not consume the next occurrence. |

@@ -455,3 +455,62 @@ test("T2 an explicit startResearch call in recovery never runs the executor itse
   // The once occurrence was claimed before the crash, so it is not fired again.
   assert.equal(recovered.status, "completed");
 });
+
+test("T2 load() is idle-only: refused while a run is active, usable after it finishes", async (t) => {
+  const clock = createFakeClock("2026-11-03T00:00:00Z");
+  const deferred = deferredPort();
+  const completed = completedPort();
+  let calls = 0;
+  const port = scriptedRuntimePort((spec) => {
+    calls += 1;
+    return calls === 1 ? deferred.port.runAgent(spec) : completed.runAgent(spec);
+  });
+  const { scheduler } = await makeScheduler(t, clock, port);
+  await createDaily(scheduler, "reload-idle-daily");
+  clock.set("2026-11-03T01:00:00Z");
+
+  const tickPromise = scheduler.tick();
+  await deferred.started;
+
+  await assert.rejects(scheduler.load(), (error) => {
+    assert.ok(error instanceof SchedulerError);
+    assert.equal(error.code, "scheduler_busy");
+    return true;
+  });
+  // The live map still owns the lease the running execution will release.
+  assert.ok(scheduler.getSchedule("reload-idle-daily").activeTrigger);
+
+  deferred.finish("completed");
+  await tickPromise;
+
+  await scheduler.load();
+  const reloaded = scheduler.getSchedule("reload-idle-daily");
+  assert.equal(reloaded.activeTrigger, null);
+  assert.equal(reloaded.lastRun.status, TRIGGER_STATUS.SUCCEEDED);
+  assert.equal(reloaded.nextRunAt, "2026-11-04T01:00:00.000Z");
+
+  // The reloaded instance is not stuck: the next occurrence still fires.
+  clock.set("2026-11-04T01:00:00Z");
+  const next = await scheduler.tick();
+  assert.equal(next.triggered.length, 1);
+  assert.equal(next.triggered[0].status, TRIGGER_STATUS.SUCCEEDED);
+  assert.equal(calls, 2);
+});
+
+test("T2 load() is refused while the tick loop runs and allowed after stop", async (t) => {
+  const clock = createFakeClock("2026-11-03T00:00:00Z");
+  const { scheduler } = await makeScheduler(t, clock, completedPort());
+  await createDaily(scheduler, "reload-running-daily");
+  await scheduler.start({ tickIntervalMs: 60_000 });
+  t.after(() => scheduler.stop({ abortActive: false }));
+
+  await assert.rejects(scheduler.load(), (error) => {
+    assert.ok(error instanceof SchedulerError);
+    assert.equal(error.code, "scheduler_busy");
+    return true;
+  });
+
+  await scheduler.stop({ abortActive: false });
+  await scheduler.load();
+  assert.equal(scheduler.getSchedule("reload-running-daily").activeTrigger, null);
+});

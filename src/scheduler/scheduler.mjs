@@ -129,12 +129,26 @@ class Scheduler {
     return this._store.rootDir;
   }
 
-  /** Re-read every schedule from disk. Does not recover leases or fire anything. */
+  /**
+   * Re-read every schedule from disk. Does not fire anything.
+   *
+   * Startup / idle-only. The reload replaces every in-memory schedule object,
+   * so it must not overlap an execution that is already under way: that run
+   * keeps the previous object, releases its lease against it and writes that
+   * object to disk, while this instance would still hold the reloaded copy —
+   * including its stale `activeTrigger` — and skip the schedule from then on.
+   * A busy instance gets `scheduler_busy` instead of a hot reload. Lease
+   * recovery stays the job of `start()`, which runs again after a reload.
+   */
   async load() {
     this._assertUsable();
-    const records = await this._store.list();
-    this._schedules = new Map(records.map((record) => [record.scheduleId, record]));
-    return this;
+    return this._withStateLock(async () => {
+      this._assertIdle("load()");
+      const records = await this._store.list();
+      this._schedules = new Map(records.map((record) => [record.scheduleId, record]));
+      this._recovered = false;
+      return this;
+    });
   }
 
   listSchedules() {
@@ -404,6 +418,21 @@ class Scheduler {
 
   _assertUsable() {
     if (this._disposed) throw new SchedulerError(SCHEDULER_ERROR.CONFLICT, "scheduler is disposed");
+  }
+
+  /**
+   * Guard for operations that require a startup/idle instance. A running tick
+   * loop, a claimed global slot, a live controller or pending background work
+   * all mean some execution still owns the current in-memory schedule objects.
+   */
+  _assertIdle(operation) {
+    const busy =
+      this._running || !this._slotFree || this._controllers.size > 0 || this._background.size > 0;
+    if (!busy) return;
+    throw new SchedulerError(
+      SCHEDULER_ERROR.BUSY,
+      `${operation} is only allowed while the scheduler is idle; stop it and let active work settle first`,
+    );
   }
 
   _now() {
