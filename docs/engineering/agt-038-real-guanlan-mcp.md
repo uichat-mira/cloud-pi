@@ -105,7 +105,8 @@ run: status=succeeded  durationMs=9926  usage{input:596,output:364}
    +CAS 的端到端验证（本卡只读范围）。
 2. **真实长 run 跨 TTL**：用可注入时钟的单测覆盖，没有在真实网关上跑几分钟去"顺便验证"（避免把
    TTL 失败与网络失败混在一起）。
-3. **runId 形态**：本分支继承 `dev`，运行时自生成 UUID；`r-…` 形态来自另一分支的改动，合并后一致。
+3. **runId 形态**：合并 `dev`（含 t7 统一入口）后实测为 run-store 形态 `r-20261103T190201-1a7caf`；
+   本次证据即用该 id。
 4. **`dev` 上两条 Windows-only 既有失败**（`resolveRunsRoot` 的 POSIX 路径、`REPO_ROOT` 跨盘
    `relative`）与本卡无关，修复在另一分支；Linux CI 不受影响。
 5. **模型在无工具时会输出伪工具标记**（如 `||DSML|| invoke bash`）：本卡用 `mcp_server_unavailable`
@@ -114,7 +115,7 @@ run: status=succeeded  durationMs=9926  usage{input:596,output:364}
 ## 7. 验证命令
 
 ```bash
-npm test                     # 全仓；本卡新增 18 条（15 单测 + 3 集成）
+npm test                     # 全仓 660/660；本卡新增 18 条（15 单测 + 3 集成）
 npm run test:mcp             # 仅 AGT-038
 npm run mcp:probe            # 真实端点：连接 + tools/list（不调模型）
 npm run mcp:live             # 真实模型 + 真实 MCP：--mode=happy|expired|forged|audience-mismatch
