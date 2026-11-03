@@ -402,10 +402,13 @@ test("budget exhaustion refuses calls and records budget_exceeded", async (t) =>
   assert.deepEqual(sources.map((source) => source.url), ["https://example.com/one"]);
 });
 
-test("maxTotalPageChars refuses further page reads", async (t) => {
+test("maxTotalPageChars refuses an oversized body before the model sees it and blocks further reads", async (t) => {
   const rootDir = await tempRoot(t);
   const port = scriptedPort(async ({ call, toolCalls }) => {
-    await call(TOOL.READ_PAGE, { url: "https://example.com/a" });
+    const oversized = await call(TOOL.READ_PAGE, { url: "https://example.com/a" });
+    assert.equal(oversized.isError, true);
+    assert.match(oversized.content[0].text, /budget_exceeded/);
+    assert.doesNotMatch(oversized.content[0].text, /page ok/);
     await call(TOOL.READ_PAGE, { url: "https://example.com/b" });
     return { status: "completed", text: LONG_REPORT, usage: USAGE, toolCalls };
   });
@@ -459,7 +462,8 @@ test("model-claimed URLs never reach the source ledger", async (t) => {
     { topic: "provenance" },
     { runtimePort: port, toolLayer: fixtureToolLayer(), rootDir },
   );
-  assert.equal(record.status, RUN_STATUS.COMPLETED);
+  assert.equal(record.status, RUN_STATUS.COMPLETED_WITH_ERRORS);
+  assert.ok(record.errors.some((error) => error.phase === "citations"));
   const { report, sources } = await readResearchRun(record.runId, { rootDir });
   // The model's text may contain the invented URL, but it must never become a source.
   assert.ok(!JSON.stringify(sources).includes("fake.example"));
@@ -613,8 +617,9 @@ test("startResearch returns the run id while run.json says running", async (t) =
   await startedPromise;
   release();
   const finished = await done;
-  assert.equal(finished.status, RUN_STATUS.COMPLETED);
-  assert.equal((await store.readRun(runId)).status, RUN_STATUS.COMPLETED);
+  // The scripted report cites [S1] without ever fetching a source.
+  assert.equal(finished.status, RUN_STATUS.COMPLETED_WITH_ERRORS);
+  assert.equal((await store.readRun(runId)).status, RUN_STATUS.COMPLETED_WITH_ERRORS);
 });
 
 test("listResearchRuns returns newest first", async (t) => {
@@ -686,7 +691,7 @@ test("the real research tool layer is accepted by the executor (no tool call, no
     return { status: "completed", text: LONG_REPORT, usage: USAGE, toolCalls };
   });
   const record = await executeResearch({ topic: "real tool definitions" }, { runtimePort: port, toolLayer, rootDir });
-  assert.equal(record.status, RUN_STATUS.COMPLETED);
+  assert.equal(record.status, RUN_STATUS.COMPLETED_WITH_ERRORS, "an unsupported [S1] citation must not pass as fully completed");
   assert.equal(record.tools.calls.length, 0);
 });
 
@@ -737,7 +742,7 @@ test("omitting toolLayer wires the production tool layer lazily", async (t) => {
     return { status: "completed", text: LONG_REPORT, usage: USAGE, toolCalls };
   });
   const record = await executeResearch({ topic: "default tools" }, { runtimePort: port, rootDir });
-  assert.equal(record.status, RUN_STATUS.COMPLETED);
+  assert.equal(record.status, RUN_STATUS.COMPLETED_WITH_ERRORS, "the scripted report cites an unread source");
 });
 
 test("CLI usage errors exit 2 and missing runtime exits 3", async (t) => {

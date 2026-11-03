@@ -284,12 +284,20 @@ export function createSourceLedger() {
     if (!source) {
       source = createSource({ kind: "page", url: requestedUrl || finalUrl });
     }
+    if (!fetched && source.status === SOURCE_STATUS.FETCHED) {
+      // Preserve the successful source's URL, HTTP status and evidence when a
+      // subsequent attempt fails. The separate tool-call ledger owns failures.
+      remember(requestedUrl, source);
+      return { id: source.id, url: source.finalUrl ?? source.url, status: source.status };
+    }
     source.finalUrl = finalUrl || source.finalUrl;
     if (fetched) {
       source = claimFinalUrl(source, finalUrl);
       source.status = SOURCE_STATUS.FETCHED;
       source.error = null;
-    } else {
+    } else if (source.status !== SOURCE_STATUS.FETCHED) {
+      // A later failed retry must not erase an earlier successful read.
+      // The failed tool call remains visible in the separate call/error ledger.
       source.status = SOURCE_STATUS.FAILED;
       source.error = normalizeToolError(details?.error, "extract_failed") ?? {
         code: "extract_failed",

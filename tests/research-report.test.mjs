@@ -146,6 +146,21 @@ test("ledger is built from tool details: fetched / failed / not_fetched", () => 
   assert.equal(sources[1].error.code, "http_error");
 });
 
+test("a failed retry must not erase a previously fetched source", () => {
+  const ledger = createSourceLedger();
+  ledger.addPage(PAGE_OK);
+  ledger.addPage({
+    ...PAGE_FAILED,
+    url: PAGE_OK.url,
+    finalUrl: PAGE_OK.finalUrl,
+  });
+  const [source] = ledger.snapshot();
+  assert.equal(source.status, SOURCE_STATUS.FETCHED);
+  assert.equal(source.httpStatus, 200);
+  assert.equal(source.error, null);
+  assert.equal(source.contentChars, 1200);
+});
+
 test("a page read without a search hit creates its own source", () => {
   const ledger = createSourceLedger();
   const annotation = ledger.addPage({

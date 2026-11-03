@@ -302,7 +302,8 @@ describe("adversarial: citations and fabricated provenance", () => {
       { runtimePort: port, toolLayer: { tools: [search] }, rootDir },
     );
 
-    assert.equal(record.status, RUN_STATUS.COMPLETED);
+    assert.equal(record.status, RUN_STATUS.COMPLETED_WITH_ERRORS);
+    assert.ok(record.errors.some((error) => error.phase === "citations"));
     assert.equal(record.sourcesSummary.not_fetched, 1);
     assert.deepEqual(record.citations.unfetched, [{ id: "S1", count: 3, status: "not_fetched" }]);
     assert.deepEqual(record.citations.unresolved, [{ id: "S9", count: 1 }]);

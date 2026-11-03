@@ -63,13 +63,14 @@ export function mapAgentRuntimeRecord(record) {
       source: "provider",
     },
     toolCalls: toolCalls.map((call) => {
-      const isError = call?.status === "error";
+      // A denied Pi tool call never executed. It must not be reported as ok.
+      const status = call?.status === "blocked" ? "blocked" : call?.status === "ok" ? "ok" : "error";
       return {
         callId: typeof call?.toolCallId === "string" ? call.toolCallId : null,
         name: typeof call?.name === "string" ? call.name : "unknown",
-        status: isError ? "error" : "ok",
+        status,
         durationMs: numberOrNull(call?.durationMs),
-        isError,
+        isError: status !== "ok",
       };
     }),
     error: raw.error

@@ -97,6 +97,16 @@ test("mapAgentRuntimeRecord keeps tool-call status without arguments or content"
   ]);
 });
 
+test("a Pi permission denial is never translated into a successful tool call", () => {
+  const mapped = mapAgentRuntimeRecord({
+    status: "succeeded",
+    toolCalls: [{ name: "research_read_page", toolCallId: "denied", status: "blocked", reason: "tool_not_granted" }],
+  });
+  assert.deepEqual(mapped.toolCalls, [
+    { callId: "denied", name: "research_read_page", status: "blocked", durationMs: null, isError: true },
+  ]);
+});
+
 test("system-prompt extension prepends the research policy to the runtime prompt", async () => {
   const factory = researchSystemPromptExtension("RESEARCH POLICY");
   const handlers = [];

@@ -377,8 +377,25 @@ function wrapTools({ tools, limits, signal, calls, provenance, counters }) {
 
       const started = Date.now();
       try {
-        const result = await definition.execute(toolCallId, params, toolSignal ?? signal, onUpdate, context);
-        const details = result?.details ?? result?.structuredContent ?? null;
+        let result = await definition.execute(toolCallId, params, toolSignal ?? signal, onUpdate, context);
+        let details = result?.details ?? result?.structuredContent ?? null;
+        // A page may be larger than the remaining global character budget.
+        // Reject its body *before* giving it to the model or marking it fetched;
+        // the next page call is refused without another network request.
+        const chars = Number(details?.contentChars);
+        if (kind === "page" && details?.status === "ok" && Number.isFinite(chars) &&
+            chars > limits.maxTotalPageChars - counters.pageChars) {
+          const reason = `page exceeds remaining maxTotalPageChars (${limits.maxTotalPageChars - counters.pageChars})`;
+          counters.pageChars = limits.maxTotalPageChars;
+          details = {
+            ...details,
+            status: "error",
+            contentChars: 0,
+            excerpt: null,
+            error: { code: ERROR_CODE.BUDGET_EXCEEDED, message: reason, retryable: false },
+          };
+          result = { content: [{ type: "text", text: `budget_exceeded: ${reason}` }], details, isError: true };
+        }
         const isError = Boolean(result?.isError) || details?.status === "error";
         calls.push({
           seq: calls.length + 1,
@@ -679,7 +696,12 @@ async function runPreparedExecution(context) {
   const mergedCalls = mergeToolCalls(calls, runtimeResult?.toolCalls);
   // Persisted provenance is redacted; ledger identity stays the source id.
   const sources = provenance.snapshot().map(redactSourceRecord);
-  const status = resolveRunStatus({
+  const sourcesSummary = summarizeSources(sources);
+  const citations = reportBody
+    ? resolveCitations(reportBody, sources)
+    : { references: [], resolved: [], unresolved: [], unfetched: [], citedSourceIds: [] };
+  const citationFault = citations.unresolved.length > 0 || citations.unfetched.length > 0;
+  let status = resolveRunStatus({
     abortReason,
     runtimeError,
     runtimeResult,
@@ -687,12 +709,16 @@ async function runPreparedExecution(context) {
     calls,
     sources,
   });
-  const sourcesSummary = summarizeSources(sources);
-  const citations = reportBody
-    ? resolveCitations(reportBody, sources)
-    : { references: [], resolved: [], unresolved: [], unfetched: [], citedSourceIds: [] };
+  if (citationFault && status === RUN_STATUS.COMPLETED) status = RUN_STATUS.COMPLETED_WITH_ERRORS;
 
   const errors = [];
+  if (citationFault) {
+    errors.push(toErrorRecord({
+      code: ERROR_CODE.MODEL_ERROR,
+      message: `report citations not verified: ${citations.unresolved.length} unknown, ${citations.unfetched.length} unread`,
+      phase: "citations",
+    }));
+  }
   if (abortReason === "deadline") {
     errors.push(
       toErrorRecord({
