@@ -43,6 +43,13 @@ export class FeishuSendError extends Error {
   }
 }
 
+function businessRejection(error) {
+  const data = error?.response?.data;
+  if (data && typeof data.code === "number") return { code: data.code, msg: data.msg };
+  if (typeof error?.code === "number") return { code: error.code, msg: error.msg };
+  return null;
+}
+
 function assertSendInput({ receiveIdType, receiveId, text, uuid }) {
   const pattern = RECEIVE_ID_PATTERN[receiveIdType];
   if (!pattern) {
@@ -190,8 +197,27 @@ export function createFeishuTransport({ config, onEvent, log = () => {}, client:
         },
       });
     } catch (error) {
-      // The SDK throws for transport/protocol failures; an API rejection comes
-      // back as a business code below. A thrown network error is retryable.
+      // The SDK can throw even for HTTP business rejections (AxiosError with
+      // `response.data.code`), not only for network failures. Classify that
+      // business code first; otherwise an invalid destination would be retried
+      // as if it were a transient network error.
+      const rejection = businessRejection(error);
+      if (rejection) {
+        const retryable = RETRYABLE_FEISHU_SEND_CODES.includes(rejection.code);
+        log({
+          level: retryable ? "warn" : "error",
+          event: "feishu_send_rejected",
+          destination: maskId(receiveId),
+          feishuCode: rejection.code,
+          retryable,
+        });
+        throw new FeishuSendError(`Feishu send rejected: code=${rejection.code}`, {
+          code: "feishu_api_error",
+          retryable,
+          feishuCode: rejection.code,
+        });
+      }
+      // A genuine transport/protocol failure is retryable.
       log({
         level: "warn",
         event: "feishu_send_network_error",

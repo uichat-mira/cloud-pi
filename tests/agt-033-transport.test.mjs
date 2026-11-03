@@ -113,6 +113,49 @@ describe("AGT-033 T2: Feishu proactive send", () => {
     );
   });
 
+  test("an SDK-thrown HTTP business rejection is classified, not treated as a network error", async () => {
+    const thrown = (code) => {
+      const error = new Error("Request failed with status code 400");
+      error.code = "ERR_BAD_REQUEST";
+      error.response = { status: 400, data: { code, msg: "invalid open_id" } };
+      return error;
+    };
+    const transport = transportWith({
+      client: {
+        im: {
+          message: {
+            async create() {
+              throw thrown(99992351);
+            },
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      transport.send({ receiveIdType: "open_id", receiveId: "ou_missing", text: "x" }),
+      (error) =>
+        error instanceof FeishuSendError &&
+        error.code === "feishu_api_error" &&
+        error.feishuCode === 99992351 &&
+        error.retryable === false,
+    );
+    const limited = transportWith({
+      client: {
+        im: {
+          message: {
+            async create() {
+              throw thrown(99991400);
+            },
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      limited.send({ receiveIdType: "open_id", receiveId: "ou_person1", text: "x" }),
+      (error) => error instanceof FeishuSendError && error.feishuCode === 99991400 && error.retryable === true,
+    );
+  });
+
   test("a network failure is retryable", async () => {
     const transport = transportWith({
       client: {
