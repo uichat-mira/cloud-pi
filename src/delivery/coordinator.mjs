@@ -182,13 +182,15 @@ export function createDeliveryCoordinator({
 
   async function deliverToTarget({ runId, target, input, message, deliveryKind, at: startedAt }) {
     const key = buildDeliveryKey(runId, target);
+    // The persistence key contains the raw recipient ID; never emit it to logs.
+    const diagnosticKey = runId + "#" + target.type + ":" + maskDestination(target).maskedId;
     let record = await store.readRecord(runId, target);
 
     // Idempotency: anything already terminal is final. A repeated completion
     // callback or a restarted process therefore sends nothing for this target.
     if (record?.status === DELIVERY_STATUS.SENT || record?.status === DELIVERY_STATUS.FAILED) {
       logger.info?.(
-        `delivery: ${key} already ${record.status}; not sending again`,
+        `delivery: ${diagnosticKey} already ${record.status}; not sending again`,
       );
       return record;
     }
@@ -252,7 +254,7 @@ export function createDeliveryCoordinator({
         record.lastError = null;
         record.updatedAt = sentAt;
         await store.writeRecord(record);
-        logger.info?.(`delivery: ${key} sent (${record.segmentsSent.length} segment(s), attempt ${record.attempts})`);
+        logger.info?.(`delivery: ${diagnosticKey} sent (${record.segmentsSent.length} segment(s), attempt ${record.attempts})`);
         return record;
       } catch (error) {
         const failureAt = nowIso(clock);
@@ -264,13 +266,13 @@ export function createDeliveryCoordinator({
         if (!retryable) {
           record.status = DELIVERY_STATUS.FAILED;
           await store.writeRecord(record);
-          logger.warn?.(`delivery: ${key} failed after ${record.attempts} attempt(s): ${failure.code}`);
+          logger.warn?.(`delivery: ${diagnosticKey} failed after ${record.attempts} attempt(s): ${failure.code}`);
           return record;
         }
         record.status = DELIVERY_STATUS.PENDING;
         await store.writeRecord(record);
         logger.warn?.(
-          `delivery: ${key} attempt ${record.attempts}/${limits.maxAttempts} failed (${failure.code}); retrying`,
+          `delivery: ${diagnosticKey} attempt ${record.attempts}/${limits.maxAttempts} failed (${failure.code}); retrying`,
         );
         await delay(limits.retryDelayMs);
       }

@@ -434,3 +434,27 @@ describe("AGT-033 T2: recipient trust and no-op policies", () => {
     await assert.rejects(coordinator.deliverRun(input({ runId: "../escape" })), DeliveryError);
   });
 });
+
+test("delivery diagnostics never log raw Feishu recipient IDs", async (t) => {
+  const root = await tempRoot(t);
+  const lines = [];
+  const capture = (message) => lines.push(String(message));
+  const transport = fakeSendMessage();
+  const coordinator = createDeliveryCoordinator({
+    stateDir: join(root, "delivery"),
+    env: {},
+    now: CLOCK,
+    researchRunsDir: join(root, "runs"),
+    readRun: async () => makeRun(),
+    sendMessage: transport.sendMessage,
+    logger: { info: capture, warn: capture, error: capture },
+  });
+  await coordinator.deliverRun(input());
+  await coordinator.deliverRun(input()); // terminal replay also logs
+  assert.ok(lines.length > 0);
+  const output = lines.join("\n");
+  for (const target of TWO_TARGETS) {
+    assert.equal(output.includes(target.id), false, "raw recipient ID appeared in diagnostics");
+  }
+  assert.match(output, /…/);
+});
