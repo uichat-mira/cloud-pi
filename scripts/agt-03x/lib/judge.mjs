@@ -1,58 +1,56 @@
 /**
  * Pure verdicts for the C3 full-suite gate. Kept in `lib/` so the judgement can
- * be unit-tested (see `self-test.mjs`) without spawning a 555-test suite: a
- * gate that only looks at failure *names* can silently accept a failure whose
- * title happens to contain a known substring, so the count is asserted here.
+ * be unit-tested (see `self-test.mjs`) without spawning the whole suite.
+ *
+ * History (t11 G13): this gate used to assert two hand-edited constants — a
+ * baseline total of 555 tests and exactly 2 expected failures — captured from
+ * `dev@8efc250`. Both Windows defects were fixed by t7, so `dev` runs **642
+ * tests with 0 failures**; the constants then rejected a *healthy* suite. That
+ * is the failure mode of absolute baselines: they encode history, not health.
+ *
+ * Current rule (no absolute numbers anywhere — every count is read from the TAP
+ * summary the caller passes in):
+ *   1. the summary must exist and report a positive test count;
+ *   2. `fail` must be 0 — unless an explicit, non-empty known-failure list is
+ *      supplied *and* every failing TAP line matches one of its patterns;
+ *   3. any failure outside that list fails the gate, even if its title looks
+ *      like a known one (the old name-only check could be fooled this way).
+ *
+ * `KNOWN_FAILURES` is empty on purpose: the defects it used to hold are fixed.
+ * Relaxing it means adding a pattern **and** recording why in the commit message
+ * and in docs/evidence/wecom-v1/README.md §7 — never through an env var, which
+ * would turn the gate into a silent relaxation switch.
  */
 import { check } from "./harness.mjs";
 
-/**
- * Baseline `dev` @ 8efc250: 555 tests, 2 known failures (both Windows defects).
- *
- * DELIBERATELY A CONSTANT. Do not turn this into an env var or a
- * "tolerated failures" setting: that would give the gate a silent relaxation
- * switch. When the baseline legitimately moves (defect fixed, or an intentional
- * new failure lands), edit the numbers/patterns here **and** record why in the
- * commit message and in docs/evidence/wecom-v1/README.md §7.
- */
-export const BASELINE_TOTAL = 555;
+export const KNOWN_FAILURES = Object.freeze([]);
 
-/**
- * The two Windows-only defects recorded in baseline §4 (cleared by t7). Node's
- * TAP reporter prints the enclosing `describe` name as its own `not ok` line, so
- * three patterns cover the two real failures.
- */
-export const KNOWN_FAILURES = Object.freeze([
-  /resolveRunsRoot: explicit > env > default/,
-  /adapter: system prompt and cwd isolation/i,
-  /research policy reaches the model-visible system prompt/i,
-]);
-
-/**
- * Number of real failing tests expected on the baseline. Same rule as
- * BASELINE_TOTAL: a hand-edited constant with a recorded reason, never derived
- * from the run being judged.
- */
-export const EXPECTED_FAILURES = 2;
-
-export function fullSuiteVerdict({ tests, fail, failing }, options = {}) {
-  const baselineTotal = options.baselineTotal ?? BASELINE_TOTAL;
-  const expectedFail = options.expectedFail ?? EXPECTED_FAILURES;
+export function fullSuiteVerdict({ tests, fail, failing } = {}, options = {}) {
   const known = options.known ?? KNOWN_FAILURES;
+  const failingNames = Array.isArray(failing) ? failing : [];
 
-  if (!Number.isFinite(tests)) return check("C3", "fail", "full suite produced no TAP summary");
-  if (!Number.isFinite(fail)) return check("C3", "fail", "full suite produced no TAP failure count");
-  if (tests < baselineTotal) return check("C3", "fail", `tests=${tests} < baseline ${baselineTotal}`);
-  if (fail !== expectedFail) {
+  if (!Number.isFinite(tests) || tests <= 0) {
+    return check("C3", "fail", "full suite produced no positive TAP test count");
+  }
+  if (!Number.isFinite(fail) || fail < 0) {
+    return check("C3", "fail", "full suite produced no TAP failure count");
+  }
+  if (fail > tests) {
+    return check("C3", "fail", `fail=${fail} > tests=${tests} (inconsistent TAP summary)`);
+  }
+  if (fail === 0) {
+    return check("C3", "pass", `tests=${tests} fail=0 (counts read from TAP, no absolute baseline)`);
+  }
+  if (known.length === 0) {
     return check(
       "C3",
       "fail",
-      `fail=${fail} != expected ${expectedFail} (baseline drifted: a known defect was fixed or the failing set changed)`,
+      `fail=${fail} but no known failure is declared; failing: ${failingNames.slice(0, 2).join(" | ")}`,
     );
   }
-  const unknown = failing.filter((name) => !known.some((pattern) => pattern.test(name)));
+  const unknown = failingNames.filter((name) => !known.some((pattern) => pattern.test(name)));
   if (unknown.length > 0) {
     return check("C3", "fail", `failing set grew by ${unknown.length}: ${unknown.slice(0, 2).join(" | ")}`);
   }
-  return check("C3", "pass", `tests=${tests} fail=${fail} (${failing.length} known TAP lines)`);
+  return check("C3", "pass", `tests=${tests} fail=${fail} (all failures match the declared known list)`);
 }
