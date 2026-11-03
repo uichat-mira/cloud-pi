@@ -165,6 +165,7 @@ export async function main({
       try {
         const { loadWecomConfig } = await import("../channels/wecom/config.mjs");
         const { assertWecomSessionAuthorization } = await import("../channels/wecom/authorization.mjs");
+        const { WECOM_PROMPT_VERSION } = await import("../channels/wecom/runtime.mjs");
         const wecomConfig = loadWecomConfig(effective.env);
         const authorization = assertWecomSessionAuthorization({ env: effective.env, config: wecomConfig });
         log({
@@ -174,6 +175,17 @@ export async function main({
           sources: authorization.sources,
           allowedUserCount: authorization.allowedUserCount,
           allowedChatCount: authorization.allowedChatCount,
+        });
+        // Experience settings an operator can verify offline: which prompts are in
+        // play and how chat replies are bounded. Numbers and version ids only.
+        log({
+          level: "info",
+          event: "wecom_experience_config",
+          promptVersions: { ...WECOM_PROMPT_VERSION },
+          ackEnabled: wecomConfig.ackEnabled,
+          ackMergeMs: wecomConfig.ackMergeMs,
+          singleMaxSegments: wecomConfig.singleMaxSegments,
+          groupMaxSegments: wecomConfig.groupMaxSegments,
         });
       } catch (error) {
         log({

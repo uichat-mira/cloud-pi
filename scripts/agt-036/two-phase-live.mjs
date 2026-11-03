@@ -180,6 +180,13 @@ export async function main({
 
   const fromFiles = loadEnvFiles([options.modelEnvFile, options.secretsFile]);
   const merged = { ...fromFiles, ...env };
+  if (options.selfTest) {
+    // The self-test verifies the two-phase *transport* contract with a fake client
+    // and a fake runtime; that runtime answers in a few ms, so the production ack
+    // merge window (`WECOM_ACK_MERGE_MS`, 1.5 s) would legitimately suppress the
+    // ack. Disable the window here so the self-test exercises ack → push.
+    merged.WECOM_ACK_MERGE_MS = "0";
+  }
   if (!options.selfTest && (!merged.WECOM_BOT_ID || !merged.WECOM_BOT_SECRET)) {
     write(stderr, {
       ok: false,

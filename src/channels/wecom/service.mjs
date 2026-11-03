@@ -81,7 +81,7 @@ export function createWecomService({
     reply: (frame, text) => transport.reply(frame, text),
     push: (input) => transport.send(input),
     sessions,
-    ack: { enabled: config.ackEnabled, text: config.ackText },
+    ack: { enabled: config.ackEnabled, text: config.ackText, mergeMs: config.ackMergeMs },
     policy: {
       botName: config.botName,
       allowedUserIds: config.allowedUserIds,
@@ -89,7 +89,11 @@ export function createWecomService({
     },
     // Empty by default: a rejection is silent, so nobody can probe the allowlist.
     deniedReply: config.deniedReply,
-    segment: { maxBytes: config.replyMaxBytes },
+    segment: {
+      maxBytes: config.replyMaxBytes,
+      singleMaxSegments: config.singleMaxSegments,
+      groupMaxSegments: config.groupMaxSegments,
+    },
     dedupe,
     log,
     onOutcome: (outcome) => {

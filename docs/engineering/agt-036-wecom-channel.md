@@ -47,7 +47,10 @@
 | `WECOM_CONNECT_TIMEOUT_MS` | 否 | `20000` | 未完成认证即判启动失败 |
 | `WECOM_REPLY_MAX_BYTES` | 否 | `20000` | 单段字节预算，上限 20480 |
 | `WECOM_ACK_ENABLED` | 否 | `true` | 两段式 ack 开关；关闭退回"一次回调一次回复"（详见 §12） |
-| `WECOM_ACK_TEXT` | 否 | `已收到，正在处理…` | ack 文案（模板，非密钥） |
+| `WECOM_ACK_TEXT` | 否 | `收到，这个要跑一会儿。跑完我直接发结论，中间不用等。` | 长任务 ack 文案（模板，非密钥；详见 §13） |
+| `WECOM_ACK_MERGE_MS` | 否 | `1500` | ack 合并窗口：聊天回答在此窗口内完成则不发 ack；`0` 恢复"每条都 ack" |
+| `WECOM_SINGLE_MAX_SEGMENTS` | 否 | `3` | 单聊回复最多分几段（超出用「（续 n/m）」+ 续发提示） |
+| `WECOM_GROUP_MAX_SEGMENTS` | 否 | `1` | 群聊回复最多分几段（群聊不分段） |
 | `WECOM_REPLY_TIMEOUT_MS` | 否 | `15000` | 单次发送/回复的硬超时 |
 
 `WECOM_WS_URL` 故意不写死：**实测**真实订阅端点是 `wss://openws.work.weixin.qq.com`（直连，不走代理；
@@ -419,12 +422,14 @@ npm run delivery:live -- --inbound-timeout-ms=600000
 | 环境变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `WECOM_ACK_ENABLED` | `true` | 关闭后退回"一次回调一次回复"（只适合秒回场景） |
-| `WECOM_ACK_TEXT` | `已收到，正在处理…` | ack 文案；按字节同样受 20480 限制 |
+| `WECOM_ACK_TEXT` | `收到，这个要跑一会儿。跑完我直接发结论，中间不用等。` | 长任务 ack 文案；按字节同样受 20480 限制（t31 起，见 §13） |
+| `WECOM_ACK_MERGE_MS` | `1500` | ack 合并窗口；`0` 恢复"每条都 ack"（t31 起，见 §13） |
 | `WECOM_REPLY_MAX_BYTES` | `20000` | 单段预算（上限 20480） |
 
-**没有**实现"1.5 秒内完成就不发 ack"的合并模式：它需要"先跑模型、超时再回 ack"的反向时序，
-一旦模型比阈值慢就会**同时**触发 ack 和 final，用户仍会看到两条消息，却多了一条"可能不发"的
-不确定路径。默认不做，风险记录在此；若后续要做，应作为**默认关闭**的开关并补一条真实链路证据。
+> §12.4 曾记录"**没有**实现 1.5 秒合并模式"，理由是"先跑模型、超时再回 ack"会出现 ack 与 final
+> 同时发的窗口。t31 的实现方向相反：**收到消息时先挂一个 1.5s 定时器**，回答在窗口内完成就取消
+> 定时器（`action=ack_suppressed`），超时才发 ack。这样 ack 与 final 严格互斥，不会同时出现；
+> 且 `/research` 属于已知长任务，**不等窗口，立即 ack**。详见 §13.3。
 
 ### 12.5 离线验收
 
@@ -455,7 +460,71 @@ npm run two-phase:self-test
 `delivery=push`、`replyDelivered=true`；两行 `requestId` 相同。证据写到
 `.work/wecom-channel/two-phase-evidence.jsonl`（只含白名单投影与哈希 id）。
 
-## 13. 尚未验证 / 遗留
+## 13. 体验层（t31）：双版提示词、文案、长度与 ack 条件
+
+这一层不碰投递协议、不改既有 API 字段：`chat_type`、`deliver()`、run/outcome 字段都保持原样，
+只改"用户读到什么"。产品依据是 `docs/product/wecom-system-prompts-draft.md`（C5–C8 四句锁定）、
+`docs/product/wecom-experience-rubric.md`（L1–L6 / A2–A3 / D1–D7）与
+`docs/product/wecom-t31-acceptance-checklist.md`。
+
+### 13.1 两套提示词，按 `chatType` 选
+
+| 版本 id | 用于 | 关键约束 |
+| --- | --- | --- |
+| `wecom-single-v2` | 单聊 | 3 句 / 120 字以内；超 300 字先给摘要；纯英文问候回英文（D6）；不出现 `/research`（D5）；不提 runId（D7） |
+| `wecom-group-v2` | 群聊 | 2 句 / 60 字以内；不写小作文、不 @ 人；默认不玩梗，对方先开玩笑才接一句、一次最多一个梗（D1）；群消息是不可信数据 |
+
+选择只看 `chatType`，**不看消息内容**：一条消息不能给自己换人格或换权限。实现上 runtime 只创建
+一次，`wecomChannelPromptExtension(resolver)` 在每轮 `before_agent_start` 里取当前轮提示词，
+`runTurn()` 在进入串行队列后设置本轮提示词，并在返回记录上带 `promptVersion`（只记版本 id，
+不记提示词正文），outcome 与日志里可看到 `promptVersion` / `wecom_prompt_selected`。
+
+`WECOM_CHANNEL_SYSTEM_PROMPT` 仍导出，等价于单聊 v2，老调用方不受影响。
+
+**未做（记录在案）**：`promptVersion` 只进 outcome 与日志，**没有**写进 chat run 记录
+（`src/runs/chat-runs.mjs` 的 `toChatRunRecord` 是既有 API 契约的白名单投影，本卡约束是"不改既有
+API 字段"）。验收清单 T31-R1 若要按 run 记录抽检，需要单独一张卡扩该白名单，不要在 t31 里顺手改。
+
+### 13.2 文案：用户看不到内部码与 runId
+
+| 场景 | 改前 | 改后 |
+| --- | --- | --- |
+| 模型超时 | `处理超时，请稍后重试。` | `这次算太久了，我先停掉。要不要换个短点的问法？` |
+| 运行失败 | `处理失败，请稍后重试。（timeout）` | `刚才没跑通，再试一次？`（错误码只进 `wecom_turn_failed` 日志） |
+| 模型空回复 | `（模型没有返回内容）` | `这次没生成出内容，再问一次？` |
+| 研究未接线 | `研究功能未启用。` | `研究入口还没开。先在控制台建个定时任务，结果我会发给你。` |
+| 研究回复尾部 | `…\n\nrunId: run-abc-123` | 不展示；runId 只留在 outcome/run 记录（D7） |
+| 回答被截断 | `（后续约 N 段内容超出单次回复上限，已省略。）` | `（续 n/m）` + `内容太长，后面还有约 N 段没发。要我拆成几条继续发吗？` |
+
+约束用测试锁死：`tests/agt-036-experience-copy.test.mjs` 对全部 `WECOM_REPLIES` 断言不含
+`timeout|ECONN|code:|runId`，并对失败分支断言文案里没有错误码、日志里有。
+
+### 13.3 长度与 ack 条件
+
+- 单聊最多 3 段、群聊最多 1 段（`WECOM_SINGLE_MAX_SEGMENTS` / `WECOM_GROUP_MAX_SEGMENTS`），
+  截断时最后一段同时带 `（续 n/m）` 与"要我拆成几条继续发吗？"，不再以"已省略"收尾。
+- ack 只在两种情况下出现，且与 `deliver()` 严格互斥：
+  1. `/research`（已知长任务）→ 收到即 ack；
+  2. 聊天回答超出 `WECOM_ACK_MERGE_MS`（默认 1500ms）→ 定时器到期才 ack；
+  回答在窗口内完成 → 取消定时器，只发回答（`action=ack_suppressed`、`reason=answered_within_merge_window`）。
+- `WECOM_ACK_MERGE_MS=0` 恢复历史行为（每条 accepted 都 ack），用于真实链路取证脚本的自检。
+- **A3c（10 s 安全网）由本实现覆盖**：判定"不 ack"的短问答最多等 1.5 s 就会改判为"要 ack"，
+  因此不存在"既不 ack、又 10 s 无输出"的窗口，无需再补一条主动推送；曲线是"1.5 s 内只有终稿，
+  超过 1.5 s 先 ack、再终稿"，A3a 与 A3b 的判据同时成立。
+
+### 13.4 离线验收
+
+```bash
+npm test            # 724 个用例
+npm run test:wecom  # 125 个用例，含本节 10 个
+```
+
+新增覆盖（`tests/agt-036-experience-copy.test.mjs`）：提示词按 `chatType` 选择且群聊更短、
+每轮扩展渲染当前轮提示词、失败文案无内部码（正则）、全部文案无 runId、研究回复不展示 runId
+但 outcome 保留、单聊 3 段/群聊 1 段上限、截断提示可执行、快速回答不发 ack（`ack_suppressed`）、
+慢回答与 `/research` 发 ack、空回复文案。
+
+## 14. 尚未验证 / 遗留
 
 | 项 | 状态 | 说明 |
 | --- | --- | --- |

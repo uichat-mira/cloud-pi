@@ -269,6 +269,17 @@ test("entry --check: an explicit chat allowlist passes and reports what is enfor
   assert.equal(gate.allowedChatCount, 2);
   assert.deepEqual(gate.sources, ["GUANLAN_MCP_URL"]);
   assert.ok(lines.some((line) => line.event === "cloud_agent_config_ok"));
+
+  // t31: the experience settings are verifiable offline too — which prompt
+  // versions are in play and how chat replies are bounded. Numbers only.
+  const experience = lines.find((line) => line.event === "wecom_experience_config");
+  assert.ok(experience, "the check output must report the experience settings");
+  assert.deepEqual(experience.promptVersions, { single: "wecom-single-v2", group: "wecom-group-v2" });
+  assert.equal(experience.ackMergeMs, 1500);
+  assert.equal(experience.singleMaxSegments, 3);
+  assert.equal(experience.groupMaxSegments, 1);
+  // No prompt text or credential material in the projection.
+  assert.ok(!JSON.stringify(experience).includes("你是 Mira"));
 });
 
 test("entry --check: a chat-only deployment needs no allowlist", async (t) => {

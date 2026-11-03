@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createWecomChannel, WECOM_REPLIES } from "../src/channels/wecom/channel.mjs";
-import { WECOM_MAX_CONTENT_BYTES } from "../src/channels/wecom/config.mjs";
+import { WECOM_DEFAULT_ACK_TEXT, WECOM_MAX_CONTENT_BYTES } from "../src/channels/wecom/config.mjs";
 import { createWecomDedupeStore } from "../src/channels/wecom/dedupe.mjs";
 import { createKnownSessionStore } from "../src/channels/wecom/sessions.mjs";
 import { byteLength } from "../src/channels/wecom/text.mjs";
@@ -75,6 +75,10 @@ function buildChannel({ recordSessions = true, ...overrides } = {}) {
   const sessions = createKnownSessionStore();
   const channel = createWecomChannel({
     sessions,
+    // These tests are about the two-phase *mechanics* (ack inside the callback,
+    // answer later on the push path), so the ack merge window is off here. The
+    // merge policy itself is covered in tests/agt-036-experience-copy.test.mjs.
+    ack: { enabled: true, text: WECOM_DEFAULT_ACK_TEXT, mergeMs: 0 },
     runTurn: async () => ({ status: "succeeded", text: "最终答案" }),
     reply: async (frame, text) => {
       replies.push({ reqId: frame?.headers?.req_id, text });
@@ -115,7 +119,7 @@ test("two-phase: the callback is acknowledged before the model finishes", async 
   await settle();
   // Phase 1 only: the model has not resolved yet.
   assert.equal(replies.length, 1);
-  assert.equal(replies[0].text, "已收到，正在处理…");
+  assert.equal(replies[0].text, WECOM_DEFAULT_ACK_TEXT);
   assert.equal(replies[0].reqId, "req-1");
   assert.equal(pushes.length, 0);
   assert.equal(calls.length, 1);
@@ -150,7 +154,7 @@ test("two-phase: a group answer is pushed with the group conversation and chat_t
   await channel.whenIdle();
 
   assert.equal(replies.length, 1);
-  assert.equal(replies[0].text, "已收到，正在处理…");
+  assert.equal(replies[0].text, WECOM_DEFAULT_ACK_TEXT);
   assert.equal(pushes.length, 1);
   assert.equal(pushes[0].chatId, "chat-1");
   assert.equal(pushes[0].chatType, "group");
@@ -236,6 +240,9 @@ test("two-phase: a push to a conversation without prior inbound is refused with 
 test("two-phase: an oversized answer is segmented under the byte limit instead of being rejected", async () => {
   const answer = "长".repeat(30_000); // 90000 UTF-8 bytes, 3x the budget
   const { channel, pushes, outcomes } = buildChannel({
+    // This test is about the byte budget, not the chat segment cap (which is
+    // covered in tests/agt-036-experience-copy.test.mjs), so raise the cap.
+    segment: { singleMaxSegments: 8 },
     runTurn: async () => ({ status: "succeeded", text: answer }),
   });
 

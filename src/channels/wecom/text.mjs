@@ -21,6 +21,17 @@ export const WECOM_SEGMENT_DEFAULTS = Object.freeze({
   maxSegments: 8,
 });
 
+/**
+ * Chat replies are capped well below the platform limit (rubric §2 L2/L4/L5):
+ * a direct chat may continue across at most 3 messages, a group must stay one
+ * message ("群聊不写小作文"). Research reports are not chat replies and keep the
+ * wider default.
+ */
+export const WECOM_CHAT_SEGMENT_LIMITS = Object.freeze({
+  single: 3,
+  group: 1,
+});
+
 export function byteLength(text) {
   return typeof text === "string" ? Buffer.byteLength(text, "utf8") : 0;
 }
@@ -29,8 +40,12 @@ function continuationSuffix(index, total) {
   return `\n\n（续 ${index}/${total}）`;
 }
 
-function truncationNotice(omittedSegments) {
-  return `\n\n（后续约 ${omittedSegments} 段内容超出单次回复上限，已省略。）`;
+/**
+ * The truncation notice must give a next step, not a dead end (rubric L6/E3):
+ * the old "已省略" sentence stated the loss and stopped there.
+ */
+export function truncationNotice(omittedSegments) {
+  return `\n\n内容太长，后面还有约 ${omittedSegments} 段没发。要我拆成几条继续发吗？`;
 }
 
 /**
@@ -100,15 +115,19 @@ export function splitForSend(text, options = {}) {
   if (omitted.length > 0) {
     const omittedBytes = omitted.reduce((sum, segment) => sum + byteLength(segment), 0);
     const lastIndex = segments.length - 1;
-    // Trim the final kept segment so the notice still fits the platform limit.
+    // Trim the final kept segment so the notice still fits the platform limit. The
+    // final message keeps its "（续 n/m）" marker, so the user knows how far the
+    // answer got before the offer to continue.
+    const marker = total > 1 ? continuationSuffix(total, total) : "";
     const notice = truncationNotice(omitted.length);
+    const tail = `${marker}${notice}`;
     let last = segments[lastIndex];
-    const room = maxBytes - byteLength(notice);
+    const room = maxBytes - byteLength(tail);
     while (byteLength(last) > room) {
       const charsOfLast = Array.from(last);
       last = charsOfLast.slice(0, Math.max(0, charsOfLast.length - 1)).join("");
     }
-    segments[lastIndex] = `${last}${notice}`;
+    segments[lastIndex] = `${last}${tail}`;
     return { segments, truncated: true, omittedBytes };
   }
 

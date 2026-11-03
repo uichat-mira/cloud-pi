@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWecomChannel } from "../src/channels/wecom/channel.mjs";
+import { createWecomChannel, WECOM_REPLIES } from "../src/channels/wecom/channel.mjs";
 import { createWecomDedupeStore } from "../src/channels/wecom/dedupe.mjs";
 import { createKnownSessionStore } from "../src/channels/wecom/sessions.mjs";
 import { byteLength, splitForSend } from "../src/channels/wecom/text.mjs";
@@ -310,7 +310,9 @@ test("channel: long answers are split by UTF-8 bytes with continuation markers",
   const long = "长报告。".repeat(2_000); // 8000 chars ≈ 24 KB of CJK
   const { channel, sent } = buildChannel({
     runTurn: async () => ({ status: "succeeded", text: long }),
-    segment: { maxBytes: 4_000 },
+    // Byte budget only: the chat segment cap (and the truncation notice it adds)
+    // is covered in tests/agt-036-experience-copy.test.mjs.
+    segment: { maxBytes: 4_000, singleMaxSegments: 8 },
   });
 
   channel.handleEvent({ frame: singleFrame() });
@@ -330,7 +332,9 @@ test("channel: research command is refused when no research runner is wired", as
   const { channel, sent } = buildChannel();
   channel.handleEvent({ frame: singleFrame({ body: { msgid: "r1", text: { content: "/research 今天的企业微信新闻" } } }) });
   await channel.whenIdle();
-  assert.deepEqual(sent, ["研究功能未启用。"]);
+  // The copy must give a next step, not just state the unavailability.
+  assert.deepEqual(sent, [WECOM_REPLIES.researchUnavailable]);
+  assert.match(sent[0], /定时任务/u);
   await channel.dispose();
 });
 
@@ -348,7 +352,7 @@ test("channel: research topic is passed to an injected research runner", async (
   await channel.dispose();
 });
 
-test("channel: a research reply carries its runId and the log line stays redacted", async () => {
+test("channel: a research reply hides its runId from the user but keeps it in the trace", async () => {
   const logs = [];
   const { channel, sent } = buildChannel({
     log: (entry) => logs.push(entry),
@@ -358,9 +362,12 @@ test("channel: a research reply carries its runId and the log line stays redacte
   channel.handleEvent({ frame: singleFrame({ body: { msgid: "r3", text: { content: "/research 长连接" } } }) });
   await channel.whenIdle();
 
-  assert.match(sent[0], /runId: run-abc-123/);
+  // D7: the runId is a trace identifier, never conversation content.
+  assert.equal(sent[0], "研究报告正文");
+  assert.ok(!sent[0].includes("run-abc-123"));
   const replied = logs.find((entry) => entry.event === "wecom_channel_outcome" && entry.action === "replied");
   assert.equal(replied.channel, "wecom");
+  // …but the outcome (and therefore the run record) still carries it.
   assert.equal(replied.runId, "run-abc-123");
   // Raw platform identifiers never reach the log line.
   assert.ok(!JSON.stringify(logs).includes("user-a"));
@@ -393,13 +400,15 @@ test("text: short text stays one segment and empty text yields none", () => {
   assert.deepEqual(splitForSend("", { maxBytes: 1_000 }), { segments: [], truncated: false, omittedBytes: 0 });
 });
 
-test("text: oversized reports are capped with an explicit truncation notice", () => {
+test("text: oversized reports are capped with an actionable truncation notice", () => {
   const text = "a".repeat(50_000);
   const { segments, truncated, omittedBytes } = splitForSend(text, { maxBytes: 10_000, maxSegments: 2 });
   assert.equal(truncated, true);
   assert.equal(segments.length, 2);
   assert.ok(omittedBytes > 0);
-  assert.match(segments[1], /已省略/);
+  // L6/E3: the notice offers a next step instead of ending the conversation.
+  assert.match(segments[1], /拆成几条继续发/u);
+  assert.ok(!segments[1].includes("已省略"));
   for (const segment of segments) assert.ok(byteLength(segment) <= 10_000);
 });
 
