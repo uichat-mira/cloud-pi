@@ -13,6 +13,26 @@
 2. 凭证就绪前唯一有效的门禁是 §7 的离线套件；它只能防「飞书退化」，**不能**证明企业微信闭环。
 3. 凭证一旦到位，执行顺序固定为：A1→A3（单轮打通）→ D1/D2/D3（负例）→ B1–B7（定时 + 投递）→ A5（Trace 关联）。链路未打通之前不追 Trace，避免把「链路不通」误判成「Trace 缺失」。
 
+### 0.1 前置清单（P1–P8，可勾选；缺一项即 blocker，不得记为通过）
+
+本清单只回答「能不能开始跑」，**不证明任何判据通过**。执行前用
+`node scripts/agt-03x/preflight.mjs --scenario <A|B|C|D>` 打勾；脚本只检查变量存在性，
+不读取/打印值。任何一项未满足时，对应场景的判定必须是 `blocker`，不得降级为 pass 或「不适用」。
+
+- [ ] **P1 企业微信机器人已创建（API 模式 + 长连接）**，`WECOM_BOT_ID`/`WECOM_SECRET` 已注入本地 `.env`（不入库）。
+- [ ] **P2 非生产 Cloud Auth 实例可访问**：签发 URL + JWKS URL，且**禁止指向生产**（`CLOUD_AUTH_ENV` 必须是 dev/nonprod/staging；issuer 含 `prod` 直接判 unmet）。
+- [ ] **P3 测试 Cloud Account 已存在，且已完成设备绑定登录**：`mcs_v1.*` 设备会话有效；过期需重新登录。这是**一次真实运维动作**，代码无法替代。
+- [ ] **P4 Guanlan 隔离环境已部署**：Worker URL 可访问 + migrations 迁到 **0005**（含 `guanlan_registration_receipts` 收据表）+ `MIRA_GUANLAN_REGISTRATION_SECRET` 已设置（≥32 字符）。
+- [ ] **P5 该账号在 Guanlan 有 consumer 行**（由 GLN-015 真实投递建立；仅显式 seed 时接受）+ ≥1 已批准源与新闻行。
+  **若走 seed：证据里必须原样标注「seed 数据，非 A2 注册链能力」。**
+- [ ] **P6 模型网关可用**：`CLOUD_PI_MODEL_BASE_URL`/`CLOUD_PI_MODEL_API_KEY`/`CLOUD_PI_MODEL_ID`。
+- [ ] **P7 注册密钥两侧逐字节一致**：Cloud Auth 的 `MIRA_GUANLAN_REGISTRATION_SECRET` == GLN-015 接收端同名密钥，**无尾随换行/空白**（接收端对带空白值直接 `503 registration_not_configured`，把配置错误伪装成失败的排查代价很高）。本机无法在不泄漏密钥的前提下比对，因此只接受维护者人工声明 `AGTX_P7_SECRET_MATCH=byte-identical`。
+- [ ] **P8 非生产 Cloud Auth 公网 JWKS 可达（仅公钥）**：`CLOUD_AUTH_PUBLIC_JWKS_URL` 为 **https**，Guanlan Worker 能取到并缓存 300s。本机 loopback 只适用于 `wrangler dev`，已部署 Worker 不可达 `127.0.0.1`。
+
+场景依赖：A = P1,P3,P6；B = P1–P8；C = 无（另有 `FEISHU_APP_ID`/`FEISHU_APP_SECRET` 仅 C4 使用）；D = P1。
+
+执行入口与证据骨架：`docs/evidence/wecom-v1/README.md`（A/B/C/D 脚本用法 + 四份空证据模板 + 白名单投影说明）。
+
 ## 1. 使用规则
 
 1. **一条判据 = 可执行判定**：每条判据必须写成「运行 X 命令 / 读取 Y 证据文件，看到 Z」，不接受「观察行为正常」「人工确认可用」这类不可复核描述。
