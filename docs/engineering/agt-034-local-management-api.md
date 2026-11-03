@@ -1,0 +1,418 @@
+# AGT-034 · Cloud Agent local management API
+
+Status: local POC complete; Draft PR to `dev`; no merge, deployment or public
+listener.
+Owning Issue: [#16](https://github.com/uichat-mira/cloud-pi/issues/16).
+Base: `origin/dev` at `fad03f8` (AGT-030 Scheduler and AGT-028 Research merged;
+AGT-033 delivery is **not** in this baseline).
+Branch: `feat/agt-034-local-management-api`.
+Draft PR: [#19](https://github.com/uichat-mira/cloud-pi/pull/19) → `dev`. The
+current head is whatever the PR page shows; this note is intentionally not
+pinned to a SHA. CI at reviewed head `3bc5e73`: `test` pass, SonarCloud pass,
+CodeRabbit skipped. Checks are evidence, not merge authority.
+
+This document records what the API actually does, how it stays a thin control
+plane, the exact local smoke evidence, and what remains unproven. It does not
+claim Cloud Auth integration, a public service, production persistence or a
+live model run.
+
+## 1. Scope and intent
+
+Cloud Auth's `/account/services` console (later card) needs to create, edit,
+pause, run and inspect scheduled research. The business state must stay owned by
+Cloud Pi, not copied into Cloud Auth. This card therefore adds a versioned JSON
+HTTP facade that:
+
+- listens **only** on the literal loopback addresses `127.0.0.1` or `::1`;
+- calls the existing Scheduler and Research public modules for every read/write;
+- has no task database, cache or index of its own;
+- never edits `${SCHEDULER_STATE_DIR}/schedules/*.json` or
+  `${RESEARCH_RUNS_DIR}/*` from the HTTP layer;
+- has no account, token, session or CORS design — Cloud Auth delegation is a
+  separate, not-yet-frozen contract.
+
+It is a local development/internal boundary. Rebinding it to `0.0.0.0`, `::`,
+a LAN address or a hostname is refused before a socket exists.
+
+## 2. AGT-033 integration at acceptance
+
+This Draft was initially based on dev before AGT-033 existed. At acceptance,
+AGT-033 PR #18 has entered dev, so Issue #16 now requires the delivery
+read path. This repair consumes the existing AGT-033 public composition root,
+not a duplicated delivery store or state machine.
+
+Create a delivering scheduler with createDeliveringScheduler(), and pass it
+through the deliveringScheduler option to createManagementApi(). The API
+delegates schedule operations to the same scheduler and delivery reads to
+getRunDelivery(). Its status endpoint reports deliveryStatus=true only when
+this composition root is supplied. A legacy caller passing a standalone
+Scheduler still gets deliveryStatus=false and a documented 404.
+
+The API projects validated deliveryTargets for trusted loopback callers,
+allowing creation and PATCH edits before the first trigger. After any trigger,
+recipient identity changes fail with 409 conflict: the delivery startup
+reconciliation currently replays a terminal run using the schedule current
+recipient list. Otherwise a new recipient could unexpectedly receive an
+old report. Editing labels or reordering the same identities remains allowed;
+create a new schedule for a recipient change after execution until an
+immutable per-trigger target snapshot contract exists.
+
+GET /v1/runs/:runId/delivery checks that the Research run exists, calls the
+AGT-033 read method, and projects the research status alongside masked
+recipient IDs, per-destination delivery status, counts, attempts and message
+IDs. Raw delivery keys, raw recipient IDs and raw error messages are never
+returned in delivery diagnostics.
+
+## 3. Ownership and module layout
+
+```
+src/api/
+  contracts.mjs   version, error classes, HTTP status map, limits
+  policy.mjs      loopback host/port policy, listen-address formatting
+  views.mjs       reviewed projections (schedule/run/report/source)
+  controller.mjs  thin use cases → Scheduler / Research public modules
+  router.mjs      route table, query/body schema, error mapping
+  server.mjs      node:http server, JSON body cap, start/stop lifecycle
+  index.mjs       public exports
+src/scheduler/
+  scheduler.mjs   + updateSchedule(), deleteSchedule() only
+  index.mjs       documentation of the two new operations
+scripts/agt-034/
+  api-smoke.mjs   reproducible local HTTP smoke (fixture model boundary)
+tests/
+  agt-034-api-t1.test.mjs
+  agt-034-api-t2.test.mjs
+  agt-034-api-t3.test.mjs
+  agt-034-api-lifecycle.test.mjs
+  agt-034-helpers.mjs
+```
+
+No dependency was added. The API uses Node built-in `node:http`, `fetch` is only
+used by tests/scripts, and the repository still has no web framework.
+
+### Scheduler ownership
+
+`updateSchedule()` and `deleteSchedule()` were added to `scheduler.mjs` and
+documented in `scheduler/index.mjs`. `contracts.mjs`, `schedule.mjs` and
+`store.mjs` were **not** modified, so AGT-033's scheduler contract surface is
+untouched. No status machine, timer, lease or dedupe rule was rewritten.
+
+## 4. Endpoint summary (`/v1`)
+
+| Method | Path | Purpose | Success |
+| --- | --- | --- | --- |
+| GET | `/v1/health` | process liveness, API version | 200 |
+| GET | `/v1/status` | schedule counts, active runs, run count, capability flags | 200 |
+| GET | `/v1/schedules` | list schedules (reviewed projection) | 200 |
+| POST | `/v1/schedules` | create once/recurring schedule | 201 + `Location` |
+| GET | `/v1/schedules/:id` | schedule detail + bounded recent triggers | 200 |
+| PATCH | `/v1/schedules/:id` | update business fields only | 200 |
+| DELETE | `/v1/schedules/:id` | delete definition + persisted file | 200 |
+| POST | `/v1/schedules/:id/pause` | pause | 200 |
+| POST | `/v1/schedules/:id/enable` | enable and recompute next run | 200 |
+| POST | `/v1/schedules/:id/run-now` | trigger one run | 200 |
+| POST | `/v1/schedules/:id/cancel` | abort the active run | 200 |
+| GET | `/v1/runs` | list runs (`limit`, optional `scheduleId`) | 200 |
+| GET | `/v1/runs/:runId` | run detail | 200 |
+| GET | `/v1/runs/:runId/report` | report text + bounded source ledger | 200 |
+| GET | /v1/runs/:runId/delivery | read AGT-033 delivery when configured | 200 / 404 |
+
+Notes:
+
+- Query parameters are validated per route. `/v1/runs` accepts only `limit`
+  (1–100, default 50) and `scheduleId`; everything else is `invalid_request`.
+- Request bodies must be `application/json`, a JSON object, and at most 64 KiB.
+- Trailing slashes are accepted; malformed percent-encoding is `invalid_request`.
+- Unknown path → `not_found`; known path with a different method →
+  `method_not_allowed` plus an `Allow` header.
+- A schedule's recent trigger history is bounded to 20 entries in a detail view.
+  The Scheduler itself retains at most `maxTriggerHistory` (100) audit triggers,
+  so older triggers are dropped from the schedule record. Research runs are not
+  deleted; older runs stay readable through the unfiltered run list, but not
+  through the `scheduleId` filter (see §10).
+- `run-now` is synchronous for the trigger outcome: the request returns after the
+  triggered run reaches a terminal state, so the console receives the real
+  `runId`/`status` rather than an optimistic acknowledgement. The run is bounded
+  by the schedule's own `request.limits.maxRuntimeMs` (AGT-028), not by an HTTP
+  timeout. `api.stop()` bounds how long it waits for that request; it does not
+  abort the scheduler run (use `cancel` or `scheduler.stop` for that).
+
+### Response envelopes
+
+Success:
+
+```json
+{ "ok": true, "data": { "...": "..." } }
+```
+
+Failure:
+
+```json
+{ "ok": false, "error": { "code": "conflict", "message": "..." } }
+```
+
+Every response carries `x-request-id`, `cache-control: no-store` and
+`x-content-type-options: nosniff`. No CORS header is emitted.
+
+## 5. Error contract
+
+| `code` | HTTP | Typical cause |
+| --- | --- | --- |
+| `invalid_request` | 400 | schema, query, JSON, invalid schedule/request field |
+| `not_found` | 404 | unknown route, schedule, run, artifact; delivery closure |
+| `conflict` | 409 | completed schedule paused, update/delete during an active run, cancel with no active run |
+| `busy` | 503 | scheduler already has an active run; server shutting down |
+| `internal_error` | 500 | unexpected failure; message is always `"internal error"` |
+| `method_not_allowed` | 405 | known path, unsupported method |
+| `unsupported_media_type` | 415 | non-JSON body |
+| `payload_too_large` | 413 | body over 64 KiB |
+
+Internal errors never return a stack, absolute host path, environment value or
+raw internal message. Unexpected diagnostics are logged as only
+`api: internal error (<ErrorName>)`. Request logs contain method, **route
+template**, status, duration and request id — never a body, header, query value
+or report content.
+
+## 6. Loopback-only policy
+
+- Allowed hosts: literal `127.0.0.1` and `::1` only.
+- Refused before listening: `0.0.0.0`, `::`, `localhost`, LAN addresses,
+  hostnames, empty values. Hostnames are not resolved, because `/etc/hosts` or
+  DNS must not be able to widen the listener.
+- Default: `127.0.0.1:8787`; a caller may pass port `0` for an ephemeral local
+  port (tests and the smoke do).
+- The actual bound address is read back from the socket and formatted with IPv6
+  brackets when needed.
+- There is no authentication, authorization, TLS, proxy trust or public bind in
+  this card. A local process with access to the loopback port is trusted; Cloud
+  Auth delegation is a later card.
+
+## 7. Start/stop lifecycle
+
+- `start()` creates the HTTP server, binds the validated address and returns
+  `{ host, family, port, url }`. A listen failure (for example `EADDRINUSE`)
+  rejects and is not retried under another port.
+- `stop()` sets a closing flag, calls `server.close()` (no new connections),
+  closes idle keep-alive sockets, waits up to `shutdownTimeoutMs` (default 2 s)
+  for in-flight requests, then calls `closeAllConnections()` if work remains.
+  It is idempotent and returns `{ stopped, forced }`.
+- A request that reaches an already-closing server gets `503 busy` with
+  `Connection: close`.
+- A stopped instance refuses `start()` with `409 conflict`; create a new
+  instance. The API does not own the Scheduler's lifetime: the caller should
+  also call `scheduler.stop()`/`dispose()`.
+
+## 8. Sensitive-field filtering
+
+Responses are built by explicit whitelists in `views.mjs`; stored records are
+never spread verbatim.
+
+Never returned: absolute state/run paths, `paths` object, transcript, raw
+environment, API keys, Feishu credentials, Cloud Session, Authorization headers,
+model base URL, request headers, HTTP bodies, full internal errors/stacks.
+
+Returned for a schedule (trusted loopback caller): validated deliveryTargets plus id, name, kind, timezone, cron/once, reviewed research
+request (`topic`, `goal`, `timeRange`, limits), status, next/completed times,
+`lastRun`, `activeTrigger`, stats and bounded recent triggers.
+
+Returned for a run: id, status/timestamps/duration, reviewed request + limits,
+runtime status/usage token counts/model id, tool counters, source summary,
+citation counts, classified errors, artifact availability. Report text and
+source provenance come from the research run store; source URLs are restricted
+to http/https and have embedded userinfo removed. The report can contain public
+web content, which is the configured research deliverable; it is not a private
+message body.
+
+The smoke and tests seed secret-looking environment values and assert they never
+appear in responses or captured logs.
+
+## 9. Minimal `updateSchedule()` / `deleteSchedule()` contract
+
+### update
+
+Accepted fields only: name, timezone, kind, cron, at, request and
+deliveryTargets. The latter is validated by AGT-033 and may be changed only
+before the first trigger (or reordered/relabelled without changing recipient
+identities). Unknown, identity, lifecycle, lease and internal state fields are
+invalid_request. An empty patch is refused.
+
+- **In-flight fail closed:** if the schedule has a persisted `activeTrigger` or
+  a live execution controller, update returns `conflict`. Writing a definition
+  under a running execution would let the execution release a lease against a
+  stale object or start a duplicate trigger; this is refused instead.
+- **Timing changes** (`kind`, `timezone`, `cron`, `at`) re-normalise the
+  definition with the Scheduler's existing validator and recompute `nextRunAt`
+  strictly after `now`.
+- **Lifecycle is not patchable.** `pause()`/`enable()` are the only activation
+  paths. `PATCH {"enabled": true|false}` is rejected with `invalid_request`; a
+  paused schedule whose `nextRunAt` is already due stays paused, keeps that past
+  `nextRunAt`, and a tick does not execute it. `POST /enable` records one missed
+  audit entry and recomputes `nextRunAt` strictly after `now`; the missed
+  occurrence is never replayed.
+- **Non-timing changes** (name/request) keep the current `nextRunAt`/status, so a
+  due-but-not-yet-claimed occurrence cannot be silently skipped by a rename. A
+  paused schedule stays paused.
+- **Completed** schedules are immutable except together with a new future
+  `at`/`cron`, which intentionally starts a fresh activation and clears
+  `completedAt`; trigger history and stats are retained as audit.
+- History/stats/leases are preserved; only `updatedAt` is refreshed by the normal
+  save path.
+
+### delete
+
+- Refused with `conflict` while the schedule has an `activeTrigger` or a live
+  controller, so no execution can release into a deleted record.
+- Otherwise removes the file through `store.fileFor()` and then the in-memory
+  entry, inside the Scheduler's state lock. The HTTP layer never touches a file.
+- Deleting a plan does **not** delete research run history: runs are owned by
+  the AGT-028 run store and remain readable by id.
+- Cross-process concurrency is still the documented AGT-030 POC limit: one
+  scheduler process per state directory. The API does not add a distributed
+  lock.
+
+## 10. Research read path
+
+`GET /v1/runs` and `/v1/runs/:runId` call the existing
+`listResearchRuns()`/`readResearchRun()`. Run filtering by `scheduleId` uses the
+schedule's own persisted trigger `runId`s as the linkage; the run store stays the
+single source of run records. There is no API-side run index, and a run created
+by another caller/process appears automatically.
+
+**The `scheduleId` filter is explicitly bounded, never silently complete.** This
+baseline has no durable `scheduleId` field in the AGT-028 run record, and adding
+one belongs to that module (out of this card's scope). The Scheduler retains at
+most 100 audit triggers, so the filter can only associate runs still present in
+that window. When older triggers have been dropped
+(`stats.triggers > triggers.length`), the response reports:
+
+```json
+{
+  "truncated": true,
+  "filterComplete": false,
+  "scheduleFilter": {
+    "retainedTriggerCount": 100,
+    "totalTriggerCount": 101,
+    "omittedTriggerCount": 1,
+    "truncated": true
+  },
+  "filterReason": "schedule_filter_is_bounded_to_retained_trigger_history"
+}
+```
+
+The unfiltered `/v1/runs` still lists every run in the Research store; its limit
+truncation is explicit through `total` (all matches) versus `count` (returned
+page). An unknown or deleted schedule does **not** turn the filter into 404: the
+response is an explicit `200` with `runs: []`, `total: 0`, `scheduleMissing:
+true`, `filterComplete: false` and `filterReason:
+"schedule_not_found_no_durable_run_link"`, because those runs remain Research
+facts but can no longer be linked. A durable link is listed in §13.
+
+`GET /v1/runs/:runId/report` returns the report text plus a bounded (100)
+projection of `sources.json` and its summary. Missing run → 404; malformed run
+id → 400; corrupt local artifact → generic 500 (no path/stack).
+
+## 11. Tests and commands
+
+All commands below were executed in this worktree on Node `v22.23.2`.
+
+| Layer | File | Count | Proves |
+| --- | --- | --- | --- |
+| T1 contract | `tests/agt-034-api-t1.test.mjs` | 11 | envelopes, 404/405, schema/body/query limits, loopback refusal, delivery closure, secret/path/stack filtering |
+| T2 integration | `tests/agt-034-api-t2.test.mjs` | 9 | API↔Scheduler state equality, lifecycle-only PATCH regression, 101-run bounded-filter boundary, active-run conflict, busy slot, pause/enable/completed, cancel→executor, research reads, restart consistency |
+| T3 chain | `tests/agt-034-api-t3.test.mjs` | 1 | real HTTP create → run-now → run/report → pause/enable/update → restart → delete, run history retention |
+| Lifecycle | `tests/agt-034-api-lifecycle.test.mjs` | 4 | idempotent stop, bounded graceful drain, forced close after bound, no restart after stop, start/stop race |
+
+```bash
+node --test tests/agt-034-*.test.mjs
+# 25 tests, 25 pass, 0 fail
+
+npm test
+# 424 tests, 424 pass, 0 fail, 0 skipped (baseline 399 + 25 AGT-034)
+```
+
+T3/T2 use the real Scheduler `startResearch()` executor and real run store; only
+the AGT-027 runtime port and research tool layer are deterministic fixtures.
+No test replaces `startResearch`, the executor or the run store.
+
+## 12. Local smoke evidence
+
+Command:
+
+```bash
+node scripts/agt-034/api-smoke.mjs   # npm run api:smoke
+```
+
+It creates a temporary state directory, starts the real loopback server and
+fixture-model research executor, and prints JSON Lines. Captured run
+(`result.ok = true`, exit 0):
+
+```json
+{"event":"bind-policy","requestedHost":"0.0.0.0","rejected":true,"code":"invalid_request"}
+{"event":"listen","host":"127.0.0.1","family":"IPv4","port":50307,"url":"http://127.0.0.1:50307/v1"}
+{"event":"request","label":"health","method":"GET","path":"/health","status":200}
+{"event":"request","label":"status","method":"GET","path":"/status","status":200}
+{"event":"request","label":"create","method":"POST","path":"/schedules","status":201}
+{"event":"schedule","scheduleId":"smoke-daily","nextRunAt":"2026-11-03T01:00:00.000Z","status":"active"}
+{"event":"request","label":"list","method":"GET","path":"/schedules","status":200}
+{"event":"request","label":"get","method":"GET","path":"/schedules/smoke-daily","status":200}
+{"event":"request","label":"update","method":"PATCH","path":"/schedules/smoke-daily","status":200}
+{"event":"request","label":"run-now","method":"POST","path":"/schedules/smoke-daily/run-now","status":200}
+{"event":"run-now","scheduleId":"smoke-daily","triggerStatus":"succeeded","researchStatus":"completed","runId":"r-20261103T000000-a9a285"}
+{"event":"request","label":"runs","method":"GET","path":"/runs?scheduleId=smoke-daily","status":200}
+{"event":"request","label":"run","method":"GET","path":"/runs/r-20261103T000000-a9a285","status":200}
+{"event":"request","label":"report","method":"GET","path":"/runs/r-20261103T000000-a9a285/report","status":200}
+{"event":"report","runId":"r-20261103T000000-a9a285","reportChars":244,"sourcesTotal":0}
+{"event":"request","label":"delivery","method":"GET","path":"/runs/r-20261103T000000-a9a285/delivery","status":404,"code":"not_found"}
+{"event":"request","label":"pause","method":"POST","path":"/schedules/smoke-daily/pause","status":200}
+{"event":"request","label":"enable","method":"POST","path":"/schedules/smoke-daily/enable","status":200}
+{"event":"listen","phase":"restart","host":"127.0.0.1","port":50310,"url":"http://127.0.0.1:50310/v1"}
+{"event":"request","label":"get-after-restart","method":"GET","path":"/schedules/smoke-daily","status":200}
+{"event":"restart-consistency","before":{"scheduleId":"smoke-daily","nextRunAt":"2026-11-03T01:00:00.000Z","lastRunId":"r-20261103T000000-a9a285","triggerCount":1},"after":{"scheduleId":"smoke-daily","nextRunAt":"2026-11-03T01:00:00.000Z","lastRunId":"r-20261103T000000-a9a285","triggerCount":1},"consistent":true}
+{"event":"request","label":"run-after-restart","method":"GET","path":"/runs/r-20261103T000000-a9a285/report","status":200}
+{"event":"request","label":"delete","method":"DELETE","path":"/schedules/smoke-daily","status":200}
+{"event":"request","label":"get-after-delete","method":"GET","path":"/schedules/smoke-daily","status":404,"code":"not_found"}
+{"event":"request","label":"runs-after-delete","method":"GET","path":"/runs","status":200}
+{"event":"stop","drained":true}
+{"event":"result","ok":true,"requests":18}
+```
+
+The smoke records listener address/port, status codes, schedule id and run id; it
+does not record credentials, request bodies, report content or environment
+values. Ports are ephemeral and differ per run.
+
+## 13. Explicitly unverified / not implemented
+
+- **No Cloud Auth integration.** No service identity, delegated token, account
+  mapping or session; any local process that can reach the loopback port is
+  trusted. Do not expose this listener through a proxy/public bind.
+- **No public listener, TLS, CORS, rate limiting or hardening.** Only the 64 KiB
+  body cap, list limit and scheduler's own concurrency limit apply.
+- **Delivery read is sourced from AGT-033** when the delivering scheduler is configured; otherwise deliveryStatus=false and a documented 404.
+- **No real model/network live run** in this card's evidence. The smoke/API
+  integration uses the repository's deterministic runtime/tool fixture; the real
+  AGT-028 executor and run store are exercised, but not a live provider.
+- **`run-now` is request-synchronous** as described in §4; there is no async job
+  acknowledgement queue in this card.
+- **Single process per state directory.** No cross-process lock, distributed
+  exactly-once, or multi-instance coordination.
+- **No durable run→schedule link.** `scheduleId` filtering is bounded to the
+  Scheduler's retained trigger window (100) and is explicitly flagged with
+  `truncated`/`filterComplete`; a deleted schedule's filter returns an explicit
+  empty result. Persisting `scheduleId` into the AGT-028 run record would need a
+  change in `src/research/`, which this card deliberately does not touch.
+- **`GET /v1/status` scans the run directory** to count runs. Fine for the local
+  POC; a future production store should provide a bounded summary query.
+- **No browser console**, UI route or Cloud Auth page.
+- **No deployment.** Merge and closure require separate maintainer acceptance.
+
+
+## Acceptance integration evidence (2026-11-03)
+
+AGT-032 and AGT-033 were merged into dev before the AGT-034 acceptance
+review. The focused agt-034-delivery-integration.test.mjs executes real
+loopback HTTP, Scheduler, Research executor/run store and Delivery
+coordinator/store, with deterministic model/tool and outbound Feishu
+network boundaries. It verifies recipient editing before execution,
+rejection of recipient-identity changes after execution, masked delivery
+reads, missing-run 404 and restart idempotency. It is not a live provider
+or deployed production test.

@@ -30,7 +30,9 @@
  * );
  * ```
  *
- * Operations: create/load, enable, pause, run-now, start, stop, tick, cancel.
+ * Operations: create/load, update (business fields only), delete, enable, pause,
+ * run-now, start, stop, tick, cancel. Update/delete fail closed while a schedule
+ * owns a lease or a live execution controller.
  * `startResearch` (the non-blocking public form of `executeResearch`) is called
  * for every trigger; the scheduler never assembles a runtime or calls a model.
  */
