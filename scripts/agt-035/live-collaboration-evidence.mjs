@@ -31,11 +31,12 @@
  *   --group-name <name>        wanted group (matched against the bot's chats)
  *   --topic <text>             research topic (default: 48h AI Agent progress)
  *   --wait-dm-seconds <n>      how long to wait for the maintainer's DM
- *   --confirm-dm               confirm the captured DM sender as a target
+ *   --confirm-dm               opt in to a DM target; bind it with a one-time challenge
  *   --group-only               skip the private target entirely
  *   --out <path>               evidence file
  *   --api-port <n>             0 picks an ephemeral loopback port
  */
+import { randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDeliveringScheduler } from "../../src/delivery/index.mjs";
@@ -48,6 +49,11 @@ import {
 import { loadFeishuConfig, maskId } from "../../src/channels/feishu/config.mjs";
 import { createFeishuTransport } from "../../src/channels/feishu/transport.mjs";
 import { normalizeFeishuMessageEvent } from "../../src/channels/feishu/events.mjs";
+import {
+  isSuccessfulCollaborationEvidence,
+  matchesPrivateMessageChallenge,
+  sanitizeDeliveryEvidence,
+} from "./evidence-contract.mjs";
 import { createManagementApi } from "../../src/api/index.mjs";
 import { loadAgentRuntimePort } from "../../src/research/port.mjs";
 import { ENV as RESEARCH_ENV } from "../../src/research/contracts.mjs";
@@ -91,6 +97,9 @@ const schedulerDir = join(stateRoot, "scheduler");
 if (!groupName && !groupOnly) {
   throw new Error("--group-name is required (the group the bot already joined)");
 }
+if (confirmDm && groupOnly) {
+  throw new Error("--confirm-dm cannot be combined with --group-only");
+}
 if (!Number.isFinite(waitDmSeconds) || waitDmSeconds <= 0) {
   throw new Error("--wait-dm-seconds expects a positive number");
 }
@@ -115,7 +124,7 @@ function localWallTime(date, timeZone) {
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
-async function waitForPrivateMessage(transport, seconds) {
+async function waitForPrivateMessage(transport, seconds, challenge) {
   return new Promise((resolve) => {
     const startedAt = Date.now();
     let settled = false;
@@ -123,15 +132,14 @@ async function waitForPrivateMessage(transport, seconds) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      transport.__captureP2p = null;
       resolve({ ...value, waitedMs: Date.now() - startedAt });
     };
     const timer = setTimeout(() => finish({ observed: false, openId: null }), seconds * 1000);
-    // The transport owns the event hook; the capture is installed through a
-    // dedicated handler below instead of mutating the transport's callback.
+    // A sender is bound only by the unpredictable code printed to this local
+    // terminal. An arbitrary DM during the window is not an identity proof.
     transport.__captureP2p = (event) => {
-      if (event.chatType !== "p2p" || event.senderType !== "user") return;
-      if (!event.senderOpenId?.startsWith("ou_")) return;
-      if (event.senderOpenId === transport.getBotOpenId()) return;
+      if (!matchesPrivateMessageChallenge(event, challenge, transport.getBotOpenId())) return;
       finish({ observed: true, openId: event.senderOpenId });
     };
   });
@@ -202,22 +210,27 @@ async function main() {
     const botOpenId = started?.botOpenId ?? transport.getBotOpenId();
 
     let observation = { observed: false, openId: null, waitedMs: 0 };
-    if (!groupOnly) {
+    if (!groupOnly && confirmDm) {
+      const challenge = randomBytes(16).toString("hex");
       console.log(
-        `\n请在这个飞书应用里给机器人发送一条私聊消息（内容任意，不会被回复）。等待 ${waitDmSeconds}s…`,
+        `\n请从准备授权的飞书账号，向机器人私聊发送这段一次性验证码：\n\n${challenge}\n\n验证码仅在本机显示，不写入证据。等待 ${waitDmSeconds}s…`,
       );
-      observation = await waitForPrivateMessage(transport, waitDmSeconds);
+      observation = await waitForPrivateMessage(transport, waitDmSeconds, challenge);
       await record({
         event: "private_message_capture",
         observed: observation.observed,
+        challengeMatched: observation.observed,
+        confirmationMethod: "one_time_challenge",
         maskedSender: observation.openId ? maskId(observation.openId) : null,
         waitedMs: observation.waitedMs,
       });
       if (!observation.observed) {
         throw new Error(
-          "no private message was observed; run again with the maintainer's Feishu window open (or use --group-only)",
+          "no private message with the one-time challenge was observed; run again with the intended Feishu account available (or use --group-only)",
         );
       }
+    } else if (!groupOnly) {
+      console.log("未启用 --confirm-dm：跳过私聊目标，本次只解析群目标。");
     }
 
     // 3) Resolve targets from platform facts + controlled config only.
@@ -232,6 +245,7 @@ async function main() {
       event: "target_resolution",
       requestedGroup: groupName || null,
       confirmDm,
+      confirmationMethod: confirmDm ? "one_time_challenge" : null,
       targets: resolution.targets.map(maskTarget),
       unavailable: resolution.unavailable,
       rejected: resolution.rejected,
@@ -301,21 +315,7 @@ async function main() {
     const delivery = await delivering.getRunDelivery(runId);
     await record({
       event: "delivery_record",
-      runId,
-      deliveryStatus: delivery?.deliveryStatus ?? null,
-      researchStatus: delivery?.researchStatus ?? null,
-      triggerStatus: delivery?.triggerStatus ?? null,
-      counts: delivery?.counts ?? null,
-      targets: (delivery?.targets ?? []).map((target) => ({
-        destination: target.destination,
-        status: target.status,
-        attempts: target.attempts,
-        deliveryKind: target.deliveryKind,
-        messageId: target.messageId ?? null,
-        lastError: target.lastError
-          ? { code: target.lastError.code, feishuCode: target.lastError.feishuCode ?? null }
-          : null,
-      })),
+      delivery: sanitizeDeliveryEvidence(delivery),
     });
 
     // 6) Idempotent replay: the same terminal trigger twice must not send again.
@@ -346,27 +346,35 @@ async function main() {
     const statusBody = await statusResponse.json();
     const deliveryResponse = await fetch(`${address.url}/runs/${runId}/delivery`);
     const deliveryBody = await deliveryResponse.json();
+    const apiDelivery = deliveryBody?.data?.delivery ?? null;
+    const safeApiDelivery = sanitizeDeliveryEvidence(apiDelivery);
     await record({
       event: "management_api_readback",
       url: address.url,
       statusCode: statusResponse.status,
       deliveryStatusCode: deliveryResponse.status,
       deliveryCapability: statusBody?.data?.capabilities?.deliveryStatus ?? null,
-      delivery: deliveryBody?.data?.delivery ?? null,
+      delivery: safeApiDelivery,
     });
 
-    const ok =
-      deliveryResponse.status === 200 &&
-      beforeReplay === afterReplay &&
-      (deliveryBody?.data?.delivery?.targets?.length ?? 0) === deliveryTargets.length;
+    const ok = isSuccessfulCollaborationEvidence({
+      statusCode: statusResponse.status,
+      statusBody,
+      deliveryStatusCode: deliveryResponse.status,
+      deliveryBody,
+      expectedTargets: deliveryTargets.map(maskTarget),
+      sendCallsBefore: beforeReplay,
+      sendCallsAfter: afterReplay,
+      runId,
+    });
     await record({
       event: "result",
       ok,
       runId,
-      researchStatus: delivery?.researchStatus ?? null,
-      deliveryStatus: delivery?.deliveryStatus ?? null,
-      counts: delivery?.counts ?? null,
-      apiTargetCount: deliveryBody?.data?.delivery?.targets?.length ?? 0,
+      researchStatus: safeApiDelivery?.researchStatus ?? null,
+      deliveryStatus: safeApiDelivery?.deliveryStatus ?? null,
+      counts: safeApiDelivery?.counts ?? null,
+      apiTargetCount: safeApiDelivery?.targets?.length ?? 0,
       idempotent: beforeReplay === afterReplay,
     });
 
