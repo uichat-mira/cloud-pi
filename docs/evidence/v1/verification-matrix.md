@@ -226,8 +226,8 @@
 
 - 本矩阵只判两件事：**功能是否成立**、**证据属于哪一层**（L1/L2/L3 + 环境限定）。语气、文案、回复长度、
   交互节奏、错误话术是否"像人说的"——**一律不判**。
-- 产品体验标准另立：`docs/product/wecom-experience-rubric.md`（t30 / PR #34，**尚未合并**；
-  合并后才成为权威。合并前不得当作已生效标准，也不得拿来当验收依据）。
+- 产品体验标准另立：`docs/product/wecom-experience-rubric.md`（t30，**已合并 `8c6e1f4`**，自该 commit 起 dev 上有
+  `docs/product/` 且该文件为权威；它生效之前本矩阵不引用它，生效之后也只用它判体验、不用它判功能与层级）。
 - 两个方向都写死：① 矩阵里的 "✅" 永远不等于"用户会觉得好用"；
   ② 体验评审也不能替代 L3 证据——文笔再好，没有真实平台证据就是没验。
 - 为什么需要这条：t12 的 A 场景会同时产出"功能通过"和"体验很差"（例如工具不可用时只回一句人话）。
@@ -466,16 +466,20 @@ $ npm run check
 | 2 | `npm run wecom:wait-inbound`（A 场景入站） | 同上 | 用手机给机器人发一条单聊（"hi" 即可） | 无凭证：exit 2（**实测**）；有凭证但没人发消息时的超时行为**未验证**（不想在无凭证下猜）。**脚本只收不发** |
 | 3 | `npm run wecom:live`（A 场景真实驱动） | 第 1 行 + `D:\cloud-pi\.env` 的 `CLOUD_PI_MODEL_*`（provider / baseURL / model / key 共 6 项） | 同上，并同意一次真实模型计费 | 无凭证：启动即 exit 2；有凭证无入站：等待（不会自己造消息） |
 | 4 | `node scripts/agt-03x/a-wecom-live-reply.mjs --api … --evidence-in …` | 第 2/3 行产出的 `poc/evidence/agt-036-live.jsonl` + `GET /v1/runs/:runId` 可达 | 发一条消息（产生一个 run） | 无 JSONL / 无 runId：**blocker exit 3**（脚本设计如此，缺证据绝不返回 pass） |
-| 5 | `node scripts/agt-03x/b-scheduled-research-delivery.mjs --api … --schedule-id …` | 已真实触发过一次的 schedule + 对应 `run.json` | 在管理 API 建一个 schedule 并等它触发 | **当前到不了**：投递协调器只认飞书目标（`src/delivery/coordinator.mjs:324`），WeCom 目标被显式拒绝 → 依赖 t25 |
-| 6 | `node scripts/agt-03x/c-feishu-regression.mjs --live` | `D:\cloud-pi\.env`：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`ALLOWED_CHAT_IDS` | 授权一个测试群，并同意"发一条真实飞书消息" | 离线部分（C1/C2/C5/C6）**已可跑**；`--live` 无凭证 → blocker |
+| 5 | `node scripts/agt-03x/b-scheduled-research-delivery.mjs --api … --schedule-id …` | 已真实触发过一次的 schedule + 对应 `run.json` | 在管理 API 建一个 schedule 并等它到点 | **接线阻塞已解除**（#31 合并 `c15d0ef`：WeCom 目标改由自己的 sender 投递，不再被当成飞书目标拒绝）；但仍**缺一次真实入站触发的 live**（脚本只读证据，不会自己触发） |
+| 6 | `node scripts/agt-03x/c-feishu-regression.mjs --live` | `D:\cloud-pi\.env`：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`ALLOWED_CHAT_IDS` | 一句"可以往测试群发一条"的明确同意（发完即回） | 离线部分（C1/C2/C5/C6）**已可跑**；`--live` 无同意 → blocker |
 | 7 | Guanlan 现签：`node %TEMP%\gln013-t23\mint.mjs …` | 非生产 Cloud Auth 的登录态 `%TEMP%\gln013-t23\session.txt`（维护者登录产物，不在仓库） | 在 `127.0.0.1:8788` 实例上完成一次登录，产出 `session.txt` | 无 session：`mint.mjs` 打印 `issue failed: <status>` 后 exit 1（状态码**未实测**，因当前 session 有效）；令牌文件缺失/过期：`mcp_credential_unavailable`（已实测） |
 | 8 | cloud-pi #30：`npm run mcp:probe` / `mcp:live` | `GUANLAN_MCP_URL`（隔离 Worker）、令牌文件路径（`GUANLAN_MCP_TOKEN_FILE`）、`GUANLAN_MCP_PROXY` | 给 Worker URL 与代理端口（**已具备**） | 无 env：`guanlan_mcp_config_error` exit 1；其余我已跑通（probe/live/expired/forged/audience 五种） |
 | 9 | 无需外部凭证：`api:smoke`、`entry-smoke`、`d-failure-modes`、`self-test --full`、六个 `test:*`、`npm test` | — | — | 已到 L1/L2（C.9 有逐条结果） |
 | 10 | guanlan `npm run check`、cloud-auth `pnpm run check` | 本机依赖（`node_modules` / `pnpm`） | 本机装依赖即可（无需凭证） | guanlan 本机缺 `node_modules` → 以 Ubuntu CI 为准；auth 已跑 204/136 |
 
-**维护者最短路径（3 个动作 + 1 次合并）**：
-① 往 `~/.mira-secrets/wecom.env` 写两行凭据；② 用手机给机器人发一条消息；③ 授权一个飞书测试群并允许发一条消息；
-④ 合并 t25（投递接线）——①②③ 解锁场景 A/C，④ 解锁场景 B。做完这四件，t12 的 A/B/C 就不再是 blocker。
+**维护者最短路径：现在只剩 1 个动作（发消息）**：
+
+1. **用手机给机器人发一条消息**（单聊即可）——解锁场景 A 的真实入站；场景 B 也靠它到点触发一次 schedule。
+2. 若还要跑场景 C 的 `--live`，再给一句"可以往测试群发一条"的同意（发完即回）。
+
+原先的"3 动作 + 1 合并"其中两项已不存在：`~/.mira-secrets/wecom.env` 里凭据**已存在**（`WECOM_BOT_ID`/`WECOM_BOT_SECRET`，本轮只读确认，未写入），
+`#31`（投递接线 `c15d0ef`）、`#34`（体验文档 `8c6e1f4`）**合并已由 lead 完成**。剩下的是"发一条消息"这个只有维护者能做的动作。
 
 ### D.1 附带的生成物保护结论（回应"确认 .gitignore 覆盖"）
 
@@ -490,3 +494,18 @@ $ npm run check
   复核请用 `--out`"，比改 `.gitignore` 有效。
 - **给下一任的一句话**：`.gitignore` 拦不住对**已跟踪**证据的改写——能拦住它的只有 `--out` / `--no-write`，
   以及"要留新证据就走独立分支/PR 让 diff 可见"。不要用"加一条忽略规则"来假装这个问题已经解决。
+
+### C.10 #31 / #34 合并后的回填（append-only，判定不动）
+
+- **#34 体验文档（`8c6e1f4`）**：dev 上现在有 `docs/product/`，`docs/product/wecom-experience-rubric.md` 自该 commit 起为权威。
+  §5.6 里"尚未合并、合并后才成权威"已按事实回填为"已合并 `8c6e1f4`"——**只改这一句事实，不改边界与判定**。
+- **#31 投递接线（`c15d0ef`）**：`src/delivery/coordinator.mjs` 不再"只认飞书"——WeCom 目标改由自己的
+  `DELIVERY_TARGET_TYPE` sender 投递（L119 / L341-342），不会再被塞给飞书传输层。**G1 的"接线阻塞"解除**。
+- **但不升级任何判定**：没有真实入站触发过一次 schedule，所以 §2 第 3 项仍是"通道 L3 + 接线 L2"，
+  A-1 仍待补，G1 只从"功能不存在"变成"功能存在、**未真实触发**"，仍**不算已解决**。
+  §0 里"定时投递到企业微信（t25）仍未接线"是当时的判定；现在应读作"接线已合入 dev，真实触发未验"——
+  原文不改，以本段为准。
+- **t27 两段式**：pi-dev 已实现（`test:wecom` 105/105、`npm test` 676/676），但 PR #35 **尚未合并且拟改 base**；
+  A-2 仍待补，**不提前给判定**。
+
+> 结论不变：本矩阵的 L1/L2/L3 结论、缺口表其余行、§6 各仓判定一处都没动；C.10 只记录"仓库状态变了"。
