@@ -24,10 +24,10 @@
 
 - Run：`r-20261103T090100-8f53d7`（研究状态 `completed`，trigger `succeeded`）
 - 个人目标：`ou_f7a…81a5`（来自维护者在同一会话发来的普通私聊，仅内存使用），
-  `status=sent`，`attempts=1`，`messageId=om_x100b61ae6215c0acdf690efe9f0bfc8`，
+  `status=sent`，`attempts=1`，`messageId=om_<redacted>`，
   `sentAt=2026-11-03T09:01:01.394Z`
 - 群目标：`oc_09e…5daf`（`.env` 唯一授权测试群），`status=sent`，`attempts=1`，
-  `messageId=om_x100b61ae622e1ec8c0e8c857c6ea1e6`，
+  `messageId=om_<redacted>`，
   `sentAt=2026-11-03T09:01:02.079Z`
 - 真实消息数：2（每个目标恰好 1 条）
 - 幂等：重复 completion callback ×2 后发送计数仍 2；新 coordinator 重启后仍 2；
@@ -86,7 +86,7 @@ node --env-file-if-exists=.env scripts/agt-033/live-failure-probe.mjs
 `2783e86`，run `r-20261103T095233-b00061`（确定性 fixture 研究）。脱敏结果：
 
 - 个人 `ou_f7a…81a5`：`sent`、`attempts=1`、messageId
-  `om_x100b61aea0ecc4a4dfc6c51c0c684b6`、sentAt `2026-11-03T09:52:34.146Z`；
+  `om_<redacted>`、sentAt `2026-11-03T09:52:34.146Z`；
 - `realMessages=1`、`groupTarget=null`：没有群发送；
 - 专属 client 诊断：`dedicatedSendClient=true`、`sendTimeoutMs=15000`、
   `sharedDefaultsTimeoutAfterCreate=0`；

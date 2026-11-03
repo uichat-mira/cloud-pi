@@ -276,7 +276,7 @@ AGT_033_CODE_COMMIT=$(git rev-parse HEAD) \
 目标补发 1 条、明确不发群（避免打扰群成员）：
 
 - run `r-20261103T095233-b00061`，research=`completed`、trigger=`succeeded`；
-- 个人 `ou_f7a…81a5`：`sent`、`attempts=1`、messageId `om_x100b61aea0ecc4a4dfc6c51c0c684b6`、
+- 个人 `ou_f7a…81a5`：`sent`、`attempts=1`、messageId `om_<redacted>`、
   sentAt `2026-11-03T09:52:34.146Z`；`realMessages=1`，`groupTarget=null`（无群发送）；
 - 运行时诊断：`dedicatedSendClient=true`、`sendTimeoutMs=15000`、
   `sharedDefaultsTimeoutAfterCreate=0`（未改共享 `defaults`）；
@@ -294,6 +294,13 @@ AGT_033_CODE_COMMIT=$(git rev-parse HEAD) \
 
 Live 研究 run 的 runtime 仍是确定性 fixture；真实模型/联网研究触发投递不在本卡 Live
 证据内。
+
+> **证据卫生（2026-11-04）**：本节正文与 `poc/evidence/agt-033-*` 里的真实飞书
+> `messageId`（原 `om_x1…`）已统一替换为 `om_<redacted>`，个人 open_id 只保留
+> `ou_f7a…81a5` 这种前后缀掩码形式。**只替换标识符值**：run id、状态、`attempts`、
+> `sentAt`、`counts`、`checks` 与修正记录的 `correction.originalSha256` 全部未动。
+> 理由：证据里不得出现原始用户/消息 id；保留 id 会让本文件与 `poc/evidence` 一起
+> 变成一份可被外部索引的租户标识清单。判定结论因此**不因脱敏而改变**。
 
 仍未证明/明确不在本卡范围：
 
