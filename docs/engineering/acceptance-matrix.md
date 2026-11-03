@@ -82,7 +82,7 @@
 | C3 | 全量 `npm test` 的失败集合不扩大 | `npm test` | 基线为 555 tests；Windows 上已知 2 项失败（`research-store.test.mjs:52`、`research-verify-adapter.test.mjs:162`，见基线 §4）。接入后要求：**失败集合 ⊆ 已知 2 项**，且新增用例必须 pass | **可执行**（判据即「不新增 fail」；建议 pi-dev 修掉这 2 项后改为「fail 0」） |
 | C4 | 飞书真实往返仍可用（私聊 + 授权群 @） | `npm run feishu:live -- --expect reply`（真实凭证 + 真人发消息） | `poc/evidence/agt-029-live-p2p.jsonl` 形态的事件：`status:"sent"`、真实 `runId`、`usage` 非零 | **待凭证** |
 | C5 | 飞书侧安全语义未被新通道改动 | `npm run test:feishu`（policy/dedupe 用例）+ 代码审阅 `src/channels/feishu/policy.mjs` 未被企业微信改动波及 | 未授权群/未 @/bot open_id 未验证 三类负例仍 fail closed | **可执行** |
-| C6 | 飞书与企业微信共享同一 Agent 执行入口（不出现第二套 runtime） | 代码检查：企业微信 runner 必须调用 `src/runtime.mjs:createAgentRuntime().run()` 或 `src/research/runtime/agt-027.mjs` 的既有 port | 无新增 provider/session 装配实现；`grep -r "createAgentSession" src/` 仅出现在 AGT-027 一处 | 待能力（t6 交付时审） |
+| C6 | 飞书与企业微信共享同一 Agent 执行入口（不出现第二套 runtime） | 代码检查：企业微信 runner 必须调用 `src/runtime.mjs:createAgentRuntime().run()` 或 `src/research/runtime/agt-027.mjs` 的既有 port | 无新增 provider/session 装配实现。基线事实：`createAgentSession` 在 `src/` 中只出现在 `src/runtime.mjs`（import + 调用），`src/research/port.mjs` 仅注释提及 —— 接入后该集合不得扩大 | 待能力（t6 交付时审） |
 
 ## 6. 场景 D：故障与安全（未授权、无效凭证、重复消息、重启、投递失败）
 

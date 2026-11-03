@@ -201,7 +201,7 @@
 | G3 | 真实 Guanlan MCP（Pi SDK 原生 extension） | P0 用 faux provider + 本地 workerd fixture + fixture 令牌；AGT-027 已支持 `extensionFactories` 与 `mcp__*` 白名单；研究工具层是自研 HTTP 抓取 | 需要真实令牌（Cloud Auth 签发）、真实远端 MCP URL、把 MCP 工具装进研究/通道 runtime 的 allowlist 与权限门 | t8（GLN-013）、t9（AGT-038）、t10（GLN-014） |
 | G4 | 定时研究 + 主动投递 | Scheduler（once/recurring、missed 合并、重启恢复）与 AGT-033 投递（幂等、多目标、有界重试）均已实现并本地验证 | 投递目标只有 Feishu `open_id`/`chat_id`；企业微信需新增 transport 与目标类型；跨通道投递需保持同一幂等键语义 | t7（组合根）、t6（若目标解析需扩展） |
 | G5 | 全链路 Trace | **无** traceId/span/关联 id；只有各进程独立 JSONL | 需要贯穿 入口→事件→run→trigger→delivery→API 读回 的关联 id 与白名单投影；这是新增设计面 | **无卡片**：建议 lead 新增或并入 t7 |
-| G6 | Management API 可查 | `/v1` 13 条路由，loopback-only，字段白名单投影 | 需要能查企业微信会话/投递目标；需要「API 读回」成为验收矩阵的判定手段（已在草案中使用） | t7 / t11（验证矩阵落地） |
+| G6 | Management API 可查 | `/v1` 15 条路由，loopback-only，字段白名单投影 | 需要能查企业微信会话/投递目标；需要「API 读回」成为验收矩阵的判定手段（已在草案中使用） | t7 / t11（验证矩阵落地） |
 | G7 | 飞书通道不退化 | 48 项 feishu 套件全绿；全量 553/555（2 项 Windows 断言缺陷） | 需要把飞书回归固化成判据（见 acceptance-matrix 场景 C），并消除 `npm test` 的 Windows 假阴性 | t11（验证矩阵）、t12（E2E） |
 | G8 | 未授权/无效凭证/重复消息/重启/投递失败 | 飞书侧已有 fail-closed 实现与 T1/T2 负例；调度侧重启与 interrupted 恢复有本地证据 | 企业微信侧全部为零；跨通道的重复消息与重启语义待设计 | t6、t7、t12 |
 
