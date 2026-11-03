@@ -82,7 +82,16 @@ export const SECRET_SCAN_PATTERNS = Object.freeze([
   { name: "wecom_message_id", pattern: /\bwm(?!(?:_)?(?:local|fixture))[A-Za-z0-9]{8,}/ },
   // Masks such as `chat_id=0f3b9e…a9b6` (or the ASCII `...` form that generated
   // evidence must use) are the sanctioned projection; an untruncated id is not.
-  { name: "wecom_chat_id", pattern: /\b(?:chatid|chat_id)=(?![A-Za-z0-9_-]*(?:…|\.\.\.))[A-Za-z0-9_-]{4,}/i },
+  // Documentation also writes the *placeholder* form (`chatid=userid`,
+  // `chatid=chatid`, `chat_id=redacted`) when explaining a mapping; those are not
+  // leaks, so placeholder words are allow-listed on the right-hand side
+  // (t11 G12: prose in docs/research/wecom-channel/t6-answers.md tripped the rule
+  // and turned a clean tree into a false positive).
+  {
+    name: "wecom_chat_id",
+    pattern:
+      /\b(?:chatid|chat_id)=(?![A-Za-z0-9_-]*(?:…|\.\.\.))(?!(?:userid|chatid|open_userid|xxx+|redacted|example|sample|placeholder|todo|tbd|value|id)\b)[A-Za-z0-9_-]{4,}/i,
+  },
   { name: "bearer", pattern: /Bearer\s+[A-Za-z0-9._-]{20,}/ },
   { name: "app_secret", pattern: /app_?secret\s*[=:]\s*[A-Za-z0-9]{8,}/i },
   // Mixed-case 32+ character tokens (base64url secrets). Requires a digit, rejects
