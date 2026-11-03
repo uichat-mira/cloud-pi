@@ -162,7 +162,11 @@
 
 根因：断言 `relative(REPO_ROOT, sentinel.cwd).startsWith("..")`（第 202 行）假设 repo 与临时目录同盘。本机 repo 在 `D:\`、`tmpdir()` 在 `C:\`，`path.relative()` 跨盘返回绝对路径，于是不以 `..` 开头。同一测试里紧邻的 `startsWith(realpathSync(tmpdir()))`（第 201 行）**通过**，说明「cwd 在 tmpdir 且不在仓库内」这一安全属性实际成立，失败的是断言写法。
 
-### 4.3 对回归门禁的直接影响
+### 4.3 跨平台交叉验证：同一份代码在 CI 上是绿的
+
+本分支（`docs/agt-03x-acceptance-baseline`，测试代码与 `dev@8efc250` 完全一致）的 CI `Validate / test` job（`ubuntu-latest`，Node `22.19.0`，`npm test`）**通过**（run `41674641155`，head `b613f6b`）。结合 §4.1/§4.2 的根因（POSIX 路径字面量、跨盘 `path.relative()`），可以确定这 2 项失败是 **Windows 专有**，不是产品逻辑或依赖问题，也不是本次交付引入的。
+
+### 4.4 对回归门禁的直接影响
 
 `npm test` 在 Windows 上**不是绿的**（exit 1 / 2 fail）。因此：
 
