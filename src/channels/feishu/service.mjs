@@ -4,11 +4,15 @@
  * Order matters: the channel is created before the transport starts so no
  * inbound event is dropped while the WebSocket is connecting. The bot open id
  * is a getter because it is discovered by the transport at startup.
+ *
+ * The chat runtime and the research runtime are assembled separately
+ * (AGT-032): chat keeps the single AGT-027 runtime, while research lazily loads
+ * the research runtime port and calls the existing AGT-028 entry point.
  */
 import { createFeishuChannel } from "./channel.mjs";
 import { loadFeishuConfig, describeFeishuConfig, maskId } from "./config.mjs";
 import { createFeishuTransport } from "./transport.mjs";
-import { createFeishuAgentRunner } from "./runtime.mjs";
+import { createFeishuAgentRunner, createFeishuResearchRunner } from "./runtime.mjs";
 
 /**
  * @param {object} [options]
@@ -16,19 +20,24 @@ import { createFeishuAgentRunner } from "./runtime.mjs";
  * @param {Function} [options.log]
  * @param {Function} [options.onOutcome]
  * @param {object} [options.runtimeOptions] forwarded to createFeishuAgentRunner
+ * @param {object} [options.researchOptions] forwarded to createFeishuResearchRunner
  * @param {Function} [options.createTransport] injection (tests)
  * @param {Function} [options.createAgentRunner] injection (tests)
+ * @param {Function} [options.createResearchRunner] injection (tests)
  */
 export async function startFeishuService({
   env = process.env,
   log = () => {},
   onOutcome,
   runtimeOptions = {},
+  researchOptions = {},
   createTransport = createFeishuTransport,
   createAgentRunner = createFeishuAgentRunner,
+  createResearchRunner = createFeishuResearchRunner,
 } = {}) {
   const config = loadFeishuConfig(env);
   const agent = createAgentRunner({ env, ...runtimeOptions });
+  const research = createResearchRunner({ env, log, ...researchOptions });
   let transport;
   let channel;
 
@@ -47,6 +56,7 @@ export async function startFeishuService({
       allowedChatIds: config.allowedChatIds,
       botOpenId: () => transport.getBotOpenId(),
       runTurn: agent.runTurn,
+      runResearch: research.runResearch,
       reply: transport.reply,
       log,
       onOutcome,
@@ -59,6 +69,7 @@ export async function startFeishuService({
       channel,
       transport,
       agent,
+      research,
       summary: {
         ...describeFeishuConfig(config),
         appId: maskId(config.appId),
@@ -71,6 +82,7 @@ export async function startFeishuService({
           transport.stop();
         } finally {
           drained = await channel.stopAll({ timeoutMs });
+          await research.dispose();
           await agent.dispose();
         }
         return drained;
@@ -79,6 +91,11 @@ export async function startFeishuService({
   } catch (error) {
     try {
       transport?.stop();
+    } catch {
+      // Best effort during startup failure.
+    }
+    try {
+      await research.dispose();
     } catch {
       // Best effort during startup failure.
     }

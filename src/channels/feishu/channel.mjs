@@ -2,17 +2,23 @@
  * The Feishu channel adapter.
  *
  * One inbound Feishu message that passes routing policy becomes exactly one
- * `runTurn` call (which the host wires to `createAgentRuntime().run()`); the
- * run's answer is replied to the original message. The adapter owns no model,
- * session or tool, so it cannot become a second Agent Runtime.
+ * `runTurn` call (which the host wires to `createAgentRuntime().run()`) or, for
+ * the explicit research command, one `runResearch` call (which the host wires
+ * to the existing AGT-028 `startResearch()`). The run's answer is replied to
+ * the original message. The adapter owns no model, session or tool, so it
+ * cannot become a second Agent Runtime.
  *
  * Guarantees this module enforces:
  *  - routing is decided before any run (private / authorized group @ / ignore);
  *  - a dedupe key is reserved before the async run starts, so redelivery and
  *    concurrent duplicates produce one run;
+ *  - only an explicit `/research <topic>` command starts research; every other
+ *    text keeps the existing single-turn chat behaviour;
  *  - runs for one chat are serialized; `/stop` aborts the active run's
  *    AbortSignal immediately and queued pre-stop messages are dropped;
- *  - runtime failures and reply failures are reported, never swallowed.
+ *  - runtime failures and reply failures are reported, never swallowed;
+ *  - a research reply is bounded and mapped from the real research terminal
+ *    status, and reply/truncation failures never rewrite that status.
  */
 import { createDedupeStore } from "./dedupe.mjs";
 import { normalizeFeishuMessageEvent, readFeishuEventType } from "./events.mjs";
@@ -29,10 +35,82 @@ export const CHANNEL_REPLIES = Object.freeze({
   timeout: "处理超时，请稍后重试。",
 });
 
+/**
+ * Explicit research entry points. This is a command contract, not intent
+ * detection: only a message whose *first* token is exactly one of these starts
+ * a research run, so ordinary chat text never becomes a high-cost run.
+ */
+export const RESEARCH_COMMANDS = Object.freeze(["/research", "/研究"]);
+
+/** Hard upper bound for one research reply, including the run id line. */
+export const MAX_RESEARCH_REPLY_CHARS = 1_800;
+
+export const RESEARCH_REPLIES = Object.freeze({
+  usage: "用法：/research <研究主题>。例如：/research 最近 48 小时 AI Agent 工程进展",
+  unavailable: "研究入口当前不可用，请稍后重试。",
+  noReport: "（本次运行没有可读报告，详情见运行记录。）",
+  reportUnavailable: "（报告读取失败，详情见运行记录。）",
+  truncated: "\n\n…（报告已截断，完整内容见运行记录）",
+});
+
+/** Research terminal status → the reply/outcome vocabulary. */
+const RESEARCH_REPLY_STATUS = Object.freeze({
+  completed: "succeeded",
+  completed_with_errors: "partial",
+  failed: "failed",
+  cancelled: "cancelled",
+  timeout: "timeout",
+});
+
+const RESEARCH_LABELS = Object.freeze({
+  succeeded: "研究完成",
+  partial: "研究部分完成（部分来源或工具失败）",
+  failed: "研究失败",
+  cancelled: "研究已取消",
+  timeout: "研究超时",
+});
+
 const MAX_REPLY_CODE_LENGTH = 40;
 
 function isStopCommand(text) {
   return STOP_COMMANDS.has(text.trim().toLowerCase()) || STOP_COMMANDS.has(text.trim());
+}
+
+/**
+ * Map a research run status onto the distinct reply kinds. Unknown or missing
+ * statuses fail closed instead of being presented as success.
+ */
+export function mapResearchStatus(status) {
+  return RESEARCH_REPLY_STATUS[status] ?? "failed";
+}
+
+/**
+ * Parse the explicit research command.
+ *
+ * @param {string} text trimmed-or-raw message text
+ * @returns {{isCommand:boolean, command?:string, topic:string}}
+ *   `isCommand` only when the first token is exactly `/research` or `/研究` and
+ *   is followed by whitespace/end; `/researchfoo` and `please /research x` are
+ *   ordinary chat text.
+ */
+export function parseResearchCommand(text) {
+  if (typeof text !== "string") return { isCommand: false, topic: "" };
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return { isCommand: false, topic: "" };
+  const lower = trimmed.toLowerCase();
+  for (const command of RESEARCH_COMMANDS) {
+    if (!lower.startsWith(command)) continue;
+    const rest = trimmed.slice(command.length);
+    if (rest.length > 0 && !/^\s/.test(rest)) continue;
+    return { isCommand: true, command, topic: rest.trim() };
+  }
+  return { isCommand: false, topic: "" };
+}
+
+function clipText(value, maxChars) {
+  const chars = Array.from(value);
+  if (chars.length <= maxChars) return value;
+  return chars.slice(0, Math.max(0, maxChars)).join("");
 }
 
 function safeErrorCode(record) {
@@ -45,11 +123,58 @@ function maskMessageId(value) {
   return maskId(value, { head: 6, tail: 4 });
 }
 
+function reportBody(report) {
+  if (typeof report !== "string") return "";
+  return report.replace(/^\uFEFF/, "").trim();
+}
+
+/**
+ * Build the bounded Feishu reply for one research result.
+ *
+ * The run id is part of the header and therefore always survives truncation;
+ * the body is clipped to the remaining budget. A long report degrades into a
+ * truncated body, never into a failed run.
+ *
+ * @param {{status?:string, runId?:string, report?:string|null,
+ *   reportUnavailable?:boolean, error?:{code?:string}}} record
+ * @param {{maxChars?:number}} [options]
+ */
+export function buildResearchReply(record, { maxChars = MAX_RESEARCH_REPLY_CHARS } = {}) {
+  const limit = Number.isFinite(maxChars) && maxChars > 0 ? Math.floor(maxChars) : MAX_RESEARCH_REPLY_CHARS;
+  const kind = mapResearchStatus(record?.status);
+  const runId = typeof record?.runId === "string" && record.runId.length > 0 ? record.runId : null;
+  const runLabel = runId ? `run ${runId}` : "run 未创建";
+
+  if (kind === "cancelled" || kind === "timeout") {
+    return clipText(`${RESEARCH_LABELS[kind]} · ${runLabel}`, limit);
+  }
+  if (kind === "failed") {
+    return clipText(`${RESEARCH_LABELS.failed}（${safeErrorCode(record)}） · ${runLabel}，请稍后重试。`, limit);
+  }
+
+  const header = `${RESEARCH_LABELS[kind]} · ${runLabel}`;
+  const body = reportBody(record?.report);
+  if (body.length === 0) {
+    const fallback = record?.reportUnavailable === true ? RESEARCH_REPLIES.reportUnavailable : RESEARCH_REPLIES.noReport;
+    return clipText(`${header}\n\n${fallback}`, limit);
+  }
+
+  const separator = "\n\n";
+  const bodyBudget = Math.max(0, limit - Array.from(header).length - separator.length - Array.from(RESEARCH_REPLIES.truncated).length);
+  const bodyChars = Array.from(body);
+  const clipped = bodyChars.length > bodyBudget;
+  const bodyText = clipped ? bodyChars.slice(0, bodyBudget).join("") : body;
+  return clipText(`${header}${separator}${bodyText}${clipped ? RESEARCH_REPLIES.truncated : ""}`, limit);
+}
+
 /**
  * @param {object} options
  * @param {Iterable<string>|Set<string>} [options.allowedChatIds] trusted POC group allowlist
  * @param {string|Function} [options.botOpenId] verified bot open id, or a getter
  * @param {Function} options.runTurn async ({text, chatId, chatType, messageId, signal}) => run record
+ * @param {Function} [options.runResearch] async ({topic, chatId, chatType, messageId, signal}) =>
+ *   research record `{status, runId, report, reportUnavailable?, durationMs?}`; when absent an
+ *   explicit research command fails closed without starting a run
  * @param {Function} options.reply async (messageId, text) => {messageId?}
  * @param {object} [options.dedupe] dedupe store (tests/injection)
  * @param {Function} [options.onOutcome] observes every decision/outcome (no message text)
@@ -59,6 +184,7 @@ export function createFeishuChannel({
   allowedChatIds = [],
   botOpenId,
   runTurn,
+  runResearch,
   reply,
   dedupe = createDedupeStore(),
   onOutcome,
@@ -196,7 +322,25 @@ export function createFeishuChannel({
     if (queues.get(chatId) === queue) queues.delete(chatId);
   }
 
-  async function runMessage(event, epoch) {
+  async function replyResearchUsage(event, epoch) {
+    if (disposed) return ignored(event, "channel_disposed");
+    if ((epochs.get(event.chatId) ?? 0) !== epoch) {
+      return ignored(event, "stopped_before_start");
+    }
+    const sent = await safeReply(event.messageId, RESEARCH_REPLIES.usage);
+    const outcome = {
+      action: "research_usage",
+      kind: "research",
+      reason: "missing_topic",
+      replyMessageId: sent.messageId,
+      replyDelivered: sent.ok,
+      ...baseOutcome(event),
+    };
+    emit(outcome);
+    return outcome;
+  }
+
+  async function runMessage(event, epoch, research = null) {
     if (disposed) return ignored(event, "channel_disposed");
     if ((epochs.get(event.chatId) ?? 0) !== epoch) {
       // A /stop arrived after this message was queued; it must never run.
@@ -206,22 +350,45 @@ export function createFeishuChannel({
     const controller = new AbortController();
     const state = { controller, stopped: false };
     activeRuns.set(event.chatId, state);
+    const isResearch = Boolean(research);
 
     let record;
     try {
-      record = await runTurn({
-        text: event.text,
-        chatId: event.chatId,
-        chatType: event.chatType,
-        messageId: event.messageId,
-        eventId: event.eventId,
-        senderOpenId: event.senderOpenId,
-        signal: controller.signal,
-      });
+      if (isResearch) {
+        if (typeof runResearch !== "function") {
+          record = {
+            status: "failed",
+            text: "",
+            runId: undefined,
+            error: { code: "research_unavailable" },
+          };
+        } else {
+          record = await runResearch({
+            text: event.text,
+            topic: research.topic,
+            chatId: event.chatId,
+            chatType: event.chatType,
+            messageId: event.messageId,
+            eventId: event.eventId,
+            senderOpenId: event.senderOpenId,
+            signal: controller.signal,
+          });
+        }
+      } else {
+        record = await runTurn({
+          text: event.text,
+          chatId: event.chatId,
+          chatType: event.chatType,
+          messageId: event.messageId,
+          eventId: event.eventId,
+          senderOpenId: event.senderOpenId,
+          signal: controller.signal,
+        });
+      }
     } catch (error) {
       log({
         level: "error",
-        event: "feishu_run_turn_failed",
+        event: isResearch ? "feishu_research_turn_failed" : "feishu_run_turn_failed",
         messageId: maskMessageId(event.messageId),
         message: String(error?.message ?? error),
       });
@@ -238,6 +405,7 @@ export function createFeishuChannel({
         action: "cancelled",
         reason: "stop_command",
         status: "cancelled",
+        ...(isResearch ? { kind: "research", researchStatus: status } : {}),
         runId: typeof record?.runId === "string" ? record.runId : undefined,
         ...baseOutcome(event),
       };
@@ -246,7 +414,9 @@ export function createFeishuChannel({
     }
 
     let replyText;
-    if (status === "succeeded") {
+    if (isResearch) {
+      replyText = buildResearchReply(record);
+    } else if (status === "succeeded") {
       const answer = typeof record?.text === "string" ? record.text.trim() : "";
       replyText = answer.length > 0 ? answer : CHANNEL_REPLIES.empty;
     } else if (status === "cancelled") {
@@ -258,6 +428,26 @@ export function createFeishuChannel({
     }
 
     const sent = await safeReply(event.messageId, replyText);
+
+    if (isResearch) {
+      const kind = mapResearchStatus(status);
+      const outcome = {
+        action: kind === "cancelled" ? "cancelled" : kind === "failed" || kind === "timeout" ? "failed" : "replied",
+        kind: "research",
+        status: kind,
+        researchStatus: status,
+        runId: typeof record?.runId === "string" ? record.runId : undefined,
+        durationMs: Number.isFinite(record?.durationMs) ? record.durationMs : undefined,
+        sources: Number.isFinite(record?.sources) ? record.sources : undefined,
+        errorCode: kind === "succeeded" || kind === "partial" ? undefined : safeErrorCode(record),
+        replyMessageId: sent.messageId,
+        replyDelivered: sent.ok,
+        ...baseOutcome(event),
+      };
+      emit(outcome);
+      return outcome;
+    }
+
     const outcome = {
       action: status === "succeeded" ? "replied" : status === "cancelled" ? "cancelled" : "failed",
       status,
@@ -337,6 +527,27 @@ export function createFeishuChannel({
     if (isStopCommand(event.text)) return handleStop(event);
 
     const epoch = epochs.get(event.chatId) ?? 0;
+    const research = parseResearchCommand(event.text);
+    if (research.isCommand) {
+      // An explicit command is the only way to start research; a missing topic
+      // replies with usage instead of calling the research executor.
+      if (research.topic.length === 0) {
+        enqueue(event.chatId, () => replyResearchUsage(event, epoch));
+      } else {
+        enqueue(event.chatId, () => runMessage(event, epoch, research));
+      }
+      const outcome = {
+        action: "accepted",
+        reason: route.reason,
+        kind: "research",
+        command: research.command,
+        topicProvided: research.topic.length > 0,
+        ...baseOutcome(event),
+      };
+      emit(outcome);
+      return outcome;
+    }
+
     enqueue(event.chatId, () => runMessage(event, epoch));
     const outcome = { action: "accepted", reason: route.reason, ...baseOutcome(event) };
     emit(outcome);

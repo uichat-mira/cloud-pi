@@ -1,0 +1,274 @@
+#!/usr/bin/env node
+/**
+ * One-shot live evidence driver for AGT-032 (Feishu `/research`).
+ *
+ *   node --env-file-if-exists=.env scripts/agt-032/research-live-evidence.mjs \
+ *     [--chat-type p2p|group] [--timeout-ms N] [--evidence PATH] [--runs-dir DIR]
+ *
+ * Starts the real Feishu service (real WebSocket transport, real AGT-027 chat
+ * runtime, real AGT-028 research runtime + tool layer), waits for one human-sent
+ * `/research <topic>` message, and writes redacted evidence after the run and
+ * reply complete. The script cannot create the inbound message itself: a human
+ * must send it from Feishu while this process is waiting.
+ *
+ * Evidence never contains message text, secrets/tokens, or full Feishu ids. It
+ * records only run id, research status, duration, source count, replyDelivered
+ * and masked ids. The run directory itself is the real AGT-028 artifact root.
+ */
+import { appendFileSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { maskId } from "../../src/channels/feishu/config.mjs";
+import { startFeishuService } from "../../src/channels/feishu/service.mjs";
+import { readResearchRun } from "../../src/research/index.mjs";
+
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+
+const ARG_KEYS = Object.freeze({
+  "--chat-type": "chatType",
+  "--timeout-ms": "timeoutMs",
+  "--evidence": "evidence",
+  "--runs-dir": "runsDir",
+});
+
+function parseArgs(argv) {
+  const options = {
+    chatType: "p2p",
+    timeoutMs: 600_000,
+    evidence: join(ROOT, "poc", "evidence", "agt-032-live.jsonl"),
+    runsDir: undefined,
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index];
+    if (flag === "--help" || flag === "-h") {
+      options.help = true;
+      continue;
+    }
+    if (flag === "--print-metadata") {
+      options.printMetadata = true;
+      continue;
+    }
+    const key = ARG_KEYS[flag];
+    if (!key) throw new Error(`unknown argument: ${flag}`);
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) throw new Error(`${flag} requires a value`);
+    index += 1;
+    options[key] = key === "timeoutMs" ? Number(value) : value;
+  }
+  if (options.chatType !== "p2p" && options.chatType !== "group") {
+    throw new Error("--chat-type must be p2p or group");
+  }
+  if (!(options.timeoutMs >= 10_000)) throw new Error("--timeout-ms must be >= 10000");
+  return options;
+}
+
+function versionOf(packageName) {
+  try {
+    const file = join(ROOT, "node_modules", packageName, "package.json");
+    return JSON.parse(readFileSync(file, "utf8")).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function refFile(gitDir, ref) {
+  try {
+    return readFileSync(join(gitDir, ref), "utf8").trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read HEAD from fixed repository paths (no subprocess, no PATH lookup). In a
+ * linked worktree the worktree git dir only has HEAD/commondir; the branch ref
+ * lives under the common git dir, so fall back to commondir and packed-refs.
+ */
+function gitHead() {
+  try {
+    const dotGit = join(ROOT, ".git");
+    const pointer = statSync(dotGit).isFile() ? readFileSync(dotGit, "utf8").trim() : null;
+    const gitDir = pointer && pointer.startsWith("gitdir:")
+      ? resolve(ROOT, pointer.slice("gitdir:".length).trim())
+      : dotGit;
+    const head = readFileSync(join(gitDir, "HEAD"), "utf8").trim();
+    if (!head.startsWith("ref: ")) return head || null;
+    const ref = head.slice(5);
+    const direct = refFile(gitDir, ref);
+    if (direct) return direct;
+    const commonFile = join(gitDir, "commondir");
+    const common = statSync(commonFile).isFile()
+      ? resolve(gitDir, readFileSync(commonFile, "utf8").trim())
+      : gitDir;
+    const fromCommon = refFile(common, ref);
+    if (fromCommon) return fromCommon;
+    try {
+      const packed = readFileSync(join(common, "packed-refs"), "utf8").split("\n");
+      const line = packed.find((entry) => entry.endsWith(` ${ref}`));
+      return line ? line.split(" ")[0] : null;
+    } catch {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+const options = parseArgs(process.argv.slice(2));
+if (options.help || options.printMetadata) {
+  if (options.help) {
+    process.stderr.write(
+      "usage: node scripts/agt-032/research-live-evidence.mjs [--chat-type p2p|group] [--timeout-ms N] [--evidence PATH] [--runs-dir DIR] [--print-metadata]\n",
+    );
+  }
+  if (options.printMetadata) {
+    process.stdout.write(
+      `${JSON.stringify({
+        commit: gitHead(),
+        node: process.version,
+        piCodingAgent: versionOf("@earendil-works/pi-coding-agent"),
+        feishuSdk: versionOf("@larksuiteoapi/node-sdk"),
+      })}\n`,
+    );
+  }
+  process.exit(0);
+}
+
+mkdirSync(dirname(options.evidence), { recursive: true });
+
+function writeEvidence(entry) {
+  appendFileSync(options.evidence, `${JSON.stringify(entry)}\n`);
+}
+
+/** Only whitelisted, non-content fields may enter evidence. */
+function maskedOutcome(outcome) {
+  return {
+    action: outcome.action,
+    kind: outcome.kind,
+    reason: outcome.reason,
+    chatType: outcome.chatType,
+    status: outcome.status,
+    researchStatus: outcome.researchStatus,
+    runId: outcome.runId,
+    durationMs: outcome.durationMs,
+    sources: outcome.sources,
+    errorCode: outcome.errorCode,
+    replyDelivered: outcome.replyDelivered,
+    messageId: outcome.messageId ? maskId(outcome.messageId) : undefined,
+    eventId: outcome.eventId ? maskId(outcome.eventId) : undefined,
+    chatId: outcome.chatId ? maskId(outcome.chatId) : undefined,
+    replyMessageId: outcome.replyMessageId ? maskId(outcome.replyMessageId) : undefined,
+  };
+}
+
+writeEvidence({
+  kind: "session_start",
+  at: new Date().toISOString(),
+  commit: gitHead(),
+  node: process.version,
+  piCodingAgent: versionOf("@earendil-works/pi-coding-agent"),
+  feishuSdk: versionOf("@larksuiteoapi/node-sdk"),
+  chatType: options.chatType,
+  timeoutMs: options.timeoutMs,
+  runsDir: options.runsDir ?? "default (RESEARCH_RUNS_DIR or .work/research-runs)",
+  redaction: "no message text, no secrets/tokens, full Feishu ids masked",
+});
+
+let service;
+let finished = false;
+let timer;
+
+async function finish(ok, detail) {
+  if (finished) return;
+  finished = true;
+  clearTimeout(timer);
+  writeEvidence({ kind: "result", at: new Date().toISOString(), ok, ...detail });
+  let drained = false;
+  try {
+    drained = service ? await service.stop({ timeoutMs: 15_000 }) : false;
+  } catch (error) {
+    writeEvidence({ kind: "shutdown_error", code: String(error?.code ?? error?.name ?? "error") });
+  }
+  process.stderr.write(
+    `${ok ? "PASS" : "FAIL"} agt-032 live: ${JSON.stringify({ ok, ...detail, drained })}\n`,
+  );
+  process.exit(ok ? 0 : 1);
+}
+
+async function inspectRun(runId) {
+  try {
+    const { run, report, sources } = await readResearchRun(runId, {
+      ...(options.runsDir ? { rootDir: options.runsDir } : {}),
+    });
+    return {
+      persistedStatus: run.status,
+      statusHistory: Array.isArray(run.statusHistory)
+        ? run.statusHistory.map((entry) => entry.status)
+        : undefined,
+      reportChars: typeof report === "string" ? report.length : 0,
+      sourcesCount: Array.isArray(sources) ? sources.length : null,
+      durationMs: run.durationMs,
+      errorCodes: Array.isArray(run.errors) ? run.errors.map((error) => error.code) : [],
+    };
+  } catch (error) {
+    return { readError: String(error?.code ?? error?.name ?? "error") };
+  }
+}
+
+timer = setTimeout(() => {
+  void finish(false, { reason: "timeout", message: "no research outcome arrived before the deadline" });
+}, options.timeoutMs);
+timer.unref?.();
+
+try {
+  service = await startFeishuService({
+    log: (entry) => {
+      if (entry.level === "error") process.stderr.write(`${JSON.stringify(entry)}\n`);
+    },
+    onOutcome: (outcome) => {
+      if (outcome.kind !== "research" || outcome.action === "accepted") return;
+      if (outcome.chatType !== options.chatType) return;
+      writeEvidence({ kind: "outcome", at: new Date().toISOString(), ...maskedOutcome(outcome) });
+      if (finished) return;
+      if (outcome.action === "replied" && outcome.status === "succeeded") {
+        void (async () => {
+          const inspected = outcome.runId ? await inspectRun(outcome.runId) : { readError: "missing_run_id" };
+          const ok = inspected.persistedStatus === "completed";
+          await finish(ok, {
+            reason: ok ? "research_completed" : "run_status_mismatch",
+            outcome: maskedOutcome(outcome),
+            run: inspected,
+          });
+        })();
+        return;
+      }
+      void finish(false, {
+        reason: "research_not_completed",
+        outcome: maskedOutcome(outcome),
+      });
+    },
+  });
+} catch (error) {
+  const isConfig =
+    error?.code === "feishu_config_error" ||
+    error?.name === "FeishuConfigError" ||
+    error?.name === "ConfigError";
+  writeEvidence({
+    kind: "start_failed",
+    at: new Date().toISOString(),
+    code: String(error?.code ?? error?.name ?? "error"),
+    fields: Array.isArray(error?.fields) ? error.fields : undefined,
+    message: isConfig ? error.message : undefined,
+  });
+  process.stderr.write(`agt-032 live start failed: ${error?.message ?? error}\n`);
+  process.exit(isConfig ? 2 : 1);
+}
+
+writeEvidence({ kind: "connected", at: new Date().toISOString(), ...service.summary });
+process.stderr.write(
+  [
+    "Feishu channel connected (real transport + AGT-028 research runtime).",
+    `Send exactly one ${options.chatType === "group" ? "authorized-group @bot" : "private"} message: /research <short topic>`,
+    `Waiting up to ${Math.round(options.timeoutMs / 1000)}s; evidence → ${options.evidence}`,
+  ].join("\n"),
+);
