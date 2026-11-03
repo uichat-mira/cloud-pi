@@ -179,7 +179,7 @@ export const defaultAppDeps = {
       import("./research/port.mjs"),
       import("./research/tools/search.mjs"),
       import("./research/tools/read-page.mjs"),
-      import("./research/run-store.mjs"),
+      import("./research/execute.mjs"),
     ]);
     const runtimePort = await loadAgentRuntimePort({ moduleSpecifier: env.AGENT_RUNTIME_MODULE });
     const toolLayer = {

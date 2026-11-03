@@ -186,15 +186,16 @@ export async function main({
 
   // The scheduler tick timer and the channel sockets are the liveness owners;
   // this timer makes the invariant explicit so a process with an unref'd timer
-  // never exits silently while it is supposed to be serving.
-  const keepAlive = setInterval(() => {}, 60_000);
+  // never exits silently while it is supposed to be serving. With
+  // `installSignals: false` the caller owns liveness (tests, embedded use).
+  const keepAlive = installSignals ? setInterval(() => {}, 60_000) : null;
 
   let stopping = false;
   const shutdown = async (signal) => {
     if (stopping) return { code: 0, alreadyStopping: true };
     stopping = true;
     log({ level: "info", event: "cloud_agent_shutdown_requested", signal });
-    clearInterval(keepAlive);
+    if (keepAlive) clearInterval(keepAlive);
     const result = await app.stop({ reason: signal }).catch((error) => {
       log({ level: "error", event: "cloud_agent_stop_failed", message: String(error?.message ?? error) });
       return { drained: false };
