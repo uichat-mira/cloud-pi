@@ -1,0 +1,215 @@
+{"scenario":"B","at":"2026-11-03T17:16:51.561Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:16:51.565Z","event":"self-test","status":"pass","detail":"happy path → pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T17:16:51.566Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:16:51.566Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:16:51.566Z","event":"self-test","status":"pass","detail":"no Guanlan tool call → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:16:51.567Z","event":"self-test","status":"pass","detail":"delivery reader unavailable → blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T17:16:51.567Z","event":"self-test","status":"pass","detail":"API/disk mismatch → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:16:51.567Z","event":"self-test","status":"pass","detail":"unbounded retries → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:16:51.567Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:16:51.568Z","check":"B1-B7","status":"blocker","detail":"offline self-test only — no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:16:51.568Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:16:51.659Z","event":"start","mode":"real","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:16:51.662Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T17:16:51.663Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T17:16:51.663Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:16:51.663Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T17:16:51.663Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T17:16:51.663Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:16:51.663Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T17:16:51.663Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T17:16:51.664Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.664Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.664Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.665Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.665Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.665Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.665Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.665Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:16:51.665Z","event":"result","mode":"real","status":"blocker","counts":{"total":8,"sent":0,"failed":0,"pending":8},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:17:43.117Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:17:43.121Z","event":"self-test","status":"pass","detail":"happy path → pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T17:17:43.122Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:17:43.122Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:17:43.122Z","event":"self-test","status":"pass","detail":"no Guanlan tool call → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:17:43.123Z","event":"self-test","status":"pass","detail":"delivery reader unavailable → blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T17:17:43.123Z","event":"self-test","status":"pass","detail":"API/disk mismatch → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:17:43.123Z","event":"self-test","status":"pass","detail":"unbounded retries → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:17:43.124Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:17:43.124Z","check":"B1-B7","status":"blocker","detail":"offline self-test only — no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:17:43.124Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:17:43.225Z","event":"start","mode":"real","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:17:43.228Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T17:17:43.229Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T17:17:43.229Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:17:43.229Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T17:17:43.229Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T17:17:43.229Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:17:43.229Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T17:17:43.229Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T17:17:43.230Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.230Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.230Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.230Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.231Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.231Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.231Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.231Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:17:43.231Z","event":"result","mode":"real","status":"blocker","counts":{"total":8,"sent":0,"failed":0,"pending":8},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:18:46.593Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:18:46.597Z","event":"self-test","status":"pass","detail":"happy path → pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T17:18:46.597Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:18:46.598Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:18:46.598Z","event":"self-test","status":"pass","detail":"no Guanlan tool call → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:18:46.598Z","event":"self-test","status":"pass","detail":"delivery reader unavailable → blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T17:18:46.598Z","event":"self-test","status":"pass","detail":"API/disk mismatch → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:18:46.598Z","event":"self-test","status":"pass","detail":"unbounded retries → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:18:46.598Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:18:46.599Z","check":"B1-B7","status":"blocker","detail":"offline self-test only — no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:18:46.599Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:18:46.692Z","event":"start","mode":"real","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:18:46.696Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T17:18:46.696Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T17:18:46.696Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:18:46.696Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T17:18:46.697Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T17:18:46.697Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:18:46.697Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T17:18:46.697Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T17:18:46.697Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.698Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.698Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.698Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.698Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.698Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.698Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.698Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:18:46.699Z","event":"result","mode":"real","status":"blocker","counts":{"total":8,"sent":0,"failed":0,"pending":8},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:27:55.863Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:27:55.867Z","event":"self-test","status":"pass","detail":"happy path → pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T17:27:55.867Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:27:55.868Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:27:55.868Z","event":"self-test","status":"pass","detail":"no Guanlan tool call → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:27:55.868Z","event":"self-test","status":"pass","detail":"delivery reader unavailable → blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T17:27:55.868Z","event":"self-test","status":"pass","detail":"API/disk mismatch → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:27:55.868Z","event":"self-test","status":"pass","detail":"unbounded retries → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:27:55.868Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:27:55.869Z","check":"B1-B7","status":"blocker","detail":"offline self-test only — no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:27:55.869Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:27:55.965Z","event":"start","mode":"real","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:27:55.968Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T17:27:55.968Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T17:27:55.968Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:27:55.969Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T17:27:55.969Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T17:27:55.969Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:27:55.969Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T17:27:55.969Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T17:27:55.969Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.970Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.970Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.970Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.970Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.970Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.970Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.970Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:27:55.971Z","event":"result","mode":"real","status":"blocker","counts":{"total":8,"sent":0,"failed":0,"pending":8},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:29:58.732Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:29:58.736Z","event":"self-test","status":"pass","detail":"happy path → pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T17:29:58.736Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:29:58.736Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:29:58.736Z","event":"self-test","status":"pass","detail":"no Guanlan tool call → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:29:58.737Z","event":"self-test","status":"pass","detail":"delivery reader unavailable → blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T17:29:58.737Z","event":"self-test","status":"pass","detail":"API/disk mismatch → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:29:58.737Z","event":"self-test","status":"pass","detail":"unbounded retries → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:29:58.737Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:29:58.737Z","check":"B1-B7","status":"blocker","detail":"offline self-test only — no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:29:58.737Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:29:58.835Z","event":"start","mode":"real","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:29:58.838Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T17:29:58.838Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T17:29:58.838Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:29:58.838Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T17:29:58.838Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T17:29:58.839Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:29:58.839Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T17:29:58.839Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T17:29:58.839Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH"}
+{"scenario":"B","at":"2026-11-03T17:29:58.839Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL"}
+{"scenario":"B","at":"2026-11-03T17:29:58.839Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.840Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.840Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.840Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.840Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.840Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.840Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.841Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.841Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.841Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:29:58.841Z","event":"result","mode":"real","status":"blocker","counts":{"total":10,"sent":0,"failed":0,"pending":10},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:31:02.571Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:31:02.575Z","event":"self-test","status":"pass","detail":"happy path → pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T17:31:02.576Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:31:02.576Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:31:02.576Z","event":"self-test","status":"pass","detail":"no Guanlan tool call → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:31:02.576Z","event":"self-test","status":"pass","detail":"delivery reader unavailable → blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T17:31:02.576Z","event":"self-test","status":"pass","detail":"API/disk mismatch → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:31:02.577Z","event":"self-test","status":"pass","detail":"unbounded retries → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:31:02.577Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:31:02.577Z","check":"B1-B7","status":"blocker","detail":"offline self-test only — no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:31:02.577Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:31:02.670Z","event":"start","mode":"real","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:31:02.673Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T17:31:02.674Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T17:31:02.674Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:31:02.674Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T17:31:02.674Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T17:31:02.674Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:31:02.675Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T17:31:02.675Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T17:31:02.675Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH"}
+{"scenario":"B","at":"2026-11-03T17:31:02.675Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL"}
+{"scenario":"B","at":"2026-11-03T17:31:02.675Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.676Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:31:02.677Z","event":"result","mode":"real","status":"blocker","counts":{"total":10,"sent":0,"failed":0,"pending":10},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:32:07.107Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:32:07.111Z","event":"self-test","status":"pass","detail":"happy path → pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T17:32:07.111Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:32:07.111Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:32:07.112Z","event":"self-test","status":"pass","detail":"no Guanlan tool call → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:32:07.112Z","event":"self-test","status":"pass","detail":"delivery reader unavailable → blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T17:32:07.112Z","event":"self-test","status":"pass","detail":"API/disk mismatch → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:32:07.112Z","event":"self-test","status":"pass","detail":"unbounded retries → fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T17:32:07.112Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:32:07.113Z","check":"B1-B7","status":"blocker","detail":"offline self-test only — no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T17:32:07.113Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T17:32:07.204Z","event":"start","mode":"real","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c"}
+{"scenario":"B","at":"2026-11-03T17:32:07.207Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)"}
+{"scenario":"B","at":"2026-11-03T17:32:07.207Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required"}
+{"scenario":"B","at":"2026-11-03T17:32:07.207Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:32:07.207Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV"}
+{"scenario":"B","at":"2026-11-03T17:32:07.208Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN"}
+{"scenario":"B","at":"2026-11-03T17:32:07.208Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET"}
+{"scenario":"B","at":"2026-11-03T17:32:07.208Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER"}
+{"scenario":"B","at":"2026-11-03T17:32:07.208Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID"}
+{"scenario":"B","at":"2026-11-03T17:32:07.208Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH"}
+{"scenario":"B","at":"2026-11-03T17:32:07.208Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL"}
+{"scenario":"B","at":"2026-11-03T17:32:07.209Z","check":"api","status":"blocker","detail":"--api is required for readback (loopback /v1 base URL)","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.209Z","check":"target","status":"blocker","detail":"--schedule-id or --run-id is required","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.209Z","check":"pre-P1","status":"blocker","detail":"missing env: WECOM_BOT_ID, WECOM_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.209Z","check":"pre-P2","status":"blocker","detail":"missing env: CLOUD_AUTH_ISSUER_URL, CLOUD_AUTH_JWKS_URL, CLOUD_AUTH_ENV","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.209Z","check":"pre-P3","status":"blocker","detail":"missing env: CLOUD_PI_SESSION_TOKEN","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.209Z","check":"pre-P4","status":"blocker","detail":"missing env: GUANLAN_MCP_URL, MIRA_GUANLAN_REGISTRATION_SECRET","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.209Z","check":"pre-P5","status":"blocker","detail":"missing env: AGTX_P5_CONSUMER","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.210Z","check":"pre-P6","status":"blocker","detail":"missing env: CLOUD_PI_MODEL_BASE_URL, CLOUD_PI_MODEL_API_KEY, CLOUD_PI_MODEL_ID","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.210Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.210Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL","mode":"real"}
+{"scenario":"B","at":"2026-11-03T17:32:07.210Z","event":"result","mode":"real","status":"blocker","counts":{"total":10,"sent":0,"failed":0,"pending":10},"note":"B verdict=blocker"}

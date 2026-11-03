@@ -1,0 +1,340 @@
+{"scenario":"C","at":"2026-11-03T17:16:51.758Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:16:51.758Z"}
+{"scenario":"C","at":"2026-11-03T17:16:53.732Z","event":"suite","check":"C1","status":"pass","durationMs":1912,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:16:56.076Z","event":"suite","check":"C2-api","status":"pass","durationMs":2284,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:16:56.960Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":826,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:16:57.401Z","event":"suite","check":"C2-targets","status":"pass","durationMs":381,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:16:57.678Z","event":"suite","check":"C5","status":"pass","durationMs":154,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:16:57.686Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:16:57.686Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:16:57.686Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1912","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.686Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2284","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.687Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=826","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.687Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=381","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.687Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=154","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.687Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.687Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.687Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:16:57.687Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:16:57.786Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:16:57.785Z"}
+{"scenario":"C","at":"2026-11-03T17:16:59.793Z","event":"suite","check":"C1","status":"pass","durationMs":1942,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:02.148Z","event":"suite","check":"C2-api","status":"pass","durationMs":2293,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:03.028Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":819,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:03.460Z","event":"suite","check":"C2-targets","status":"pass","durationMs":375,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:03.730Z","event":"suite","check":"C5","status":"pass","durationMs":154,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:17:03.738Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:17:03.739Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:17:03.739Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1942","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.739Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2293","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.739Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=819","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.739Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=375","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.740Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=154","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.740Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.740Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.740Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:03.740Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:17:43.330Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:17:43.329Z"}
+{"scenario":"C","at":"2026-11-03T17:17:45.429Z","event":"suite","check":"C1","status":"pass","durationMs":2035,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:47.791Z","event":"suite","check":"C2-api","status":"pass","durationMs":2301,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:48.656Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":805,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:49.087Z","event":"suite","check":"C2-targets","status":"pass","durationMs":372,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:49.353Z","event":"suite","check":"C5","status":"pass","durationMs":151,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:17:49.360Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:17:49.361Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:17:49.361Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=2035","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.361Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2301","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.362Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=805","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.362Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=372","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.362Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=151","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.363Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.363Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.363Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:49.363Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:17:49.456Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:17:49.455Z"}
+{"scenario":"C","at":"2026-11-03T17:17:51.407Z","event":"suite","check":"C1","status":"pass","durationMs":1888,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:53.757Z","event":"suite","check":"C2-api","status":"pass","durationMs":2291,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:54.631Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":816,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:55.063Z","event":"suite","check":"C2-targets","status":"pass","durationMs":374,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:17:55.330Z","event":"suite","check":"C5","status":"pass","durationMs":153,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:17:55.337Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:17:55.338Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:17:55.338Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1888","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.338Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2291","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.338Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=816","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.338Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=374","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.339Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=153","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.339Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.339Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.339Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:17:55.339Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:18:06.309Z","event":"start","mode":"full","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:18:06.309Z"}
+{"scenario":"C","at":"2026-11-03T17:18:08.255Z","event":"suite","check":"C1","status":"pass","durationMs":1885,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:10.626Z","event":"suite","check":"C2-api","status":"pass","durationMs":2311,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:11.497Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":813,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:11.923Z","event":"suite","check":"C2-targets","status":"pass","durationMs":368,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:12.190Z","event":"suite","check":"C5","status":"pass","durationMs":152,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:18:39.490Z","event":"suite","check":"C3","status":"fail","durationMs":27218,"detail":"tests=555 fail=2 exit=1"}
+{"scenario":"C","at":"2026-11-03T17:18:39.491Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:18:39.491Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1885","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.491Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2311","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.492Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=813","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.492Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=368","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.492Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=152","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.492Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.492Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known Windows defects)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.492Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:18:39.493Z","event":"result","mode":"full","status":"blocker","counts":{"total":8,"sent":7,"failed":0,"pending":1},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:18:46.792Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:18:46.791Z"}
+{"scenario":"C","at":"2026-11-03T17:18:48.771Z","event":"suite","check":"C1","status":"pass","durationMs":1918,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:51.135Z","event":"suite","check":"C2-api","status":"pass","durationMs":2304,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:52.013Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":819,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:52.466Z","event":"suite","check":"C2-targets","status":"pass","durationMs":390,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:52.740Z","event":"suite","check":"C5","status":"pass","durationMs":157,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:18:52.748Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:18:52.749Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:18:52.749Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1918","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.749Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2304","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.749Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=819","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.750Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=390","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.750Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=157","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.750Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.750Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.750Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:52.750Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:18:52.850Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:18:52.849Z"}
+{"scenario":"C","at":"2026-11-03T17:18:54.950Z","event":"suite","check":"C1","status":"pass","durationMs":2034,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:57.301Z","event":"suite","check":"C2-api","status":"pass","durationMs":2292,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:58.162Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":803,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:58.594Z","event":"suite","check":"C2-targets","status":"pass","durationMs":373,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:18:58.860Z","event":"suite","check":"C5","status":"pass","durationMs":153,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:18:58.868Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:18:58.868Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:18:58.868Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=2034","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.868Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2292","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.869Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=803","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.869Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=373","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.869Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=153","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.869Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.869Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.869Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:18:58.869Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:19:09.753Z","event":"start","mode":"full","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:19:09.753Z"}
+{"scenario":"C","at":"2026-11-03T17:19:11.696Z","event":"suite","check":"C1","status":"pass","durationMs":1881,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:14.043Z","event":"suite","check":"C2-api","status":"pass","durationMs":2289,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:14.926Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":823,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:15.363Z","event":"suite","check":"C2-targets","status":"pass","durationMs":377,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:15.629Z","event":"suite","check":"C5","status":"pass","durationMs":152,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:19:42.778Z","event":"suite","check":"C3","status":"fail","durationMs":27068,"detail":"tests=555 fail=2 exit=1"}
+{"scenario":"C","at":"2026-11-03T17:19:42.779Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:19:42.779Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1881","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.779Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2289","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.780Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=823","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.780Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=377","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.780Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=152","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.780Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.780Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known Windows defects)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.780Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:19:42.781Z","event":"result","mode":"full","status":"blocker","counts":{"total":8,"sent":7,"failed":0,"pending":1},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:19:42.964Z","event":"start","mode":"full","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:19:42.963Z"}
+{"scenario":"C","at":"2026-11-03T17:19:44.916Z","event":"suite","check":"C1","status":"pass","durationMs":1892,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:47.261Z","event":"suite","check":"C2-api","status":"pass","durationMs":2286,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:48.126Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":809,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:48.551Z","event":"suite","check":"C2-targets","status":"pass","durationMs":368,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:19:48.816Z","event":"suite","check":"C5","status":"pass","durationMs":149,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:20:16.133Z","event":"suite","check":"C3","status":"fail","durationMs":27235,"detail":"tests=555 fail=2 exit=1"}
+{"scenario":"C","at":"2026-11-03T17:20:16.134Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:20:16.134Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1892","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.134Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2286","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.135Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=809","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.135Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=368","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.135Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=149","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.135Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.135Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known Windows defects)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.135Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:20:16.135Z","event":"result","mode":"full","status":"blocker","counts":{"total":8,"sent":7,"failed":0,"pending":1},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:27:56.064Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:27:56.063Z"}
+{"scenario":"C","at":"2026-11-03T17:27:58.118Z","event":"suite","check":"C1","status":"pass","durationMs":1992,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:00.479Z","event":"suite","check":"C2-api","status":"pass","durationMs":2300,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:01.366Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":826,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:01.794Z","event":"suite","check":"C2-targets","status":"pass","durationMs":369,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:02.062Z","event":"suite","check":"C5","status":"pass","durationMs":152,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:28:02.070Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:28:02.070Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:28:02.070Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1992","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.070Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2300","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.070Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=826","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.071Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=369","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.071Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=152","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.071Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.071Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.071Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:02.071Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:28:02.171Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:28:02.170Z"}
+{"scenario":"C","at":"2026-11-03T17:28:04.196Z","event":"suite","check":"C1","status":"pass","durationMs":1961,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:06.555Z","event":"suite","check":"C2-api","status":"pass","durationMs":2299,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:07.487Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":872,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:07.927Z","event":"suite","check":"C2-targets","status":"pass","durationMs":378,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:28:08.199Z","event":"suite","check":"C5","status":"pass","durationMs":154,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:28:08.207Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:28:08.207Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:28:08.207Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1961","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.208Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2299","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.208Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=872","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.208Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=378","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.208Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=154","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.208Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.208Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.208Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:28:08.209Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:29:58.933Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:29:58.933Z"}
+{"scenario":"C","at":"2026-11-03T17:30:00.874Z","event":"suite","check":"C1","status":"pass","durationMs":1879,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:03.225Z","event":"suite","check":"C2-api","status":"pass","durationMs":2289,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:04.076Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":794,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:04.510Z","event":"suite","check":"C2-targets","status":"pass","durationMs":375,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:04.774Z","event":"suite","check":"C5","status":"pass","durationMs":150,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:30:04.781Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:30:04.781Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:30:04.782Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1879","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.782Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2289","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.782Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=794","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.782Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=375","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.782Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=150","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.782Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.783Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.783Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:04.783Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:30:04.880Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:30:04.879Z"}
+{"scenario":"C","at":"2026-11-03T17:30:06.849Z","event":"suite","check":"C1","status":"pass","durationMs":1906,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:09.211Z","event":"suite","check":"C2-api","status":"pass","durationMs":2302,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:10.060Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":790,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:10.493Z","event":"suite","check":"C2-targets","status":"pass","durationMs":374,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:10.761Z","event":"suite","check":"C5","status":"pass","durationMs":151,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:30:10.768Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:30:10.769Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:30:10.769Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1906","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.769Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2302","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.770Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=790","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.770Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=374","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.770Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=151","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.770Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.770Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.770Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:30:10.770Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:30:21.582Z","event":"start","mode":"full","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:30:21.581Z"}
+{"scenario":"C","at":"2026-11-03T17:30:23.530Z","event":"suite","check":"C1","status":"pass","durationMs":1887,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:25.869Z","event":"suite","check":"C2-api","status":"fail","durationMs":2280,"detail":"api: tests=26 fail=1 exit=1"}
+{"scenario":"C","at":"2026-11-03T17:30:26.749Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":820,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:27.184Z","event":"suite","check":"C2-targets","status":"pass","durationMs":374,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:30:27.457Z","event":"suite","check":"C5","status":"pass","durationMs":155,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:30:54.799Z","event":"suite","check":"C3","status":"fail","durationMs":27254,"detail":"tests=555 fail=2 exit=1"}
+{"scenario":"C","at":"2026-11-03T17:30:54.800Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:30:54.800Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1887","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.801Z","check":"C2-api","status":"fail","detail":"api: fail=1 (T1 successful responses never include configured credentials or env values)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.801Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=820","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.801Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=374","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.801Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=155","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.802Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.802Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known Windows defects)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.802Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:30:54.802Z","event":"result","mode":"full","status":"fail","counts":{"total":8,"sent":6,"failed":1,"pending":1},"note":"C verdict=fail","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:31:02.769Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:31:02.769Z"}
+{"scenario":"C","at":"2026-11-03T17:31:04.741Z","event":"suite","check":"C1","status":"pass","durationMs":1910,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:07.085Z","event":"suite","check":"C2-api","status":"pass","durationMs":2284,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:07.955Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":811,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:08.383Z","event":"suite","check":"C2-targets","status":"pass","durationMs":370,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:08.649Z","event":"suite","check":"C5","status":"pass","durationMs":151,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:31:08.657Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:31:08.657Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:31:08.657Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1910","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.657Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2284","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.657Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=811","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.658Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=370","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.658Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=151","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.658Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.658Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.658Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:08.658Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:31:08.754Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:31:08.753Z"}
+{"scenario":"C","at":"2026-11-03T17:31:10.692Z","event":"suite","check":"C1","status":"pass","durationMs":1876,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:13.033Z","event":"suite","check":"C2-api","status":"pass","durationMs":2283,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:13.886Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":793,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:14.316Z","event":"suite","check":"C2-targets","status":"pass","durationMs":373,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:14.587Z","event":"suite","check":"C5","status":"pass","durationMs":155,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:31:14.594Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:31:14.594Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:31:14.595Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1876","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.595Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2283","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.595Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=793","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.595Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=373","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.595Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=155","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.595Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.595Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.596Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:31:14.596Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:31:25.474Z","event":"start","mode":"full","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:31:25.473Z"}
+{"scenario":"C","at":"2026-11-03T17:31:27.404Z","event":"suite","check":"C1","status":"pass","durationMs":1870,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:29.753Z","event":"suite","check":"C2-api","status":"pass","durationMs":2290,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:30.600Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":790,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:31.023Z","event":"suite","check":"C2-targets","status":"pass","durationMs":366,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:31:31.286Z","event":"suite","check":"C5","status":"pass","durationMs":150,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:31:58.552Z","event":"suite","check":"C3","status":"fail","durationMs":27183,"detail":"tests=555 fail=2 exit=1"}
+{"scenario":"C","at":"2026-11-03T17:31:58.552Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:31:58.553Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1870","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.553Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2290","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.554Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=790","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.554Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=366","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.554Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=150","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.554Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.554Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known Windows defects)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.554Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:31:58.555Z","event":"result","mode":"full","status":"blocker","counts":{"total":8,"sent":7,"failed":0,"pending":1},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:32:07.303Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:32:07.303Z"}
+{"scenario":"C","at":"2026-11-03T17:32:09.275Z","event":"suite","check":"C1","status":"pass","durationMs":1911,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:11.621Z","event":"suite","check":"C2-api","status":"pass","durationMs":2287,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:12.494Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":815,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:12.925Z","event":"suite","check":"C2-targets","status":"pass","durationMs":373,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:13.188Z","event":"suite","check":"C5","status":"pass","durationMs":149,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:32:13.195Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:32:13.196Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:32:13.196Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1911","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.196Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2287","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.196Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=815","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.196Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=373","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.197Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=149","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.197Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.197Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.197Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:13.197Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:32:13.291Z","event":"start","mode":"offline","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:32:13.290Z"}
+{"scenario":"C","at":"2026-11-03T17:32:15.215Z","event":"suite","check":"C1","status":"pass","durationMs":1863,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:17.568Z","event":"suite","check":"C2-api","status":"pass","durationMs":2293,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:18.421Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":790,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:18.852Z","event":"suite","check":"C2-targets","status":"pass","durationMs":372,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:19.122Z","event":"suite","check":"C5","status":"pass","durationMs":154,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:32:19.129Z","event":"skip","check":"C3","status":"blocker","detail":"--full not requested"}
+{"scenario":"C","at":"2026-11-03T17:32:19.129Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:32:19.130Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1863","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.130Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2293","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.130Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=790","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.130Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=372","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.130Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=154","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.130Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.131Z","check":"C3","status":"blocker","detail":"not executed (pass --full; ~30s, needs the Guanlan fixture)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.131Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"offline"}
+{"scenario":"C","at":"2026-11-03T17:32:19.131Z","event":"result","mode":"offline","status":"blocker","counts":{"total":8,"sent":6,"failed":0,"pending":2},"note":"C verdict=blocker","channel":"feishu"}
+{"scenario":"C","at":"2026-11-03T17:32:30.022Z","event":"start","mode":"full","detail":"head=8efc2507e088ea7e94b60db19e7671db8904705c at=2026-11-03T17:32:30.021Z"}
+{"scenario":"C","at":"2026-11-03T17:32:32.001Z","event":"suite","check":"C1","status":"pass","durationMs":1916,"detail":"feishu: tests=48 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:34.356Z","event":"suite","check":"C2-api","status":"pass","durationMs":2297,"detail":"api: tests=26 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:35.204Z","event":"suite","check":"C2-scheduler","status":"pass","durationMs":790,"detail":"scheduler: tests=31 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:35.632Z","event":"suite","check":"C2-targets","status":"pass","durationMs":369,"detail":"targets: tests=29 fail=0 exit=0"}
+{"scenario":"C","at":"2026-11-03T17:32:35.897Z","event":"suite","check":"C5","status":"pass","durationMs":150,"detail":"policy+dedupe: tests=11 fail=0 exit=0/0"}
+{"scenario":"C","at":"2026-11-03T17:33:03.171Z","event":"suite","check":"C3","status":"fail","durationMs":27190,"detail":"tests=555 fail=2 exit=1"}
+{"scenario":"C","at":"2026-11-03T17:33:03.171Z","event":"skip","check":"C4","status":"blocker","detail":"--live not requested"}
+{"scenario":"C","at":"2026-11-03T17:33:03.172Z","check":"C1","status":"pass","detail":"feishu: tests=48 fail=0 duration_ms=1916","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.172Z","check":"C2-api","status":"pass","detail":"api: tests=26 fail=0 duration_ms=2297","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.172Z","check":"C2-scheduler","status":"pass","detail":"scheduler: tests=31 fail=0 duration_ms=790","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.172Z","check":"C2-targets","status":"pass","detail":"targets: tests=29 fail=0 duration_ms=369","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.173Z","check":"C5","status":"pass","detail":"policy+dedupe: tests=11 fail=0 duration_ms=150","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.173Z","check":"C6","status":"pass","detail":"createAgentSession confined to src/runtime.mjs, src/research/port.mjs","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.173Z","check":"C3","status":"pass","detail":"tests=555 fail=2 (3 known Windows defects)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.173Z","check":"C4","status":"blocker","detail":"not executed (pass --live with Feishu credentials and send one message)","mode":"full"}
+{"scenario":"C","at":"2026-11-03T17:33:03.173Z","event":"result","mode":"full","status":"blocker","counts":{"total":8,"sent":7,"failed":0,"pending":1},"note":"C verdict=blocker","channel":"feishu"}
