@@ -136,3 +136,13 @@ await client.replyStream(frame.headers, streamId, text, true);
 - `enter_chat` 不是收消息的前置条件：第二轮没有 `enter_chat` 也正常收到 `aibot_msg_callback`，
   所以**不要**把它写成"必须等待进入事件"的状态机分支；收到消息直接处理即可。
 - `enter_chat` 的合法用途是发欢迎语（`replyWelcome`，5 s 窗口），与普通回复是两条路径。
+
+### 7.3 群聊实测补充（t26 → 同一交接）
+
+真实群聊证据见 [group-and-proactive-evidence.md](group-and-proactive-evidence.md)，三条直接影响实现：
+
+1. 群里 `@机器人` **只体现为正文前缀**（`body` 无 `mention` 字段，`from` 只有明文 `userid`），
+   送模型前必须剥离开头 `@<WECOM_BOT_NAME>`（可配置，实测 `Mira`），剥离后为空则不调模型；
+2. 群会话键用 `chatid`（实测 32 位），单聊无 `chatid` 用 `userid`，统一 `wecom:{chattype}:{chatid||userid}`；
+3. 主动推送 `aibot_send_msg` 必须显式带 `chat_type`（群 2 / 单聊 1）；伪造 `chatid` 返回 **93006**，
+   内容超 **20480 字节**返回 **40058**（拒绝而非截断），分段必须按 `Buffer.byteLength`。
