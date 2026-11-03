@@ -21,6 +21,22 @@ export const FEISHU_CONFIG_KEYS = Object.freeze({
   domain: "FEISHU_DOMAIN",
 });
 
+/**
+ * Research entry configuration (AGT-032). Kept separate from the channel
+ * credentials because the chat channel must still start when research is
+ * unavailable; a research run then fails closed instead of degrading chat.
+ */
+export const FEISHU_RESEARCH_CONFIG_KEYS = Object.freeze({
+  maxConcurrent: "FEISHU_RESEARCH_MAX_CONCURRENT",
+});
+
+/**
+ * One research run is a real model + Web Research session, so the default is
+ * serial (matching AGT-027's one-run-per-runtime contract) and the ceiling is
+ * deliberately small for the 2C2G target host.
+ */
+export const RESEARCH_CONCURRENCY = Object.freeze({ default: 1, max: 4 });
+
 /** Only the domains this adapter has actually been written against. */
 export const SUPPORTED_DOMAINS = Object.freeze(["feishu", "lark"]);
 
@@ -128,6 +144,35 @@ export function describeFeishuConfig(config) {
     allowedChatCount: config.allowedChatIds.length,
     botOpenIdConfigured: Boolean(config.botOpenId),
   };
+}
+
+/**
+ * Validate the optional research-channel configuration.
+ *
+ * The concurrency cap is a hard resource bound applied across chats: a value
+ * above the ceiling is clamped (the run still happens, only slower), while a
+ * malformed value fails startup instead of silently running unbounded work.
+ *
+ * @param {Record<string,string|undefined>} [env]
+ * @returns {{maxConcurrent:number}}
+ */
+export function loadFeishuResearchConfig(env = process.env) {
+  const raw = present(env[FEISHU_RESEARCH_CONFIG_KEYS.maxConcurrent]);
+  if (!raw) return Object.freeze({ maxConcurrent: RESEARCH_CONCURRENCY.default });
+  if (!/^\d+$/.test(raw)) {
+    throw new FeishuConfigError(
+      [FEISHU_RESEARCH_CONFIG_KEYS.maxConcurrent],
+      `${FEISHU_RESEARCH_CONFIG_KEYS.maxConcurrent} must be a positive integer (1-${RESEARCH_CONCURRENCY.max})`,
+    );
+  }
+  const parsed = Number(raw);
+  if (parsed < 1) {
+    throw new FeishuConfigError(
+      [FEISHU_RESEARCH_CONFIG_KEYS.maxConcurrent],
+      `${FEISHU_RESEARCH_CONFIG_KEYS.maxConcurrent} must be at least 1`,
+    );
+  }
+  return Object.freeze({ maxConcurrent: Math.min(parsed, RESEARCH_CONCURRENCY.max) });
 }
 
 /**
