@@ -41,6 +41,7 @@ export function createWecomService({
   runResearch,
   now = Date.now,
   pid = process.pid,
+  onOutcome,
 } = {}) {
   const config = wecomConfig ?? loadWecomConfig(env);
   const runner = createWecomAgentRunner({ env, cwd, config: modelConfig, createRuntime });
@@ -69,6 +70,7 @@ export function createWecomService({
       if (outcome?.action === "accepted" && outcome.chatId) {
         sessions.record({ chatId: outcome.chatId, chatType: outcome.chatType });
       }
+      onOutcome?.(outcome);
     },
   });
 

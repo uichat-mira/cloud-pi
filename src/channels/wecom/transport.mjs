@@ -77,9 +77,15 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
   let stopped = false;
   let streamCounter = 0;
   let lastError;
+  let rejectAuthentication;
   /** @type {Map<string, number[]>} chatId → send timestamps (ms) */
   const sendHistory = new Map();
   const listeners = [];
+
+  /** The SDK reports a rejected subscribe as an error, then retries and gives up. */
+  function looksLikeAuthFailure(message) {
+    return /853000|invalid bot_id|authentication failed|auth failure/i.test(String(message ?? ""));
+  }
 
   function attach(target, event, handler) {
     target.on(event, handler);
@@ -161,6 +167,14 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       attach(client, "error", (error) => {
         lastError = String(error?.message ?? error ?? "unknown");
         log({ level: "warn", event: "wecom_transport_error", message: lastError });
+        // A rejected subscribe must fail startup immediately instead of waiting
+        // for the connect timeout.
+        if (!authenticated && rejectAuthentication && looksLikeAuthFailure(lastError)) {
+          rejectAuthentication(
+            new WecomTransportError("auth_failed", "the platform rejected bot_id/secret", { retryable: false }),
+          );
+          rejectAuthentication = undefined;
+        }
       });
       attach(client, "disconnected", (detail) => {
         authenticated = false;
@@ -173,16 +187,11 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       });
 
       const authenticatedPromise = new Promise((resolve, reject) => {
+        rejectAuthentication = reject;
         attach(client, "authenticated", () => {
           authenticated = true;
+          rejectAuthentication = undefined;
           resolve();
-        });
-        attach(client, "auth_failed", (error) => {
-          reject(
-            new WecomTransportError("auth_failed", String(error?.message ?? "invalid bot_id or secret"), {
-              retryable: false,
-            }),
-          );
         });
       });
 

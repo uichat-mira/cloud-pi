@@ -59,11 +59,16 @@ npm run wecom:check
 
 # 真实长连接（需要真实凭证）
 npm run channel:wecom
+
+# 真实链路验收：订阅 → 收一条入站 → 真实模型回复 → 读回证据（见 §8）
+npm run wecom:live
 ```
 
-退出码：`0` 干净停止，`1` 运行期失败（含认证失败），`2` 配置错误。
-日志是 stdout 上的 JSON 行，`event` 字段固定，标识符全部经 `hashId()` 投影，
+退出码：`0` 干净停止，`1` 运行期失败（含认证失败），`2` 配置错误。日志是 stdout 上的 JSON 行，`event` 字段固定，标识符全部经 `hashId()` 投影，
 不含消息正文、原始 `userid`/`chatid`、不含 secret。
+
+认证失败的处理：SDK 把"订阅被拒"报成 `error` 事件（`853000` / `invalid bot_id`），
+transport 据此立刻以 `auth_failed` 拒绝 `start()`，而不是干等连接超时。
 
 ## 4. 一条消息的处理路径
 
@@ -102,8 +107,9 @@ npm run channel:wecom
    - 定时研究**还不能**投递到企业微信目标；
    - `transport.send()` 已实现能力与限制（群聊可发、单聊因 SDK 缺陷拒绝），但**没有**接线到投递链。
    W1 需要单独的工作项或明确覆盖 t6 合同后才能落地。
-2. **Live 未执行**：无 BotID/Secret。离线测试只证明通道逻辑、边界与失败路径，不证明
-   真实认证、真实收发或真实模型往返。
+2. **Live 需要真实凭证**：凭证由维护者写入本机私有文件，**只有** `npm run wecom:live`
+   会按 `KEY=VALUE` 读入进程环境变量；值不写入 `.env`、代码、fixture、日志或异常消息。
+   离线测试一律用假值。
 3. **去重与已知会话都是进程内**：重启或多实例后失效；持久化属于投递/会话工作项。
 4. **群聊 `@` 判定依赖显示名**：机器人改名、群昵称、`@所有人` 会影响判定；无法解析时记
    `mention_required`，不猜测。
@@ -117,9 +123,38 @@ npm run channel:wecom
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
-| 通道离线测试 | `npm run test:wecom` | 55 passed / 0 failed（6 个测试文件：config、events/policy/dedupe、channel/text/sessions、transport、service/lock、runtime） |
+| 通道离线测试 | `npm run test:wecom` | 61 passed / 0 failed（7 个测试文件：config、events/policy/dedupe、channel/text/sessions、transport、service/lock、runtime、live 脚本） |
 | 全仓回归 | `npm test` | 见 PR 描述（含既有飞书、调度、API、投递测试） |
 | 配置校验入口 | `npm run wecom:check` | 有凭证时 exit 0 并输出脱敏配置摘要；无凭证 exit 2 且列出缺失字段 |
-| 真实链路 | — | **未执行**（无凭证）。取得凭证后需记录：认证成功、一条单聊消息的真实回复、一次群 @ 的真实回复、日志脱敏抽查 |
+| 真实链路 | `npm run wecom:live` | 见 §8；结果写入 PR 证据表（成功或失败都如实记录） |
 
 真实证据只写白名单投影：`action/status/runId/segments/耗时` + 哈希 id，不写正文与原始标识。
+
+## 8. Live 验收：`npm run wecom:live`
+
+一条命令完成"订阅 → 收一条入站 → 真实模型回复 → 读回证据"：
+
+```bash
+# 默认从 ~/.mira-secrets/wecom.env 读通道凭证，从仓库 .env 读模型配置
+npm run wecom:live
+
+# 也可显式指定（值仍然只在进程内，不落盘）
+node scripts/agt-036/wecom-live.mjs --secrets <path> --env-file <path> --timeout-ms 180000
+```
+
+行为与证据：
+
+| 阶段 | 通过标准 | 失败时的输出 |
+| --- | --- | --- |
+| 启动 | `authenticated` 事件到达（真实 `bot_id`/`secret` 被平台接受） | `phase:"connect"` + `code`（`auth_failed`/`connect_timeout`） |
+| 入站 | 窗口内出现一条可回复消息 | `phase:"wait_inbound"` + `reason:"no_inbound_message"` |
+| 回复 | 真实模型产出内容并送达原会话（`replyDelivered:true`） | `phase:"reply"`，按 `outcome.action` 区分 `failed` |
+| 读回 | `wecom_live_result` 行含 `runId`/`status`/`segments`/哈希 id | 退出码非 0 |
+
+限制（如实声明）：
+
+- **单连接**：平台同一机器人只允许一条长连接，运行前必须确认没有其它进程/队友占用
+  （新连接会把旧连接踢下线，旧连接收到 `disconnected_event`）。
+- **不证明投递**：`wecom:live` 只覆盖"入站 → 回复"。定时研究主动投递需要 W1（见 §6.1）。
+- **不持久化聊天 run**：`runId` 由 `src/runtime.mjs` 运行时生成，聊天 run 目前不落盘
+  （run 落盘/`runId` 链路属于 AGT-037 trace 工作项），因此"读回"是进程内 outcome 而非 run store。

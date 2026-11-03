@@ -27,7 +27,8 @@ class FakeClient extends EventEmitter {
       if (this.hang) return;
       setTimeout(() => {
         if (this.authenticate) this.emit("authenticated");
-        else this.emit("auth_failed", new Error("invalid bot_id or secret (853000)"));
+        // The real SDK reports a rejected subscribe as an error event (853000).
+        else this.emit("error", new Error("Authentication failed: invalid bot_id or secret (code: 853000)"));
       }, 1);
     };
     this.disconnect = async () => {
@@ -184,6 +185,19 @@ test("transport: a silent endpoint times out instead of hanging the process", as
       return true;
     },
   );
+});
+
+test("transport: a transient error does not abort an otherwise successful start", async () => {
+  const client = new FakeClient();
+  const transport = createWecomTransport({ config: { ...CONFIG, connectTimeoutMs: 2_000 }, createClient: () => client });
+  // Emitted before the subscribe answer: unrelated to credentials.
+  client.connect = async () => {
+    client.emit("error", new Error("socket hang up (ECONNRESET)"));
+    setTimeout(() => client.emit("authenticated"), 1);
+  };
+  const started = await transport.start();
+  assert.equal(started.authenticated, true);
+  await transport.stop();
 });
 
 test("transport: SDK errors are surfaced without leaking the secret", async () => {
