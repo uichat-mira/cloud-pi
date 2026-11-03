@@ -16,10 +16,12 @@
  * (see `paths`), never absolute host paths, so a run directory can be moved or
  * archived together. The store never reads or writes credentials.
  */
-import { randomBytes } from "node:crypto";
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { mkdir, readdir, readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { atomicWriteFile } from "../fs/atomic.mjs";
 import { DEFAULT_RUNS_DIR, ENV, isRunStatus } from "./contracts.mjs";
+
+export { atomicWriteFile };
 
 /** `r-<UTC yyyymmddThhmmss>-<6 hex>`; stable and sortable by time. */
 export const RUN_ID_PATTERN = /^r-\d{8}T\d{6}-[0-9a-f]{6}$/;
@@ -66,23 +68,6 @@ export function resolveRunsRoot({ rootDir, env = process.env } = {}) {
   const fromEnv = env?.[ENV.RUNS_DIR];
   if (typeof fromEnv === "string" && fromEnv.trim()) return resolve(fromEnv.trim());
   return resolve(DEFAULT_RUNS_DIR);
-}
-
-/**
- * Atomic write: `data` → `<file>.tmp-<pid>-<rand>` → rename over `file`.
- * The temporary file lives in the target directory so rename is same-filesystem.
- */
-export async function atomicWriteFile(filePath, data) {
-  const directory = dirname(filePath);
-  await mkdir(directory, { recursive: true });
-  const tmpPath = join(directory, `.${randomBytes(6).toString("hex")}.tmp`);
-  try {
-    await writeFile(tmpPath, data, "utf8");
-    await rename(tmpPath, filePath);
-  } catch (error) {
-    await rm(tmpPath, { force: true }).catch(() => {});
-    throw error;
-  }
 }
 
 function isPlainObject(value) {
