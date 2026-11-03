@@ -15,11 +15,13 @@
  * Usage:
  *   node --env-file=D:\cloud-pi\.env scripts/agt-038/live-mcp.mjs --mode=happy
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createAgentRuntime } from "../../src/runtime.mjs";
 import { generateRunId } from "../../src/research/execute.mjs";
 import { createGuanlanMcpBinding, loadGuanlanMcpConfig } from "../../src/mcp/guanlan.mjs";
-import { redactOpaqueHandles } from "../../src/redaction.mjs";
+import { redactCompactJwt, redactOpaqueHandles } from "../../src/redaction.mjs";
 
 const MODES = Object.freeze(["happy", "expired", "forged", "audience-mismatch", "wrong-audience"]);
 
@@ -64,8 +66,24 @@ if (positionals.length > 0 || !MODES.includes(mode)) {
   process.stdout.write(`${JSON.stringify(usageError)}\n`);
   process.exit(2);
 }
-const TMP = `${process.env.TEMP}\\gln013-t23`;
-const MCP_LOG = `${TMP}\\t9-mcp.log`;
+/**
+ * Private per-run directory for the synthetic token files and the MCP log.
+ *
+ * Never a fixed path in a shared temp root: `mkdtemp` creates a fresh 0700
+ * directory that only this process can write, so a pre-created file or a
+ * symlink planted by another local user cannot be followed. The directory is
+ * removed on exit.
+ */
+const RUN_DIR = mkdtempSync(join(tmpdir(), "agt-038-live-"));
+const MCP_LOG = join(RUN_DIR, "mcp.log");
+const CLEANUP = () => {
+  try {
+    rmSync(RUN_DIR, { recursive: true, force: true });
+  } catch {
+    // Best effort: a leftover private directory is not an evidence problem.
+  }
+};
+process.on("exit", CLEANUP);
 
 const logLines = [];
 const log = (entry) => {
@@ -112,11 +130,7 @@ function expiredTokenFile(path) {
 
 /** Keep evidence free of credentials and of raw account/consumer identifiers. */
 function sanitize(value) {
-  return redactOpaqueHandles(
-    String(value)
-      .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-      .replace(/[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>"),
-  );
+  return redactOpaqueHandles(redactCompactJwt(String(value).replace(/Bearer\s+\S+/gi, "Bearer <redacted>")));
 }
 
 /** A forged JWT: right claims, signature nothing Cloud Auth ever produced. */
@@ -142,26 +156,27 @@ function sanitizeLogTail() {
   const text = readFileSafe(MCP_LOG);
   if (!text) return null;
   return redactOpaqueHandles(
-    text
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .slice(-12)
-      .join("\n")
-      .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-      .replace(/[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>"),
+    redactCompactJwt(
+      text
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .slice(-12)
+        .join("\n")
+        .replace(/Bearer\s+\S+/gi, "Bearer <redacted>"),
+    ),
   );
 }
 
 try {
   const env = { ...process.env };
   if (mode === "expired") {
-    env.GUANLAN_MCP_TOKEN_FILE = expiredTokenFile(`${TMP}\\t9-expired.txt`);
+    env.GUANLAN_MCP_TOKEN_FILE = expiredTokenFile(join(RUN_DIR, "t9-expired.txt"));
     delete env.GUANLAN_MCP_TOKEN;
   }
   if (mode === "forged") {
     // Correct aud/exp/scope but not signed by Cloud Auth: the client cannot tell,
     // the server must. Proves a real 401 does not become a plausible answer.
-    env.GUANLAN_MCP_TOKEN_FILE = forgedTokenFile(`${TMP}\\t9-forged.txt`);
+    env.GUANLAN_MCP_TOKEN_FILE = forgedTokenFile(join(RUN_DIR, "t9-forged.txt"));
     delete env.GUANLAN_MCP_TOKEN;
   }
   if (mode === "audience-mismatch") {
@@ -170,10 +185,18 @@ try {
     env.GUANLAN_MCP_AUDIENCE = "mira:cloud-shiyan";
   }
   if (mode === "wrong-audience") {
-    // Really issued by Cloud Auth, but for another audience/service.
-    const issued = readFileSafe(`${TMP}\\t9-wrong-audience.txt`);
-    if (!issued) throw new Error("t9-wrong-audience.txt is missing; mint one with --audience=mira:shiyan");
-    env.GUANLAN_MCP_TOKEN_FILE = `${TMP}\\t9-wrong-audience.txt`;
+    // Really issued by Cloud Auth, but for another audience/service. The token is
+    // supplied explicitly (--wrong-audience-token-file=...) instead of being read
+    // from a fixed shared path.
+    const issuedPath = args.get("wrong-audience-token-file") ?? args.get("token-file");
+    if (!issuedPath) {
+      throw new Error(
+        "wrong-audience mode needs --wrong-audience-token-file=<path> (a token minted for another service)",
+      );
+    }
+    const issued = readFileSafe(issuedPath);
+    if (!issued) throw new Error("the wrong-audience token file could not be read");
+    env.GUANLAN_MCP_TOKEN_FILE = issuedPath;
     delete env.GUANLAN_MCP_TOKEN;
   }
 

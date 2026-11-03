@@ -8,7 +8,7 @@
  *
  * Usage: node scripts/agt-038/probe-mcp.mjs
  */
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,20 +21,37 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { fauxProvider } from "@earendil-works/pi-ai/providers/faux";
 import { createGuanlanMcpBinding, loadGuanlanMcpConfig } from "../../src/mcp/guanlan.mjs";
+import { redactCompactJwt } from "../../src/redaction.mjs";
 
-const MCP_LOG = `${process.env.TEMP}\\gln013-t23\\t9-probe-mcp.log`;
+/**
+ * Private per-run directory for the MCP log.
+ *
+ * `mkdtemp` gives a fresh 0700 directory instead of a fixed path under a shared
+ * temp root, so the probe cannot be pointed at a file another local user
+ * prepared. Removed on exit.
+ */
+const RUN_DIR = mkdtempSync(join(tmpdir(), "agt-038-probe-"));
+const MCP_LOG = join(RUN_DIR, "mcp.log");
+process.on("exit", () => {
+  try {
+    rmSync(RUN_DIR, { recursive: true, force: true });
+  } catch {
+    // Best effort.
+  }
+});
 const evidence = { event: "agt038_probe_mcp", ok: false };
 let exitCode = 1;
 
 function logTail() {
   try {
-    return readFileSync(MCP_LOG, "utf8")
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .slice(-15)
-      .join("\n")
-      .replace(/Bearer\s+\S+/gi, "Bearer <redacted>")
-      .replace(/[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}/g, "<redacted-jwt>");
+    return redactCompactJwt(
+      readFileSync(MCP_LOG, "utf8")
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .slice(-15)
+        .join("\n")
+        .replace(/Bearer\s+\S+/gi, "Bearer <redacted>"),
+    );
   } catch {
     return null;
   }
@@ -112,8 +129,11 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  evidence.tools = [...tools].sort();
-  evidence.expected = binding.config.tools.map((tool) => `mcp__guanlan__${tool}`).sort();
+  // Explicit comparator: the default sort is alphabetical, which is not the
+  // ordering this evidence means (and Sonar S2871 flags it as a defect).
+  const byName = (left, right) => left.localeCompare(right);
+  evidence.tools = [...tools].sort(byName);
+  evidence.expected = binding.config.tools.map((tool) => `mcp__guanlan__${tool}`).sort(byName);
   evidence.waitedMs = Date.now() - startedAt;
   evidence.credential = binding.credentials.describe();
   evidence.ok = evidence.expected.every((name) => evidence.tools.includes(name));

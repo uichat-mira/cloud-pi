@@ -16,6 +16,7 @@ import { createWecomDedupeStore } from "../src/channels/wecom/dedupe.mjs";
 import {
   containsPseudoToolText,
   PSEUDO_TOOL_REPLY,
+  redactCompactJwt,
   redactOpaqueHandles,
   sanitizeModelReply,
 } from "../src/redaction.mjs";
@@ -160,4 +161,23 @@ test("live-mcp: an unknown mode is a usage error too", async () => {
       return true;
     },
   );
+});
+
+test("jwt redaction is structural, so no backtracking regex is needed", () => {
+  const header = Buffer.from(JSON.stringify({ alg: "EdDSA", kid: "gln013-t23-1", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ iss: "mira:cloud-auth", sub: "svc:t30", exp: 1_900_000_000 })).toString(
+    "base64url",
+  );
+  const token = `${header}.${payload}.Zm9yZ2VkLXNpZ25hdHVyZQ`;
+
+  assert.equal(redactCompactJwt(`Authorization: Bearer ${token}`), "Authorization: Bearer <redacted-jwt>");
+  // Text that merely contains dots is left alone.
+  assert.equal(redactCompactJwt("version 1.2.3 released"), "version 1.2.3 released");
+  assert.equal(redactCompactJwt("a.b.c"), "a.b.c");
+  assert.equal(redactCompactJwt(""), "");
+  // A very long token-like run must not be catastrophically slow.
+  const long = "A".repeat(20_000);
+  const startedAt = Date.now();
+  redactCompactJwt(`x ${long} ${long}`);
+  assert.ok(Date.now() - startedAt < 1_000);
 });

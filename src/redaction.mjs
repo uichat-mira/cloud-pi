@@ -96,3 +96,31 @@ export function sanitizeModelReply(text) {
   if (!containsPseudoToolText(value)) return { text: value, leaked: false };
   return { text: PSEUDO_TOOL_REPLY, leaked: true };
 }
+
+/** base64url segment: a linear test, deliberately not one backtracking regex. */
+const BASE64URL_SEGMENT = /^[A-Za-z0-9_-]+$/;
+
+function isBase64UrlSegment(value, minLength) {
+  return typeof value === "string" && value.length >= minLength && BASE64URL_SEGMENT.test(value);
+}
+
+/**
+ * Mask compact JWS/JWT strings (`header.payload.signature`).
+ *
+ * Implemented structurally instead of
+ * `[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{8,}`: that regex has
+ * super-linear backtracking on long token-like input (Sonar javascript:S8786),
+ * and these helpers are fed arbitrary tool output.
+ */
+export function redactCompactJwt(text) {
+  if (typeof text !== "string" || text.length === 0) return text;
+  return text.replace(/\S+/g, (word) => {
+    if (!word.includes(".")) return word;
+    const parts = word.split(".");
+    if (parts.length !== 3) return word;
+    if (!isBase64UrlSegment(parts[0], 16) || !isBase64UrlSegment(parts[1], 16) || !isBase64UrlSegment(parts[2], 8)) {
+      return word;
+    }
+    return "<redacted-jwt>";
+  });
+}
