@@ -1,0 +1,394 @@
+[
+  {
+    "id": "A01-session-token-format",
+    "file": "apps/api/src/security/session-token.ts",
+    "from": 3,
+    "to": 34,
+    "re": "mcs_v1"
+  },
+  {
+    "id": "A01b-session-token-hash",
+    "file": "apps/api/src/security/session-token.ts",
+    "from": 3,
+    "to": 34,
+    "re": "sha256|createHash"
+  },
+  {
+    "id": "A02-login-entry",
+    "file": "apps/api/src/auth/auth-service.ts",
+    "from": 51,
+    "to": 116,
+    "re": "async login|login\\("
+  },
+  {
+    "id": "A03-oauth-exchange",
+    "file": "apps/api/src/oauth/oauth-service.ts",
+    "from": 77,
+    "to": 111,
+    "re": "session|Session"
+  },
+  {
+    "id": "A04-session-ttl-default",
+    "file": "apps/api/src/config.ts",
+    "from": 41,
+    "to": 41,
+    "re": "2592000|2_592_000|SESSION_TTL"
+  },
+  {
+    "id": "A05-session-validate",
+    "file": "apps/api/src/auth/auth-service.ts",
+    "from": 300,
+    "to": 318,
+    "re": "revoked|expires"
+  },
+  {
+    "id": "A06-session-renew",
+    "file": "apps/api/src/auth/auth-service.ts",
+    "from": 161,
+    "to": 182,
+    "re": "secret|rotate|renew"
+  },
+  {
+    "id": "A07-rotate-repository",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 457,
+    "to": 484,
+    "re": "secret_hash|UPDATE sessions"
+  },
+  {
+    "id": "A08-logout-revoke",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 486,
+    "to": 495,
+    "re": "revoked_at"
+  },
+  {
+    "id": "A09-device-revoke-sessions",
+    "file": "apps/api/src/devices/device-repository.ts",
+    "from": 129,
+    "to": 164,
+    "re": "sessions"
+  },
+  {
+    "id": "A10-disable-account",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 303,
+    "to": 315,
+    "re": "disabled_at"
+  },
+  {
+    "id": "A11-reject-account",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 289,
+    "to": 301,
+    "re": "is_allowed|rejected"
+  },
+  {
+    "id": "A12-password-change",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 142,
+    "to": 162,
+    "re": "password"
+  },
+  {
+    "id": "A13-issuer-audience-literals",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 8,
+    "to": 24,
+    "re": "mira:cloud-auth"
+  },
+  {
+    "id": "A13b-shiyan-audience",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 8,
+    "to": 24,
+    "re": "mira:cloud-shiyan"
+  },
+  {
+    "id": "A13c-relay-audience",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 8,
+    "to": 24,
+    "re": "mira:cloud-relay-transport"
+  },
+  {
+    "id": "A14-audience-enum",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 13,
+    "to": 16,
+    "re": "z\\.enum"
+  },
+  {
+    "id": "A15-scope-enum",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 21,
+    "to": 24,
+    "re": "z\\.enum"
+  },
+  {
+    "id": "A16-discriminated-union",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 92,
+    "to": 114,
+    "re": "discriminatedUnion"
+  },
+  {
+    "id": "A17-strict-claims",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 60,
+    "to": 114,
+    "re": "strict\\(\\)"
+  },
+  {
+    "id": "A18-device-id-claim",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 68,
+    "to": 69,
+    "re": "device_id"
+  },
+  {
+    "id": "A19-request-schema",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 116,
+    "to": 133,
+    "re": "audience"
+  },
+  {
+    "id": "A20-service-issuance",
+    "file": "apps/api/src/service-credentials/service.ts",
+    "from": 24,
+    "to": 28,
+    "re": "audience|scope"
+  },
+  {
+    "id": "A21-route-issue",
+    "file": "apps/api/src/service-credentials/routes.ts",
+    "from": 41,
+    "to": 66,
+    "re": "service-credentials|POST"
+  },
+  {
+    "id": "A22-route-jwks",
+    "file": "apps/api/src/service-credentials/routes.ts",
+    "from": 68,
+    "to": 75,
+    "re": "jwks"
+  },
+  {
+    "id": "A23-jwks-cache-control",
+    "file": "apps/api/src/service-credentials/routes.ts",
+    "from": 8,
+    "to": 8,
+    "re": "max-age=300"
+  },
+  {
+    "id": "A24-signer-ttl-limit",
+    "file": "apps/api/src/service-credentials/signer.ts",
+    "from": 16,
+    "to": 17,
+    "re": "600"
+  },
+  {
+    "id": "A25-signer-kid",
+    "file": "apps/api/src/service-credentials/signer.ts",
+    "from": 75,
+    "to": 82,
+    "re": "kid"
+  },
+  {
+    "id": "A26-signer-sub",
+    "file": "apps/api/src/service-credentials/signer.ts",
+    "from": 93,
+    "to": 103,
+    "re": "sub"
+  },
+  {
+    "id": "A27-verifier-window",
+    "file": "apps/api/src/service-credentials/verifier.ts",
+    "from": 143,
+    "to": 217,
+    "re": "audience"
+  },
+  {
+    "id": "A28-verifier-ttl",
+    "file": "apps/api/src/service-credentials/verifier.ts",
+    "from": 81,
+    "to": 81,
+    "re": "600|TTL"
+  },
+  {
+    "id": "A29-keyring-order",
+    "file": "apps/api/src/service-credentials/keyring.ts",
+    "from": 80,
+    "to": 142,
+    "re": "retiring|active"
+  },
+  {
+    "id": "A30-fail-closed-503",
+    "file": "apps/api/src/config.ts",
+    "from": 89,
+    "to": 159,
+    "re": "503|signing"
+  },
+  {
+    "id": "A31-service-fail-closed",
+    "file": "apps/api/src/service-credentials/service.ts",
+    "from": 38,
+    "to": 45,
+    "re": "signing|unavailable"
+  },
+  {
+    "id": "A32-service-relay-admission",
+    "file": "apps/api/src/service-credentials/service.ts",
+    "from": 59,
+    "to": 92,
+    "re": "relay|room"
+  },
+  {
+    "id": "A33-relay-rules",
+    "file": "apps/api/src/service-credentials/relay-admission.ts",
+    "from": 21,
+    "to": 41,
+    "re": "room|platform"
+  },
+  {
+    "id": "A34-host-room-ownership",
+    "file": "apps/api/src/hosts/host-service.ts",
+    "from": 90,
+    "to": 90,
+    "re": "resolveRoomOwnership"
+  },
+  {
+    "id": "A35-server-injection",
+    "file": "apps/api/src/server.ts",
+    "from": 48,
+    "to": 52,
+    "re": "host|service"
+  },
+  {
+    "id": "A36-tx-scope",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 226,
+    "to": 287,
+    "re": "BEGIN IMMEDIATE"
+  },
+  {
+    "id": "A37-tx-recheck",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 249,
+    "to": 260,
+    "re": "revoked_at|is_allowed"
+  },
+  {
+    "id": "A38-device-required",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 262,
+    "to": 265,
+    "re": "device_required"
+  },
+  {
+    "id": "A39-device-owner-check",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 267,
+    "to": 274,
+    "re": "device"
+  },
+  {
+    "id": "A40-commit",
+    "file": "apps/api/src/auth/auth-repository.ts",
+    "from": 276,
+    "to": 282,
+    "re": "COMMIT"
+  },
+  {
+    "id": "A41-error-codes-schema",
+    "file": "packages/contracts/src/service-credential.ts",
+    "from": 161,
+    "to": 168,
+    "re": "SERVICE_CREDENTIAL|error"
+  },
+  {
+    "id": "A42-check-script",
+    "file": "package.json",
+    "from": 21,
+    "to": 21,
+    "re": "typecheck|test"
+  },
+  {
+    "id": "A43-doc-kid-retention",
+    "file": "docs/service-credentials-v0.md",
+    "from": 258,
+    "to": 267,
+    "re": "kid"
+  },
+  {
+    "id": "A44-doc-revocation-window",
+    "file": "docs/service-credentials-v0.md",
+    "from": 252,
+    "to": 256,
+    "re": "revoc|撤销|exp"
+  },
+  {
+    "id": "A45-doc-introspection",
+    "file": "docs/service-credentials-v0.md",
+    "from": 276,
+    "to": 276,
+    "re": "introspect"
+  },
+  {
+    "id": "A46-contract-test-no-session-material",
+    "file": "apps/api/tests/contract/service-credential-issuance-contract.test.ts",
+    "from": 42,
+    "to": 42,
+    "re": "session|mcs_v1"
+  },
+  {
+    "id": "A47-integration-tx-test",
+    "file": "apps/api/tests/integration/service-credential-issuance.test.ts",
+    "from": 336,
+    "to": 386,
+    "re": "test|it\\("
+  },
+  {
+    "id": "A48-integration-tx-test-2",
+    "file": "apps/api/tests/integration/service-credential-issuance.test.ts",
+    "from": 294,
+    "to": 334,
+    "re": "test|it\\("
+  },
+  {
+    "id": "A49-integration-full",
+    "file": "apps/api/tests/integration/service-credential-issuance.test.ts",
+    "from": 110,
+    "to": 410,
+    "re": "revoked|logout|device"
+  },
+  {
+    "id": "A50-unit-contracts",
+    "file": "apps/api/tests/unit/service-credential-contracts.test.ts",
+    "from": 36,
+    "to": 36,
+    "re": "test|it\\("
+  },
+  {
+    "id": "A51-unit-signing",
+    "file": "apps/api/tests/unit/service-credential-signing.test.ts",
+    "from": 42,
+    "to": 135,
+    "re": "test|it\\("
+  },
+  {
+    "id": "A52-contract-audience-mismatch",
+    "file": "apps/api/tests/contract/service-credential.test.ts",
+    "from": 178,
+    "to": 216,
+    "re": "AUDIENCE_MISMATCH|audience"
+  },
+  {
+    "id": "A53-doc-trust-context",
+    "file": "docs/service-credentials-v0.md",
+    "from": 25,
+    "to": 25,
+    "re": "scope|权限|trust"
+  }
+]

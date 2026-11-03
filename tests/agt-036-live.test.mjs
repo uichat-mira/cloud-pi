@@ -47,7 +47,10 @@ function fakeClient({ message = true } = {}) {
       this.replyStream = async (frame, streamId, content, finish) => {
         this.replies.push({ streamId, content, finish });
       };
-      this.sendMessage = async () => {};
+      this.sent = [];
+      this.sendMessage = async (chatid, body) => {
+        this.sent.push({ chatid, body });
+      };
     }
   })();
 }
@@ -126,9 +129,15 @@ test("live: one inbound message is answered and the evidence is redacted", async
   });
 
   assert.equal(code, 0, `stderr: ${err.text()}`);
+  // Two-phase: the callback gets the acknowledgement, the answer is pushed.
   assert.equal(client.replies.length, 1);
-  assert.equal(client.replies[0].content, "你好，我是 Mira。");
+  assert.equal(client.replies[0].content, "已收到，正在处理…");
   assert.equal(client.replies[0].finish, true);
+  assert.equal(client.sent.length, 1);
+  assert.equal(client.sent[0].body.chat_type, 1);
+  assert.equal(client.sent[0].body.msgtype, "markdown");
+  assert.equal(client.sent[0].body.markdown.content, "你好，我是 Mira。");
+  assert.equal(client.sent[0].chatid, "live-user-1");
 
   const combined = `${out.text()}\n${err.text()}`;
   // Credentials from the file never appear in any output.

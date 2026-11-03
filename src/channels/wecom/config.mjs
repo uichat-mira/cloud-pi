@@ -22,10 +22,38 @@ export const WECOM_CONFIG_KEYS = Object.freeze({
   CONNECT_TIMEOUT_MS: "WECOM_CONNECT_TIMEOUT_MS",
   REPLY_MAX_BYTES: "WECOM_REPLY_MAX_BYTES",
   REPLY_TIMEOUT_MS: "WECOM_REPLY_TIMEOUT_MS",
+  /**
+   * Two-phase replies (AGT-036 follow-up): the callback `req_id` is short-lived,
+   * so the first message is an immediate acknowledgement and the answer is pushed
+   * with `aibot_send_msg` afterwards. Disabling the ack restores the old
+   * "answer inside the callback reply" behaviour for fast answers only.
+   */
+  ACK_ENABLED: "WECOM_ACK_ENABLED",
+  ACK_TEXT: "WECOM_ACK_TEXT",
 });
 
 /** Documented platform limit for one markdown/stream payload, in UTF-8 bytes. */
 export const WECOM_MAX_CONTENT_BYTES = 20_480;
+
+/** Default acknowledgement text (configurable via `WECOM_ACK_TEXT`). */
+export const WECOM_DEFAULT_ACK_TEXT = "已收到，正在处理…";
+
+/**
+ * Platform error codes this channel can name precisely.
+ *
+ * - `93006`: the conversation is not known to the platform, i.e. the bot has
+ *   never received a message from it. A proactive push cannot create it.
+ * - `40058`: the payload exceeded the per-message limit.
+ *
+ * Both were observed in the real long-connection work for AGT-036 (see
+ * `docs/engineering/agt-036-wecom-channel.md`); they are reported as codes so an
+ * operator recognises the platform semantics instead of reading a generic
+ * transport error.
+ */
+export const WECOM_PLATFORM_ERROR = Object.freeze({
+  SESSION_UNKNOWN: 93006,
+  PAYLOAD_TOO_LARGE: 40058,
+});
 
 export const WECOM_DEFAULTS = Object.freeze({
   /**
@@ -39,6 +67,7 @@ export const WECOM_DEFAULTS = Object.freeze({
   /** Headroom under the platform limit so the continuation suffix always fits. */
   replyMaxBytes: 20_000,
   replyTimeoutMs: 15_000,
+  ackEnabled: true,
 });
 
 export class WecomConfigError extends Error {
@@ -71,8 +100,7 @@ function readInteger(env, key, { min, max, fallback }) {
   return value;
 }
 
-function readIdList(env, key) {
-  const raw = readString(env, key);
+function readIdList(env, key) {  const raw = readString(env, key);
   if (raw === undefined) return Object.freeze([]);
   const parts = raw
     .split(",")
@@ -83,6 +111,15 @@ function readIdList(env, key) {
     throw new WecomConfigError([key], `${key} contains an invalid id`);
   }
   return Object.freeze([...new Set(parts)]);
+}
+
+function readBool(env, key, fallback) {
+  const raw = readString(env, key);
+  if (raw === undefined) return fallback;
+  const value = raw.toLowerCase();
+  if (["1", "true", "yes", "on"].includes(value)) return true;
+  if (["0", "false", "no", "off"].includes(value)) return false;
+  throw new WecomConfigError([key], `${key} must be a boolean (1/0, true/false, yes/no, on/off)`);
 }
 
 /**
@@ -137,6 +174,8 @@ export function loadWecomConfig(env = process.env) {
       max: 60_000,
       fallback: WECOM_DEFAULTS.replyTimeoutMs,
     }),
+    ackEnabled: readBool(env, WECOM_CONFIG_KEYS.ACK_ENABLED, WECOM_DEFAULTS.ackEnabled),
+    ackText: readString(env, WECOM_CONFIG_KEYS.ACK_TEXT) ?? WECOM_DEFAULT_ACK_TEXT,
   });
 }
 
@@ -168,6 +207,8 @@ export function describeWecomConfig(config) {
     allowedUserCount: config?.allowedUserIds?.length ?? 0,
     allowedChatCount: config?.allowedChatIds?.length ?? 0,
     replyMaxBytes: config?.replyMaxBytes,
+    replyTimeoutMs: config?.replyTimeoutMs,
+    ackEnabled: config?.ackEnabled ?? true,
     heartbeatIntervalMs: config?.heartbeatIntervalMs,
   });
 }

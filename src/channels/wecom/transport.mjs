@@ -7,9 +7,9 @@
  *  - reply framing (`replyStream` needs a stream id, and the channel sends
  *    bounded segments rather than one streaming answer);
  *  - the per-conversation rate limits (30/min, 1000/h) the platform documents;
- *  - the `chat_type` gap: `WSClient.sendMessage()` cannot send `chat_type`, so a
- *    single-chat push would be inferred as a group chat. This module refuses it
- *    instead of delivering to the wrong place;
+ *  - `chat_type`: `WSClient.sendMessage()` spreads its body into `aibot_send_msg`,
+ *    so this module passes `chat_type` explicitly (1 single / 2 group) — without
+ *    it the platform prefers a group and a single-chat push would be misrouted;
  *  - a hard timeout per send so a missing protocol ack can never hang a run.
  *
  * The SDK is imported lazily, so offline tests and any non-WeCom command never
@@ -17,7 +17,7 @@
  * transport exposes; it never sees credentials outside the client options.
  */
 
-import { WECOM_MAX_CONTENT_BYTES, hashId } from "./config.mjs";
+import { WECOM_MAX_CONTENT_BYTES, WECOM_PLATFORM_ERROR, hashId } from "./config.mjs";
 import { byteLength } from "./text.mjs";
 
 export const WECOM_RATE_LIMITS = Object.freeze({
@@ -26,11 +26,14 @@ export const WECOM_RATE_LIMITS = Object.freeze({
 });
 
 export class WecomTransportError extends Error {
-  constructor(code, detail, { retryable = false } = {}) {
+  constructor(code, detail, { retryable = false, platformCode } = {}) {
     super(detail ? `WeCom transport error (${code}): ${detail}` : `WeCom transport error (${code})`);
     this.name = "WecomTransportError";
     this.code = code;
     this.retryable = retryable;
+    // A platform error code (when the failure has a documented one) so callers can
+    // report `93006`/`40058` semantics instead of a generic transport class.
+    if (typeof platformCode === "number") this.platformCode = platformCode;
   }
 }
 
@@ -129,6 +132,7 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       throw new WecomTransportError(
         "content_too_large",
         `${bytes} bytes exceeds ${WECOM_MAX_CONTENT_BYTES}; channel must segment first`,
+        { retryable: false, platformCode: WECOM_PLATFORM_ERROR.PAYLOAD_TOO_LARGE },
       );
     }
   }
@@ -274,7 +278,7 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       recordSend(reqId);
       // The SDK resolves only on a platform acknowledgement, so a resolved call is
       // an accepted delivery; the code is reported for the evidence projection.
-      return { replyId: streamId, errcode: typeof ack?.errcode === "number" ? ack.errcode : 0 };
+      return { messageId: streamId, replyId: streamId, errcode: typeof ack?.errcode === "number" ? ack.errcode : 0 };
     } catch (error) {
       if (error instanceof WecomTransportError) throw error;
       throw new WecomTransportError("reply_failed", String(error?.message ?? error), { retryable: false });
@@ -282,33 +286,32 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
   }
 
   /**
-   * Proactive push to an existing conversation.
+   * Proactive push to an existing conversation (`aibot_send_msg`).
    *
-   * Deliberately not wired into the scheduler/delivery contract yet: the
-   * destination vocabulary and the known-session requirement are decided in the
-   * AGT-036 follow-up (W1). This method exists so the capability and its limits
-   * are explicit rather than assumed.
+   * `chat_type` is required: when it is absent the platform assumes a group chat,
+   * so a single-chat push would be misrouted. The SDK's typed `SendMsgBody` does
+   * not declare `chat_type`, but `sendMessage()` spreads the body into the frame
+   * unchanged, so the documented field (1 single / 2 group, per the platform's
+   * `aibot_send_msg` reference) is passed explicitly.
+   *
+   * The platform only accepts a push into a conversation the bot has already
+   * seen; that precondition is enforced by the caller (delivery sender), not
+   * guessed here.
    *
    * @param {{chatId: string, chatType: "single"|"group", text: string}} input
+   * @returns {Promise<{delivered: true, errcode: number}>} resolves on a platform ack
    */
   async function send({ chatId, chatType, text } = {}) {
     if (!authenticated || !client) throw new WecomTransportError("not_connected", "send before authentication");
     if (typeof chatId !== "string" || chatId.length === 0) {
       throw new WecomTransportError("invalid_target", "chatId is required");
     }
+    if (chatType !== "single" && chatType !== "group") {
+      throw new WecomTransportError("invalid_target", "chatType must be single or group");
+    }
     const content = typeof text === "string" ? text : "";
     if (content.length === 0) throw new WecomTransportError("empty_message", "refusing to send an empty message");
     assertTextFits(content);
-
-    if (chatType !== "group") {
-      // `WSClient.sendMessage()` sends `{chatid: chatId, ...body}` with no
-      // `chat_type`; the platform then prefers "group". Sending a single-chat
-      // push through it would be misrouted, so refuse and report the gap.
-      throw new WecomTransportError(
-        "chat_type_unsupported",
-        "SDK sendMessage() cannot set chat_type=1; single-chat push needs a raw aibot_send_msg frame",
-      );
-    }
 
     const limit = assertWithinRateLimit(chatId);
     if (limit) {
@@ -320,9 +323,16 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       throw new WecomTransportError("sdk_incompatible", "sendMessage() not available");
     }
 
+    let ack;
     try {
-      await withTimeout(
-        Promise.resolve(client.sendMessage(chatId, { msgtype: "markdown", markdown: { content } })),
+      ack = await withTimeout(
+        Promise.resolve(
+          client.sendMessage(chatId, {
+            chat_type: chatType === "group" ? 2 : 1,
+            msgtype: "markdown",
+            markdown: { content },
+          }),
+        ),
         config.replyTimeoutMs,
         "send_timeout",
       );
@@ -331,7 +341,9 @@ export function createWecomTransport({ config, onEvent, log = () => {}, createCl
       throw new WecomTransportError("send_failed", String(error?.message ?? error), { retryable: true });
     }
     recordSend(chatId);
-    return { delivered: true };
+    // The SDK resolves only on a platform acknowledgement; report its code so the
+    // delivery record keeps the real receipt and not just "we called send()".
+    return { delivered: true, errcode: typeof ack?.errcode === "number" ? ack.errcode : 0 };
   }
 
   async function stop() {

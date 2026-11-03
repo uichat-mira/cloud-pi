@@ -54,6 +54,7 @@ export async function createDeliveringScheduler({ schedulerOptions = {}, deliver
       env: delivery.env ?? schedulerOptions.env,
       now: delivery.now ?? schedulerOptions.now,
       sendMessage: delivery.sendMessage,
+      senders: delivery.senders,
       researchRunsDir: delivery.researchRunsDir ?? schedulerOptions.researchDeps?.rootDir,
       readRun: delivery.readRun,
       limits: delivery.limits,

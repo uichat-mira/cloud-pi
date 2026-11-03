@@ -91,7 +91,11 @@ function newRecord({ runId, target, deliveryKey, deliveryKind, researchStatus, t
  * @param {string} [options.stateDir] delivery state root (default DELIVERY_STATE_DIR or .work/delivery)
  * @param {Record<string,string>} [options.env]
  * @param {Function} [options.now] clock injection
- * @param {Function} options.sendMessage `async ({receiveIdType,receiveId,text,uuid}) => {messageId}`
+ * @param {Function} [options.sendMessage] Feishu sender
+ *   `async ({receiveIdType,receiveId,text,uuid}) => {messageId}`
+ * @param {Record<string, Function>} [options.senders] extra per-target-type senders,
+ *   keyed by `DELIVERY_TARGET_TYPE`. A WeCom target is only accepted when its own
+ *   sender exists; it is never handed to the Feishu transport.
  * @param {string} [options.researchRunsDir] AGT-028 run root (else RESERVE_DIR env / default)
  * @param {Function} [options.readRun] `readResearchRun` injection (tests)
  * @param {object} [options.limits] bounded-policy overrides
@@ -103,14 +107,23 @@ export function createDeliveryCoordinator({
   env = process.env,
   now = () => new Date(),
   sendMessage,
+  senders = {},
   researchRunsDir,
   readRun = readResearchRun,
   limits: limitOverrides = {},
   logger = {},
   store: injectedStore,
 } = {}) {
-  if (typeof sendMessage !== "function") {
-    throw new TypeError("createDeliveryCoordinator requires a sendMessage function");
+  /** A target type is deliverable only when a sender exists for it. */
+  function senderFor(type) {
+    if (isFeishuDeliveryTargetType(type)) return typeof sendMessage === "function" ? sendMessage : null;
+    const candidate = senders?.[type];
+    return typeof candidate === "function" ? candidate : null;
+  }
+
+  const hasAnySender = typeof sendMessage === "function" || Object.values(senders ?? {}).some((s) => typeof s === "function");
+  if (!hasAnySender) {
+    throw new TypeError("createDeliveryCoordinator requires a sendMessage function or at least one sender");
   }
   const clock = typeof now === "function" ? now : () => new Date(now);
   const store = injectedStore ?? createDeliveryStore({ stateDir, env });
@@ -181,6 +194,7 @@ export function createDeliveryCoordinator({
   }
 
   async function deliverToTarget({ runId, target, input, message, deliveryKind, at: startedAt }) {
+    const send = senderFor(target.type);
     const key = buildDeliveryKey(runId, target);
     // The persistence key contains the raw recipient ID; never emit it to logs.
     const diagnosticKey = runId + "#" + target.type + ":" + maskDestination(target).maskedId;
@@ -227,7 +241,7 @@ export function createDeliveryCoordinator({
       try {
         while (record.segmentsSent.length < message.segments.length) {
           const index = record.segmentsSent.length;
-          const response = await sendMessage({
+          const response = await send({
             receiveIdType: target.type,
             receiveId: target.id,
             text: message.segments[index],
@@ -241,7 +255,13 @@ export function createDeliveryCoordinator({
             throw new DeliveryError(DELIVERY_ERROR.MISSING_MESSAGE_ID, "send returned no message id");
           }
           const sentAt = nowIso(clock);
-          record.segmentsSent.push({ index, messageId, sentAt });
+          record.segmentsSent.push({
+            index,
+            messageId,
+            sentAt,
+            // Optional platform acknowledgement (WeCom has no message id on push).
+            ...(response?.ack !== undefined ? { ack: response.ack } : {}),
+          });
           record.messageId = record.segmentsSent[0].messageId;
           record.updatedAt = sentAt;
           // Persist after every segment: a retry resumes at the first
@@ -317,11 +337,11 @@ export function createDeliveryCoordinator({
     }
     const rawTargets = input.deliveryTargets ?? input.schedule?.deliveryTargets;
     const allTargets = normalizeDeliveryTargets(rawTargets);
-    // W1 widened the shared vocabulary, but this coordinator can only send to
-    // Feishu. A WeCom target is therefore refused here instead of being handed to
-    // the Feishu transport, where an opaque id would either fail or — worse —
-    // silently address something else.
-    const targets = allTargets.filter((target) => isFeishuDeliveryTargetType(target.type));
+    // A target is claimed only when this coordinator can actually send to it.
+    // Feishu goes through `sendMessage`; a WeCom target needs its own sender,
+    // because handing an opaque WeCom id to the Feishu transport would either
+    // fail or — worse — address something else.
+    const targets = allTargets.filter((target) => senderFor(target.type));
     const unsupportedTargets = allTargets.length - targets.length;
     const plan = planDelivery({
       researchStatus: input.researchStatus ?? null,
