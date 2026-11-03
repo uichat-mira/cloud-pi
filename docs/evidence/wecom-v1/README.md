@@ -132,6 +132,12 @@ node scripts/agt-03x/b-scheduled-research-delivery.mjs \
   `judge/failure-without-known-list`、`judge/known-list-does-not-hide-stranger` 等守住。
   注意分层：**掩码/占位规则属于扫描器**（D8 读的是人写的文档，允许 `…` 与占位词），而**生成的证据必须 ASCII**，
   所以证据里的掩码用 `...`（`writer/ascii-mask` 用例），占位词同样不能替真实 id 开脱。
+- **跑一次自检会重写已跟踪的证据文件**（t11 附录 D.1）：`self-test.mjs --full` 默认写
+  `docs/evidence/wecom-v1/offline-selftest.txt`，`d-failure-modes.mjs` 会写 `poc/evidence/agt-03x-scenario-*.jsonl`。
+  这两类都是 **tracked** 文件，`.gitignore` 对已跟踪文件**无效**，所以"加忽略规则"防不住。
+  复核时请用 `--out %TEMP%\selftest-<ts>.txt`（脚本原生支持）或 `--no-write`；已经跑脏了就
+  `git checkout -- docs/evidence/wecom-v1/offline-selftest.txt poc/evidence/*.jsonl`。
+  要**留**新证据就单独开分支/PR 提交，让 diff 可见——证据可以更新，但不能在别人看不见的地方被悄悄改掉。
 
 ## 8. 证据卫生与更正记录
 
