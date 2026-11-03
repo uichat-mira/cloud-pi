@@ -161,18 +161,52 @@ export function createApiController({ scheduler, runsDir, env = process.env, now
     async listRuns({ limit: rawLimit, scheduleId } = {}) {
       const limit = parseRunLimit(rawLimit);
       let matched;
+      let filter = null;
       if (scheduleId !== undefined) {
-        // Existence check + run linkage from the schedule's own audit trail;
-        // the run store stays the single source of run records.
-        const schedule = await scheduler.getSchedule(scheduleId);
+        // Run linkage comes from the schedule's own audit trail; the run store
+        // stays the single source of run records. This card cannot persist
+        // scheduleId into the AGT-028 run record (src/research is out of scope),
+        // so the filter is explicitly bounded rather than silently truncated.
+        let schedule;
+        try {
+          schedule = await scheduler.getSchedule(scheduleId);
+        } catch (error) {
+          if (error?.code !== "not_found") throw error;
+          // Runs are Research facts; a deleted schedule must not turn their
+          // filter into 404. Without a durable link the only honest answer is
+          // an explicit empty, incomplete result.
+          return {
+            runs: [],
+            count: 0,
+            total: 0,
+            limit,
+            scheduleId,
+            truncated: false,
+            filterComplete: false,
+            scheduleMissing: true,
+            filterReason: "schedule_not_found_no_durable_run_link",
+          };
+        }
+        const triggers = Array.isArray(schedule.triggers) ? schedule.triggers : [];
         const allowed = new Set();
         if (typeof schedule.lastRun?.runId === "string") allowed.add(schedule.lastRun.runId);
         if (typeof schedule.activeTrigger?.runId === "string") allowed.add(schedule.activeTrigger.runId);
-        for (const trigger of Array.isArray(schedule.triggers) ? schedule.triggers : []) {
+        for (const trigger of triggers) {
           if (typeof trigger.runId === "string") allowed.add(trigger.runId);
         }
         const all = await listResearchRuns(researchReadOptions);
         matched = all.filter((run) => allowed.has(run.runId));
+
+        const totalTriggerCount = Number.isFinite(schedule.stats?.triggers)
+          ? schedule.stats.triggers
+          : triggers.length;
+        const omittedTriggerCount = Math.max(0, totalTriggerCount - triggers.length);
+        filter = {
+          retainedTriggerCount: triggers.length,
+          totalTriggerCount,
+          omittedTriggerCount,
+          truncated: omittedTriggerCount > 0,
+        };
       } else {
         matched = await listResearchRuns(researchReadOptions);
       }
@@ -183,6 +217,16 @@ export function createApiController({ scheduler, runsDir, env = process.env, now
         total: matched.length,
         limit,
         scheduleId: scheduleId ?? null,
+        ...(filter
+          ? {
+              truncated: filter.truncated,
+              filterComplete: !filter.truncated,
+              scheduleFilter: filter,
+              filterReason: filter.truncated
+                ? "schedule_filter_is_bounded_to_retained_trigger_history"
+                : "schedule_filter_covers_retained_trigger_history",
+            }
+          : {}),
       };
     },
 

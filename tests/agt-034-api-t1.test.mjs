@@ -127,9 +127,13 @@ test("T1 query parameters are validated per route", async (t) => {
   const hugeLimit = await harness.request("GET", "/v1/runs?limit=101");
   assert.equal(hugeLimit.status, 400);
 
-  const badFilter = await harness.request("GET", "/v1/runs?scheduleId=missing");
-  assert.equal(badFilter.status, 404);
-  assert.equal(errorOf(badFilter).code, "not_found");
+  // Runs are Research facts: an unknown/deleted schedule filter is an explicit
+  // empty, incomplete result rather than a 404.
+  const missingFilter = await harness.request("GET", "/v1/runs?scheduleId=missing");
+  assert.equal(missingFilter.status, 200);
+  assert.equal(missingFilter.body.data.total, 0);
+  assert.equal(missingFilter.body.data.scheduleMissing, true);
+  assert.equal(missingFilter.body.data.filterComplete, false);
 });
 
 test("T1 schedule schema errors map to invalid_request", async (t) => {

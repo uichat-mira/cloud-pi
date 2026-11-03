@@ -6,9 +6,10 @@ Owning Issue: [#16](https://github.com/uichat-mira/cloud-pi/issues/16).
 Base: `origin/dev` at `fad03f8` (AGT-030 Scheduler and AGT-028 Research merged;
 AGT-033 delivery is **not** in this baseline).
 Branch: `feat/agt-034-local-management-api`.
-Draft PR: [#19](https://github.com/uichat-mira/cloud-pi/pull/19) → `dev`
-(head `d553123`). CI on that head: `test` pass, SonarCloud pass, CodeRabbit
-skipped; checks are evidence, not merge authority.
+Draft PR: [#19](https://github.com/uichat-mira/cloud-pi/pull/19) → `dev`. The
+current head is whatever the PR page shows; this note is intentionally not
+pinned to a SHA. CI at reviewed head `3bc5e73`: `test` pass, SonarCloud pass,
+CodeRabbit skipped. Checks are evidence, not merge authority.
 
 This document records what the API actually does, how it stays a thin control
 plane, the exact local smoke evidence, and what remains unproven. It does not
@@ -116,8 +117,11 @@ Notes:
 - Trailing slashes are accepted; malformed percent-encoding is `invalid_request`.
 - Unknown path → `not_found`; known path with a different method →
   `method_not_allowed` plus an `Allow` header.
-- A schedule's recent trigger history is bounded to 20 entries in a detail view;
-  full history remains in the Scheduler's own bounded store.
+- A schedule's recent trigger history is bounded to 20 entries in a detail view.
+  The Scheduler itself retains at most `maxTriggerHistory` (100) audit triggers,
+  so older triggers are dropped from the schedule record. Research runs are not
+  deleted; older runs stay readable through the unfiltered run list, but not
+  through the `scheduleId` filter (see §10).
 - `run-now` is synchronous for the trigger outcome: the request returns after the
   triggered run reaches a terminal state, so the console receives the real
   `runId`/`status` rather than an optimistic acknowledgement. The run is bounded
@@ -218,10 +222,10 @@ appear in responses or captured logs.
 
 ### update
 
-Accepted fields only: `name`, `timezone`, `kind`, `cron`, `at`, `request`,
-`enabled`. Unknown or internal fields (`scheduleId`, `status`, `triggers`,
-`activeTrigger`, `nextRunAt`, `stats`, `lastRun`, delivery fields) are
-`invalid_request`. An empty patch is refused.
+Accepted fields only: `name`, `timezone`, `kind`, `cron`, `at`, `request`.
+Unknown, internal and lifecycle fields (`scheduleId`, `status`, `enabled`,
+`triggers`, `activeTrigger`, `nextRunAt`, `stats`, `lastRun`, delivery fields)
+are `invalid_request`. An empty patch is refused.
 
 - **In-flight fail closed:** if the schedule has a persisted `activeTrigger` or
   a live execution controller, update returns `conflict`. Writing a definition
@@ -230,11 +234,15 @@ Accepted fields only: `name`, `timezone`, `kind`, `cron`, `at`, `request`,
 - **Timing changes** (`kind`, `timezone`, `cron`, `at`) re-normalise the
   definition with the Scheduler's existing validator and recompute `nextRunAt`
   strictly after `now`.
-- **Non-timing changes** (name/request/`enabled`) keep the current
-  `nextRunAt`/status unless `enabled` is explicitly supplied. A due-but-not-yet-
-  claimed occurrence therefore cannot be silently skipped by a rename.
-- **Paused** stays paused across a name/request update; `enabled: false` pauses,
-  `enabled: true` activates a paused schedule.
+- **Lifecycle is not patchable.** `pause()`/`enable()` are the only activation
+  paths. `PATCH {"enabled": true|false}` is rejected with `invalid_request`; a
+  paused schedule whose `nextRunAt` is already due stays paused, keeps that past
+  `nextRunAt`, and a tick does not execute it. `POST /enable` records one missed
+  audit entry and recomputes `nextRunAt` strictly after `now`; the missed
+  occurrence is never replayed.
+- **Non-timing changes** (name/request) keep the current `nextRunAt`/status, so a
+  due-but-not-yet-claimed occurrence cannot be silently skipped by a rename. A
+  paused schedule stays paused.
 - **Completed** schedules are immutable except together with a new future
   `at`/`cron`, which intentionally starts a fresh activation and clears
   `completedAt`; trigger history and stats are retained as audit.
@@ -261,6 +269,35 @@ schedule's own persisted trigger `runId`s as the linkage; the run store stays th
 single source of run records. There is no API-side run index, and a run created
 by another caller/process appears automatically.
 
+**The `scheduleId` filter is explicitly bounded, never silently complete.** This
+baseline has no durable `scheduleId` field in the AGT-028 run record, and adding
+one belongs to that module (out of this card's scope). The Scheduler retains at
+most 100 audit triggers, so the filter can only associate runs still present in
+that window. When older triggers have been dropped
+(`stats.triggers > triggers.length`), the response reports:
+
+```json
+{
+  "truncated": true,
+  "filterComplete": false,
+  "scheduleFilter": {
+    "retainedTriggerCount": 100,
+    "totalTriggerCount": 101,
+    "omittedTriggerCount": 1,
+    "truncated": true
+  },
+  "filterReason": "schedule_filter_is_bounded_to_retained_trigger_history"
+}
+```
+
+The unfiltered `/v1/runs` still lists every run in the Research store; its limit
+truncation is explicit through `total` (all matches) versus `count` (returned
+page). An unknown or deleted schedule does **not** turn the filter into 404: the
+response is an explicit `200` with `runs: []`, `total: 0`, `scheduleMissing:
+true`, `filterComplete: false` and `filterReason:
+"schedule_not_found_no_durable_run_link"`, because those runs remain Research
+facts but can no longer be linked. A durable link is listed in §13.
+
 `GET /v1/runs/:runId/report` returns the report text plus a bounded (100)
 projection of `sources.json` and its summary. Missing run → 404; malformed run
 id → 400; corrupt local artifact → generic 500 (no path/stack).
@@ -272,16 +309,16 @@ All commands below were executed in this worktree on Node `v22.23.2`.
 | Layer | File | Count | Proves |
 | --- | --- | --- | --- |
 | T1 contract | `tests/agt-034-api-t1.test.mjs` | 11 | envelopes, 404/405, schema/body/query limits, loopback refusal, delivery closure, secret/path/stack filtering |
-| T2 integration | `tests/agt-034-api-t2.test.mjs` | 7 | API↔Scheduler state equality, active-run conflict, busy slot, pause/enable/completed, cancel→executor, research reads, restart consistency |
+| T2 integration | `tests/agt-034-api-t2.test.mjs` | 9 | API↔Scheduler state equality, lifecycle-only PATCH regression, 101-run bounded-filter boundary, active-run conflict, busy slot, pause/enable/completed, cancel→executor, research reads, restart consistency |
 | T3 chain | `tests/agt-034-api-t3.test.mjs` | 1 | real HTTP create → run-now → run/report → pause/enable/update → restart → delete, run history retention |
 | Lifecycle | `tests/agt-034-api-lifecycle.test.mjs` | 4 | idempotent stop, bounded graceful drain, forced close after bound, no restart after stop, start/stop race |
 
 ```bash
 node --test tests/agt-034-*.test.mjs
-# 23 tests, 23 pass, 0 fail
+# 25 tests, 25 pass, 0 fail
 
 npm test
-# 422 tests, 422 pass, 0 fail, 0 skipped (baseline 399 + 23 AGT-034)
+# 424 tests, 424 pass, 0 fail, 0 skipped (baseline 399 + 25 AGT-034)
 ```
 
 T3/T2 use the real Scheduler `startResearch()` executor and real run store; only
@@ -302,7 +339,7 @@ fixture-model research executor, and prints JSON Lines. Captured run
 
 ```json
 {"event":"bind-policy","requestedHost":"0.0.0.0","rejected":true,"code":"invalid_request"}
-{"event":"listen","host":"127.0.0.1","family":"IPv4","port":58014,"url":"http://127.0.0.1:58014/v1"}
+{"event":"listen","host":"127.0.0.1","family":"IPv4","port":50307,"url":"http://127.0.0.1:50307/v1"}
 {"event":"request","label":"health","method":"GET","path":"/health","status":200}
 {"event":"request","label":"status","method":"GET","path":"/status","status":200}
 {"event":"request","label":"create","method":"POST","path":"/schedules","status":201}
@@ -311,18 +348,18 @@ fixture-model research executor, and prints JSON Lines. Captured run
 {"event":"request","label":"get","method":"GET","path":"/schedules/smoke-daily","status":200}
 {"event":"request","label":"update","method":"PATCH","path":"/schedules/smoke-daily","status":200}
 {"event":"request","label":"run-now","method":"POST","path":"/schedules/smoke-daily/run-now","status":200}
-{"event":"run-now","scheduleId":"smoke-daily","triggerStatus":"succeeded","researchStatus":"completed","runId":"r-20261103T000000-d971d9"}
+{"event":"run-now","scheduleId":"smoke-daily","triggerStatus":"succeeded","researchStatus":"completed","runId":"r-20261103T000000-a9a285"}
 {"event":"request","label":"runs","method":"GET","path":"/runs?scheduleId=smoke-daily","status":200}
-{"event":"request","label":"run","method":"GET","path":"/runs/r-20261103T000000-d971d9","status":200}
-{"event":"request","label":"report","method":"GET","path":"/runs/r-20261103T000000-d971d9/report","status":200}
-{"event":"report","runId":"r-20261103T000000-d971d9","reportChars":244,"sourcesTotal":0}
-{"event":"request","label":"delivery","method":"GET","path":"/runs/r-20261103T000000-d971d9/delivery","status":404,"code":"not_found"}
+{"event":"request","label":"run","method":"GET","path":"/runs/r-20261103T000000-a9a285","status":200}
+{"event":"request","label":"report","method":"GET","path":"/runs/r-20261103T000000-a9a285/report","status":200}
+{"event":"report","runId":"r-20261103T000000-a9a285","reportChars":244,"sourcesTotal":0}
+{"event":"request","label":"delivery","method":"GET","path":"/runs/r-20261103T000000-a9a285/delivery","status":404,"code":"not_found"}
 {"event":"request","label":"pause","method":"POST","path":"/schedules/smoke-daily/pause","status":200}
 {"event":"request","label":"enable","method":"POST","path":"/schedules/smoke-daily/enable","status":200}
-{"event":"listen","phase":"restart","host":"127.0.0.1","port":58017,"url":"http://127.0.0.1:58017/v1"}
+{"event":"listen","phase":"restart","host":"127.0.0.1","port":50310,"url":"http://127.0.0.1:50310/v1"}
 {"event":"request","label":"get-after-restart","method":"GET","path":"/schedules/smoke-daily","status":200}
-{"event":"restart-consistency","before":{"scheduleId":"smoke-daily","nextRunAt":"2026-11-03T01:00:00.000Z","lastRunId":"r-20261103T000000-d971d9","triggerCount":1},"after":{"scheduleId":"smoke-daily","nextRunAt":"2026-11-03T01:00:00.000Z","lastRunId":"r-20261103T000000-d971d9","triggerCount":1},"consistent":true}
-{"event":"request","label":"run-after-restart","method":"GET","path":"/runs/r-20261103T000000-d971d9/report","status":200}
+{"event":"restart-consistency","before":{"scheduleId":"smoke-daily","nextRunAt":"2026-11-03T01:00:00.000Z","lastRunId":"r-20261103T000000-a9a285","triggerCount":1},"after":{"scheduleId":"smoke-daily","nextRunAt":"2026-11-03T01:00:00.000Z","lastRunId":"r-20261103T000000-a9a285","triggerCount":1},"consistent":true}
+{"event":"request","label":"run-after-restart","method":"GET","path":"/runs/r-20261103T000000-a9a285/report","status":200}
 {"event":"request","label":"delete","method":"DELETE","path":"/schedules/smoke-daily","status":200}
 {"event":"request","label":"get-after-delete","method":"GET","path":"/schedules/smoke-daily","status":404,"code":"not_found"}
 {"event":"request","label":"runs-after-delete","method":"GET","path":"/runs","status":200}
@@ -349,6 +386,11 @@ values. Ports are ephemeral and differ per run.
   acknowledgement queue in this card.
 - **Single process per state directory.** No cross-process lock, distributed
   exactly-once, or multi-instance coordination.
+- **No durable run→schedule link.** `scheduleId` filtering is bounded to the
+  Scheduler's retained trigger window (100) and is explicitly flagged with
+  `truncated`/`filterComplete`; a deleted schedule's filter returns an explicit
+  empty result. Persisting `scheduleId` into the AGT-028 run record would need a
+  change in `src/research/`, which this card deliberately does not touch.
 - **`GET /v1/status` scans the run directory** to count runs. Fine for the local
   POC; a future production store should provide a bounded summary query.
 - **No browser console**, UI route or Cloud Auth page.

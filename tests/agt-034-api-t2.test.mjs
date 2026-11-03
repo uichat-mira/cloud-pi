@@ -87,6 +87,8 @@ test("T2 create/update via HTTP match direct Scheduler state", async (t) => {
   for (const patch of [
     { scheduleId: "other-id" },
     { status: "paused" },
+    { enabled: true },
+    { enabled: false },
     { triggers: [] },
     { activeTrigger: { dedupeKey: "forged" } },
     { nextRunAt: "2020-01-01T00:00:00.000Z" },
@@ -95,6 +97,112 @@ test("T2 create/update via HTTP match direct Scheduler state", async (t) => {
     assert.equal(rejected.status, 400);
     assert.equal(errorOf(rejected).code, "invalid_request");
   }
+});
+
+test("T2 PATCH cannot activate a paused schedule whose nextRunAt is already due", async (t) => {
+  const clock = createFakeClock("2026-11-03T00:00:00Z");
+  const harness = await startApiHarness(t, { clock, port: completedPort() });
+  await createRecurring(harness, "pause-update");
+  const paused = await harness.request("POST", "/v1/schedules/pause-update/pause");
+  assert.equal(paused.status, 200);
+  const dueNextRunAt = paused.body.data.schedule.nextRunAt;
+  assert.equal(dueNextRunAt, "2026-11-03T01:00:00.000Z");
+
+  // The occurrence becomes due while paused. `enabled` must not become a
+  // second activation path that keeps the past nextRunAt or replays the run.
+  clock.set("2026-11-03T02:00:00Z");
+  for (const patch of [{ enabled: true }, { enabled: false }]) {
+    const rejected = await harness.request("PATCH", "/v1/schedules/pause-update", patch);
+    assert.equal(rejected.status, 400);
+    assert.equal(errorOf(rejected).code, "invalid_request");
+    assert.match(errorOf(rejected).message, /unsupported schedule fields/);
+  }
+
+  const still = harness.scheduler.getSchedule("pause-update");
+  assert.equal(still.status, "paused");
+  assert.equal(still.nextRunAt, dueNextRunAt);
+  assert.equal(still.stats.triggers, 0);
+  assert.equal(still.stats.missed, 0);
+  assert.equal(still.triggers.length, 0);
+
+  const tick = await harness.scheduler.tick();
+  assert.deepEqual(tick.triggered, []);
+  const afterTick = harness.scheduler.getSchedule("pause-update");
+  assert.equal(afterTick.status, "paused");
+  assert.equal(afterTick.triggers.length, 0);
+  assert.equal((await harness.request("GET", "/v1/runs")).body.data.total, 0);
+
+  // The documented lifecycle path records one missed occurrence and recomputes
+  // strictly after now; a tick immediately afterwards must not replay it.
+  const enabled = await harness.request("POST", "/v1/schedules/pause-update/enable");
+  assert.equal(enabled.status, 200);
+  assert.equal(enabled.body.data.schedule.status, "active");
+  assert.ok(Date.parse(enabled.body.data.schedule.nextRunAt) > Date.parse("2026-11-03T02:00:00Z"));
+  assert.equal(enabled.body.data.schedule.stats.missed, 1);
+  const afterEnableTick = await harness.scheduler.tick();
+  assert.deepEqual(afterEnableTick.triggered, []);
+  assert.equal((await harness.request("GET", "/v1/runs")).body.data.total, 0);
+});
+
+test("T2 scheduleId run filter is explicit beyond maxTriggerHistory", async (t) => {
+  const clock = createFakeClock("2026-11-03T00:00:00Z");
+  const harness = await startApiHarness(t, { clock, port: completedPort() });
+  await createRecurring(harness, "bounded-daily");
+
+  // Warm the boundary through the real Scheduler/executor/run store; the
+  // filter itself is then exercised through HTTP below.
+  const runIds = [];
+  for (let index = 0; index < 101; index += 1) {
+    const trigger = await harness.scheduler.runNow("bounded-daily");
+    assert.match(trigger.runId, /^r-/, `run ${index} did not complete`);
+    runIds.push(trigger.runId);
+  }
+  const oldestRunId = runIds[0];
+  const newestRunId = runIds.at(-1);
+
+  const schedule = harness.scheduler.getSchedule("bounded-daily");
+  assert.equal(schedule.stats.triggers, 101);
+  assert.equal(schedule.triggers.length, 100);
+  assert.equal(schedule.triggers.some((trigger) => trigger.runId === oldestRunId), false);
+
+  // The unfiltered store keeps all 101 runs; limit truncation is explicit via
+  // total (101) vs count (100).
+  const all = await harness.request("GET", "/v1/runs?limit=100");
+  assert.equal(all.status, 200);
+  assert.equal(all.body.data.total, 101);
+  assert.equal(all.body.data.count, 100);
+
+  const filtered = await harness.request("GET", "/v1/runs?scheduleId=bounded-daily&limit=100");
+  assert.equal(filtered.status, 200);
+  assert.equal(filtered.body.data.total, 100);
+  assert.equal(filtered.body.data.count, 100);
+  assert.equal(filtered.body.data.truncated, true);
+  assert.equal(filtered.body.data.filterComplete, false);
+  assert.deepEqual(filtered.body.data.scheduleFilter, {
+    retainedTriggerCount: 100,
+    totalTriggerCount: 101,
+    omittedTriggerCount: 1,
+    truncated: true,
+  });
+  assert.match(filtered.body.data.filterReason, /bounded_to_retained_trigger_history/);
+  assert.equal(filtered.body.data.runs.some((run) => run.runId === oldestRunId), false);
+  assert.equal(filtered.body.data.runs.some((run) => run.runId === newestRunId), true);
+
+  // Deleting the schedule must not turn the research-run filter into 404.
+  const removed = await harness.request("DELETE", "/v1/schedules/bounded-daily");
+  assert.equal(removed.status, 200);
+  const afterDelete = await harness.request("GET", "/v1/runs?scheduleId=bounded-daily");
+  assert.equal(afterDelete.status, 200);
+  assert.equal(afterDelete.body.data.total, 0);
+  assert.equal(afterDelete.body.data.scheduleMissing, true);
+  assert.equal(afterDelete.body.data.filterComplete, false);
+  assert.equal(afterDelete.body.data.truncated, false);
+  assert.match(afterDelete.body.data.filterReason, /no_durable_run_link/);
+
+  // History remains a Research fact and is still readable without the filter.
+  const remaining = await harness.request("GET", "/v1/runs?limit=100");
+  assert.equal(remaining.status, 200);
+  assert.equal(remaining.body.data.total, 101);
 });
 
 test("T2 update/delete fail closed while the schedule owns an in-flight run", async (t) => {
@@ -112,9 +220,10 @@ test("T2 update/delete fail closed while the schedule owns an in-flight run", as
   assert.equal(errorOf(update).code, "conflict");
   assert.match(errorOf(update).message, /active run/);
 
-  const enable = await harness.request("PATCH", "/v1/schedules/lease-daily", { enabled: false });
-  assert.equal(enable.status, 409);
-  assert.equal(errorOf(enable).code, "conflict");
+  // Lifecycle is not patchable at all, even while the schedule owns a lease.
+  const lifecycle = await harness.request("PATCH", "/v1/schedules/lease-daily", { enabled: false });
+  assert.equal(lifecycle.status, 400);
+  assert.equal(errorOf(lifecycle).code, "invalid_request");
 
   const remove = await harness.request("DELETE", "/v1/schedules/lease-daily");
   assert.equal(remove.status, 409);

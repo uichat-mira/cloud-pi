@@ -53,7 +53,7 @@ const DEFAULT_TICK_INTERVAL_MS = 30_000;
  * lifecycle changes go through pause/enable and the scheduler's own state
  * machine, so an API cannot forge a lease or skip a persisted occurrence.
  */
-const UPDATABLE_SCHEDULE_FIELDS = new Set(["name", "timezone", "kind", "cron", "at", "request", "enabled"]);
+const UPDATABLE_SCHEDULE_FIELDS = new Set(["name", "timezone", "kind", "cron", "at", "request"]);
 const TIMING_FIELDS = ["kind", "timezone", "cron", "at"];
 
 function isPlainObject(value) {
@@ -209,8 +209,10 @@ class Scheduler {
    * machine. This is the minimal mutation a management API needs; it is not a
    * general record editor.
    *
-   * - Only `name`, `timezone`, `kind`, `cron`, `at`, `request` and `enabled`
-   *   are accepted. Unknown or internal fields are refused.
+   * - Only `name`, `timezone`, `kind`, `cron`, `at` and `request` are accepted.
+   *   Unknown, internal and lifecycle fields (including `enabled`/`status`) are
+   *   refused: pause()/enable() are the only activation paths, so an update
+   *   cannot replay a missed occurrence or preserve a past `nextRunAt` as active.
    * - An in-flight run (`activeTrigger` or a live controller) fails closed with
    *   `conflict`: writing the definition under an execution that will later
    *   release its lease against the old object would leave a stale lease.
@@ -238,10 +240,6 @@ class Scheduler {
         `unsupported schedule fields: ${unsupported.join(", ")}`,
       );
     }
-    if (patch.enabled !== undefined && typeof patch.enabled !== "boolean") {
-      throw new SchedulerError(SCHEDULER_ERROR.INVALID_REQUEST, "enabled must be a boolean");
-    }
-
     return this._withStateLock(async () => {
       this._assertUsable();
       const current = this._require(scheduleId);
@@ -338,14 +336,6 @@ class Scheduler {
         if (current.status === SCHEDULE_STATUS.COMPLETED) {
           candidate.status = SCHEDULE_STATUS.ACTIVE;
           candidate.completedAt = null;
-        }
-      }
-
-      if (patch.enabled !== undefined) {
-        if (!patch.enabled) {
-          if (candidate.status !== SCHEDULE_STATUS.COMPLETED) candidate.status = SCHEDULE_STATUS.PAUSED;
-        } else if (candidate.status === SCHEDULE_STATUS.PAUSED) {
-          candidate.status = SCHEDULE_STATUS.ACTIVE;
         }
       }
 
