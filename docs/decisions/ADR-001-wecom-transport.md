@@ -1,6 +1,9 @@
 # ADR-001 · 企业微信 Channel 传输形态：长连接
 
-> **状态：提议（Proposed），待维护者裁决。** 本 ADR 不是"已采纳"或"已实现"。
+> **状态：已采纳（Accepted），2026-11-04。**
+> 裁决：team lead（按维护者授权的团队裁决流程记录）；**"已采纳"指方案确定，不等于已实现** ——
+> 截至本文件更新，`src/channels/wecom/` 仍不存在，Live 仍未执行（缺 `BotID`/`Secret`）。
+> 若维护者终审另择方案，本 ADR 回退为 Proposed 并按 §5 重评。
 > 依据：[研究 transport.md](../research/wecom-channel/transport.md)（官方文档 62131/62132/62154 与
 > 本机实验，访问日期 2026-11-04）。
 > 关联：[WeCom Channel 架构](../architecture/wecom-channel.md)、[ADR-002 身份](ADR-002-wecom-identity.md)。
@@ -34,6 +37,22 @@ Cloud Pi 需要一个能在真实企业微信里收发消息的 Channel。企业
 3. 协议层每帧回执超时 **5 s 且硬编码**（SDK），业务层窗口另算（欢迎语/卡片 5 s、回复 24 h、流式 10 min）。
 4. 媒体 `msg_item`（图文混排）在长连接回复中**未列入文档支持**，不要依赖。
 5. 版本必须钉死：仓库与 npm 版本漂移、25 个未处理 issue（研究 `sdk.md` §1）。
+
+### 2.1 裁决记录（2026-11-04）
+
+| 项 | 裁决 | 状态 |
+| --- | --- | --- |
+| 接入形态 | 智能机器人 API 模式 + WebSocket 长连接 | **Accepted** |
+| SDK | `@wecom/aibot-node-sdk` 精确 `1.0.7`；禁止 `^`/`~` 浮动版本 | **Accepted** |
+| URL 回调（公网 HTTPS） | 当前环境被否；仅作为"需要多实例"时的重评路径（§5 第 1 条） | Rejected（可重评） |
+| 不接入 / 只保留飞书 | 被否（不满足产品目标） | Rejected |
+| 群机器人 Webhook | 被否（不能收消息） | Rejected |
+| 自建应用 | 被否（权限面与语义不符；只有 `open_userid` 转换一处可能用到，见 ADR-002 X4） | Rejected |
+| "必须公网回调"分支 | **未触发**；隧道/云函数两种落地代价保留在 §6 备查 | Not triggered |
+| 撤销条件 | §5 的 5 条，任一出现即重评 | 有效 |
+
+> 该裁决**不包含**任何部署、凭证或代码动作：创建机器人、交付 `BotID`/`Secret` 仍是独立的外部依赖
+> （见 `docs/research/wecom-channel/admin-setup.md`）。
 
 ## 3. 后果
 

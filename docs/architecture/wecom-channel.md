@@ -1,8 +1,10 @@
 # WeCom（企业微信）Channel 架构
 
-> **状态：设计提议，不是已实现架构。** 截至 2026-11-04，仓库中**没有** `src/channels/wecom/`，
-> 也没有任何企业微信代码。本文把 `docs/research/wecom-channel/` 的研究结论固化成可实现的形状，
-> 每一段都标注"现有代码入口"与"计划新增文件"，供 t5/t8 实现、维护者裁决。
+> **状态：ADR 已裁决（2026-11-04），实现尚未开始。**
+> ADR-001（传输）与 ADR-002（身份）状态为 **Accepted**；身份侧 X1–X4 为 **Deferred**，
+> V1 采用**单租户委托凭证**范围（ADR-002 §5）。本文件描述的是"按已裁决 ADR 应实现成的形状"，
+> 不是已实现架构：截至 2026-11-04 仓库中**没有** `src/channels/wecom/`，也没有任何企业微信代码。
+> 每一段都标注"现有代码入口"与"计划新增文件"，供实现卡与 t8 使用。
 >
 > 关联：Issue #13、PR #23、[研究结论](../research/wecom-channel/README.md)、
 > [ADR-001 传输](../decisions/ADR-001-wecom-transport.md)、[ADR-002 身份](../decisions/ADR-002-wecom-identity.md)。
@@ -176,12 +178,17 @@ chatid（群）                           不映射、不授予、不持久化�
 
 - **禁止**把 `userid`/`open_userid` 当作 Cloud Account id、Mira Device id 或 Guanlan consumer。
 - **禁止**用 `from.userid` 决定工具权限、数据范围或 audience；模型输入不能选择身份（仓库 AGENTS.md §3）。
-- 首版 Channel 以**服务身份**运行：模型 Key、MCP 凭证都由部署环境注入，与聊天者身份无关；
-  聊天者只能触发"这个服务能做的事"，不能借消息提升权限。
-- 若未来需要"以用户身份访问其 Mira 数据"，必须走 [ADR-002](../decisions/ADR-002-wecom-identity.md)
-  的绑定/授权路径，且不得复用 Relay/Desktop 凭证。
+- Channel 以**服务身份**运行：模型 Key、MCP 凭证都由部署环境注入，与聊天者身份无关；
+  聊天者只能触发"这个服务能做的事"，不能借消息提升权限（ADR-002 D2，Accepted）。
+- **V1 数据面 = 单租户委托**（ADR-002 §5，Accepted）：Guanlan 读取使用维护者本人 Cloud Account 的
+  consumer 令牌（`consumer_id = account id`），所以 V1 只能看到**该账号可见**的数据；
+  未绑定用户不获得任何私有数据；Scheduler 后台任务同样只用这一个数据面。
+  这是**产品限制**（V1 只有一个人的数据视角），不是安全漏洞。
+- 若未来需要"以用户身份访问其 Mira 数据"，必须重开 ADR-002 的 X1/D4（新 audience/scope + 绑定流程），
+  且不得复用 Relay/Desktop 凭证；V1 不实现。
 - `open_userid` 转换（`[文档]` 61328）需要自建应用 `access_token` + 可见范围 → 属新权限面，
-  首版**不做**；需要时单独裁决。
+  V1 **不做**；V1 要求机器人由企业超管创建以拿明文 `userid`，拿不到就记录"无法对上明文 userid"
+  并保持不映射（ADR-002 X4，Deferred）。
 
 ## 6. 去重与幂等
 
@@ -265,6 +272,9 @@ coordinator 应把 WeCom transport 的 `isConnected()` 作为发送前置（计�
   见 §3.3 与研究 `feishu-comparison.md` §3.5。
 
 ## 11. 未决问题（交维护者 / t8）
+
+> 身份与授权类问题（X1–X4）**不在本节**：它们已由 ADR-002 裁决为 Deferred，触发条件见
+> [ADR-002 §7](../decisions/ADR-002-wecom-identity.md)。V1 不得在实现里"顺手"解决它们。
 
 1. 投递状态是否新增 `unknown`（§4.3）。
 2. 分段限额是按目标覆盖还是全局调整（§8）。
