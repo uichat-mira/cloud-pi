@@ -14,6 +14,11 @@ import { maskId } from "./config.mjs";
 
 const BOT_INFO_PATH = "/open-apis/bot/v3/info";
 
+/** Bounded per-request timeout for a proactive send (Axios default is 0 = no bound). */
+const DEFAULT_SEND_TIMEOUT_MS = 15_000;
+const MAX_SEND_TIMEOUT_MS = 120_000;
+export const SEND_TIMEOUT_ENV = "FEISHU_SEND_TIMEOUT_MS";
+
 /** Only the two receive id types this POC actually sends to. */
 const RECEIVE_ID_PATTERN = Object.freeze({
   open_id: /^ou_[A-Za-z0-9]+$/,
@@ -41,6 +46,59 @@ export class FeishuSendError extends Error {
     this.retryable = retryable;
     this.feishuCode = feishuCode;
   }
+}
+
+/**
+ * Resolve the single-request timeout: explicit option, then env, then 15s.
+ * Invalid values fail closed at transport creation instead of silently leaving
+ * the SDK's unbounded `timeout: 0`.
+ */
+export function resolveSendTimeoutMs(value) {
+  const raw = value ?? process.env[SEND_TIMEOUT_ENV] ?? DEFAULT_SEND_TIMEOUT_MS;
+  const numeric = typeof raw === "number" ? raw : Number(String(raw).trim());
+  if (!Number.isFinite(numeric) || !Number.isInteger(numeric) || numeric < 1 || numeric > MAX_SEND_TIMEOUT_MS) {
+    throw new TypeError(
+      `send timeout must be an integer between 1 and ${MAX_SEND_TIMEOUT_MS} ms (${SEND_TIMEOUT_ENV})`,
+    );
+  }
+  return numeric;
+}
+
+/**
+ * Give the SDK's shared Axios instance a bounded timeout unless the caller
+ * already configured one. `im.message.create` does not accept a per-call
+ * timeout, so this is what actually aborts a stalled socket; the transport
+ * race below still bounds callers when a fake/injected client ignores it.
+ */
+function configureHttpTimeout(client, timeoutMs) {
+  const defaults = client?.httpInstance?.defaults;
+  if (defaults && (defaults.timeout === undefined || defaults.timeout === 0)) {
+    defaults.timeout = timeoutMs;
+  }
+}
+
+function isTimeoutError(error) {
+  return (
+    error?.code === "ECONNABORTED" ||
+    error?.code === "ETIMEDOUT" ||
+    error?.name === "TimeoutError" ||
+    /timed out|timeout/i.test(String(error?.message ?? ""))
+  );
+}
+
+function withSendTimeout(promise, timeoutMs) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new FeishuSendError(`Feishu send timed out after ${timeoutMs}ms`, {
+          code: "feishu_send_timeout",
+          retryable: true,
+        }),
+      );
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function businessRejection(error) {
@@ -83,8 +141,16 @@ function domainOf(config) {
  * @param {Function} options.onEvent async (flattenedEvent) => void
  * @param {Function} [options.log] structured diagnostic sink
  * @param {object} [options.client] injected official SDK client (tests only)
+ * @param {number} [options.sendTimeoutMs] bounded single-request timeout
+ *   (default: FEISHU_SEND_TIMEOUT_MS or 15000 ms)
  */
-export function createFeishuTransport({ config, onEvent, log = () => {}, client: injectedClient }) {
+export function createFeishuTransport({
+  config,
+  onEvent,
+  log = () => {},
+  client: injectedClient,
+  sendTimeoutMs: sendTimeoutOption,
+}) {
   if (typeof onEvent !== "function") throw new TypeError("createFeishuTransport requires onEvent()");
 
   const client =
@@ -96,6 +162,9 @@ export function createFeishuTransport({ config, onEvent, log = () => {}, client:
       domain: domainOf(config),
       loggerLevel: Lark.LoggerLevel.error,
     });
+
+  const sendTimeoutMs = resolveSendTimeoutMs(sendTimeoutOption);
+  configureHttpTimeout(client, sendTimeoutMs);
 
   let wsClient;
   let botOpenId = config.botOpenId;
@@ -187,15 +256,18 @@ export function createFeishuTransport({ config, onEvent, log = () => {}, client:
     assertSendInput({ receiveIdType, receiveId, text, uuid });
     let response;
     try {
-      response = await client.im.message.create({
-        params: { receive_id_type: receiveIdType },
-        data: {
-          receive_id: receiveId,
-          msg_type: "text",
-          content: JSON.stringify({ text }),
-          ...(uuid ? { uuid } : {}),
-        },
-      });
+      response = await withSendTimeout(
+        client.im.message.create({
+          params: { receive_id_type: receiveIdType },
+          data: {
+            receive_id: receiveId,
+            msg_type: "text",
+            content: JSON.stringify({ text }),
+            ...(uuid ? { uuid } : {}),
+          },
+        }),
+        sendTimeoutMs,
+      );
     } catch (error) {
       // The SDK can throw even for HTTP business rejections (AxiosError with
       // `response.data.code`), not only for network failures. Classify that
@@ -217,6 +289,19 @@ export function createFeishuTransport({ config, onEvent, log = () => {}, client:
           feishuCode: rejection.code,
         });
       }
+      if (isTimeoutError(error)) {
+        log({
+          level: "warn",
+          event: "feishu_send_timeout",
+          destination: maskId(receiveId),
+          timeoutMs: sendTimeoutMs,
+        });
+        throw new FeishuSendError(`Feishu send timed out after ${sendTimeoutMs}ms`, {
+          code: "feishu_send_timeout",
+          retryable: true,
+        });
+      }
+      if (error instanceof FeishuSendError) throw error;
       // A genuine transport/protocol failure is retryable.
       log({
         level: "warn",

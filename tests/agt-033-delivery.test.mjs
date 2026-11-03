@@ -18,6 +18,7 @@ import {
   DeliveryError,
   createDeliveryCoordinator,
 } from "../src/delivery/index.mjs";
+import { createFeishuTransport } from "../src/channels/feishu/transport.mjs";
 import {
   RUN_ID,
   TWO_TARGETS,
@@ -211,6 +212,61 @@ describe("AGT-033 T2: multi-target failure isolation", () => {
 });
 
 describe("AGT-033 T2: bounded retry and error mapping", () => {
+  test("a hung transport request times out and only consumes the bounded attempt budget", async (t) => {
+    const root = await tempRoot(t);
+    let sdkCalls = 0;
+    const httpDefaults = { timeout: 0 };
+    const transport = createFeishuTransport({
+      config: {
+        appId: "cli_test_0001",
+        appSecret: "not-a-real-secret",
+        domain: "feishu",
+        allowedChatIds: ["oc_test_group_0001"],
+      },
+      onEvent: async () => {},
+      client: {
+        httpInstance: { defaults: httpDefaults },
+        im: {
+          message: {
+            create() {
+              sdkCalls += 1;
+              return new Promise(() => {});
+            },
+          },
+        },
+      },
+      sendTimeoutMs: 40,
+    });
+    const coordinator = createDeliveryCoordinator({
+      stateDir: join(root, "delivery"),
+      env: {},
+      now: CLOCK,
+      sendMessage: transport.send,
+      researchRunsDir: join(root, "runs"),
+      readRun: async () => makeRun({ status: "failed" }),
+      limits: { retryDelayMs: 0, maxAttempts: 2 },
+    });
+    const started = Date.now();
+    const summary = await coordinator.deliverRun({
+      runId: RUN_ID,
+      researchStatus: "failed",
+      triggerStatus: "failed",
+      schedule: {
+        scheduleId: "timeout-budget",
+        deliveryTargets: [{ type: "open_id", id: "ou_timeoutperson0001" }],
+      },
+    });
+    const elapsed = Date.now() - started;
+    assert.equal(summary.deliveryStatus, DELIVERY_RUN_STATUS.FAILED);
+    assert.equal(summary.targets[0].status, DELIVERY_STATUS.FAILED);
+    assert.equal(summary.targets[0].attempts, 2, "timeout eats exactly one bounded attempt");
+    assert.equal(sdkCalls, 2, "the hung SDK call is not retried more than maxAttempts");
+    assert.equal(summary.targets[0].lastError.retryable, true);
+    assert.match(summary.targets[0].lastError.message, /timed out/i);
+    assert.ok(elapsed < 1500, `bounded timeout attempt budget took ${elapsed}ms`);
+    assert.equal(httpDefaults.timeout, 40);
+  });
+
   test("a retryable failure is retried and eventually sent within the budget", async (t) => {
     const { coordinator, transport } = await setup(t, {
       failures: [retryableError(), retryableError(), null],

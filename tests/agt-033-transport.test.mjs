@@ -27,6 +27,7 @@ function transportWith(fake) {
     onEvent: async () => {},
     client: fake.client,
     log: fake.log,
+    sendTimeoutMs: fake.sendTimeoutMs,
   });
 }
 
@@ -110,6 +111,56 @@ describe("AGT-033 T2: Feishu proactive send", () => {
     await assert.rejects(
       transport.send({ receiveIdType: "open_id", receiveId: "ou_missing", text: "x" }),
       (error) => error instanceof FeishuSendError && error.retryable === false && error.feishuCode === 230001,
+    );
+  });
+
+  test("a hung SDK request is bounded by a timeout and classified as retryable", async () => {
+    const httpDefaults = { timeout: 0 };
+    const transport = transportWith({
+      sendTimeoutMs: 40,
+      client: {
+        httpInstance: { defaults: httpDefaults },
+        im: {
+          message: {
+            create() {
+              return new Promise(() => {});
+            },
+          },
+        },
+      },
+    });
+    const started = Date.now();
+    await assert.rejects(
+      transport.send({ receiveIdType: "open_id", receiveId: "ou_person1", text: "x" }),
+      (error) =>
+        error instanceof FeishuSendError &&
+        error.code === "feishu_send_timeout" &&
+        error.retryable === true,
+    );
+    const elapsed = Date.now() - started;
+    assert.ok(elapsed >= 30, `timeout fired too early: ${elapsed}ms`);
+    assert.ok(elapsed < 1000, `timeout did not bound the call: ${elapsed}ms`);
+    assert.equal(httpDefaults.timeout, 40, "the SDK's axios instance gets the bounded timeout");
+  });
+
+  test("an SDK axios timeout error is classified as a retryable send timeout", async () => {
+    const transport = transportWith({
+      client: {
+        im: {
+          message: {
+            async create() {
+              throw Object.assign(new Error("timeout of 40ms exceeded"), { code: "ECONNABORTED" });
+            },
+          },
+        },
+      },
+    });
+    await assert.rejects(
+      transport.send({ receiveIdType: "open_id", receiveId: "ou_person1", text: "x" }),
+      (error) =>
+        error instanceof FeishuSendError &&
+        error.code === "feishu_send_timeout" &&
+        error.retryable === true,
     );
   });
 
