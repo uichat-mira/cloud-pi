@@ -168,6 +168,8 @@
 | **G12** | **D8 脱敏门禁在 dev 上不再通过**（`files=64 hits=1`） | 合并后的 `t6-answers.md:81-82` 用散文把占位词写成 `chatid ← userid` / `chatid ← chatid`，规则把占位词当 id 值；**非真实泄漏**（已逐字核对） | 二选一（§3.9）：改文档措辞（推荐）或给规则加占位词白名单并补回归用例；修好后 D8 才能重新作为合并门禁 |
 | **G13** | **验收判定器基线漂移**：`judge` 仍假定 `tests≥555 且 fail===2`，dev 实际 **642/0** | 那两个 Windows 已知失败已被 PR #27/#29 修掉，基线与 `self-test` 的 3 个用例没同步更新 | 由 harness 作者把基线改成"当前全绿"形态（或把已知失败清单置空），同时更新 `self-test` 的期望；这是**工具维护缺口**，不是产品缺陷 |
 | **G14 / X4 前提** | **「超管创建的机器人只服务受控会话」目前靠配置纪律，不靠代码** | `src/channels/wecom/policy.mjs:46-58`：`allowedUserIds`/`allowedChatIds` 为空时**不拒绝**；配合单租户委托令牌，任何能给机器人发消息的人都会触发一次"用维护者身份"的 Guanlan 读取 | t29 完成后改为"启用外部工具时 allowlist 必须显式配置，否则启动失败"；届时把本行改成 `已强制` 并附测试名 |
+| **G15** | **验收执行包偶发失败（已观测、未定位）** | 2026-11-04 03:33 复跑 `self-test --full` 时 `C2-api` 出现 1 次失败（`T1 create returns 201 with Location…`，26 条中 1 失败）；随后同一命令**连续 8 次全过**（`test:api` 5/5、`c-feishu-regression --full` 3/3） | 用 `--test-concurrency=1` 或端口/临时目录隔离实验定位；**不得加重试掩盖**（重试会把偶发真失败一起吞掉） |
+| **G16** | **工具不可用时的投递纪律未强制**（§5.5） | 真实 401 后模型输出 `<||DSML|| invoke bash>` 伪工具文本，run 记录仍 `succeeded`，通道会把原文发给用户；已派 pi-dev | t27 + PR #30 修复落实四条（不投原文 / 一句人话 / 记录失败 / 失败态可查）；验收时用 forged 负例复检 |
 
 ## 5. 平台约束（产品边界，不是实现缺陷）
 
@@ -205,6 +207,20 @@
 - **处置**：已派 t29（「启用外部工具时 allowlist 必须显式配置，否则启动失败」）。
   **在 t29 完成前，这条边界只靠配置纪律，不算已解决**；矩阵不会把它写成"已修复"。
 - 缺口表对应行：G14 / X4 前提。
+
+### 5.5 工具/数据源不可用时，不得把模型原文投递给用户（跨场景通用规则）
+
+- **规则**（对 A/B/C/D 全部场景生效，不只企微）：一次运行若依赖的工具或数据源不可用、或本次**零工具连接成功**，则
+  1. **不得**把模型输出作为答复投递——尤其是 `<||DSML|| invoke …>` 这类伪工具标记文本；
+  2. 必须用**一句人话**说明"研究能力暂不可用"，并给出可操作下一步（何时重试 / 找谁）；
+  3. run 记录必须记为**失败**（不是 `succeeded`），带 `error.code`（如 `mcp_server_unavailable`）；
+  4. 投递记录必须能查到该失败态：不静默重试、不死循环。
+- **实测依据（L3，2026-11-04 04:15 前后）**：cloud-pi PR #30 `--mode=forged` 打真实端点得到真实 **401** 后，
+  模型输出 `<||DSML|| invoke name="bash">ls -a; …` 的伪工具文本；运行被规则判 `mcp_server_unavailable`，
+  但 ① `run.status` 仍是 `succeeded`（该 PR 的 F-30-2），② 这段文本在企微通道里会**原样发给用户**。
+- **为什么是产品边界而不是实现细节**：工具不可用是**常态**（令牌 300 s 过期、JWKS 轮换、限速、断网）。
+  用户看到的第一句话决定他是否信任这个机器人；把模型原文投出去等于把"内部失败"变成"对外事故"。
+- **状态：未强制**。归属 pi-dev（t27 两段式回复 + PR #30 修复）。缺口表 G16。
 
 ## 6. 跨仓库判定汇总
 
@@ -329,3 +345,68 @@ $ npm run check
 ✔ real scheduled three-mode profiler uses bounded production fetch, parser and D1 (2635.8423ms)
 ℹ pass 1 / ℹ fail 0   # 末个测试文件；整体 exit 0
 ```
+
+## 附录 C：后续状态更新（append-only，追加于 2026-11-04 04:20 UTC+8）
+
+> 规则同附录 A：本附录**只追加**，不修改 §2–§4 的既有判定。既有判定描述的是"当时测到的事实"；
+> 修复后的新事实写在这里，若与旧判定冲突则另开 finding，不改分。
+
+### C.1 G12 已修复（cloud-pi PR #33，commit `d4e2104`，合并 `776e6b9`）
+
+- 处置：按"规则侧"修，**没有**改 `t6-answers.md` 的措辞——`wecom_chat_id` 规则在等号右侧放行占位词
+  （`userid|chatid|open_userid|redacted|example|sample|…`），完整 id 与 `…`/`...` 掩码语义不变。
+- 新证据（同一台机器，dev 合并后）：`node scripts/agt-03x/d-failure-modes.mjs` → D8 **`hits=0`**（原 `files=64 hits=1`）；
+  `self-test --full` 的 `D/offline`、`D/wecom-absent` 恢复 pass。
+- 新增回归：`scan/placeholder-chatid-allowed`、`scan/placeholder-chatid-group-allowed`、
+  `scan/placeholder-redacted-allowed`（占位放行）、`scan/placeholder-does-not-hide-real-id`（完整 id 仍拒）。
+- 对 §3.9 / 第 9 项的影响：**不改写**。第 9 项记的是修复前"1 命中（假阳性）"的事实；
+  即使现在 0 命中，结论"**机器扫描 0 命中 ≠ 全仓无泄漏**"依然成立，边界未变。
+
+### C.2 G13 已修复（同一 PR）
+
+- 处置：`judge.mjs` 不再断言 `tests≥555 && fail===2`（那是 `dev@8efc250` 的快照），改为从 TAP 摘要读
+  `tests`/`fail`：摘要必须自洽（`0 < tests`、`0 ≤ fail ≤ tests`）；`fail === 0` 直接 pass；
+  `fail > 0` 仅当显式 `KNOWN_FAILURES`（当前为空）覆盖每一行失败才 pass。
+- 新证据：判定器内建回归 **21 → 27 条**全过，含 `judge/dev-actual-642-0-pass`
+  （给定 dev 实际 `tests=642 fail=0` → pass）与 `judge/small-suite-pass`（12 条小套件 → pass，证明不再依赖绝对值）。
+- 整体：`node scripts/agt-03x/self-test.mjs --full` → **11/11 cases + 27/27 regressions，exit 0**（原 8/11、exit 1）。
+- 对 §6 cloud-pi 行的影响：**不改写**。该行记的是修复前 `8/11、exit 1`；修复后的数字见本附录。
+
+### C.3 G15 新增（已观测、未定位、未加重试掩盖）
+
+- 现象：2026-11-04 03:33 一次 `self-test --full` 中 `C2-api` 失败 1 条
+  （`T1 create returns 201 with Location, public target config and no internal fields`，`tests=26 fail=1`）。
+- 之后的对照：`npm run test:api` 连跑 **5/5 通过**；`c-feishu-regression --full` 连跑 **3/3 通过**（C3 均为 642/0）。
+- 判断：**偶发，未定位**。没有改动它、也没有在 harness 里加重试——重试会把"偶发的真失败"一起吞掉，
+  这与本验收包"fail 必须可见"的立场冲突。定位方向见缺口表 G15。
+- 对 §6 的影响：无（该次失败发生在修复前的那一轮，未计入 C.1/C.2 的新数字）。
+
+### C.4 G16 新增（产品规则，未强制）
+
+- 规则与依据见 **§5.5**：工具不可用时不得把模型原文（尤其 `<||DSML|| …>`）投递给用户，
+  应以一句人话说明能力不可用，并在 run 记录标失败。
+- 归属：pi-dev（t27 两段式回复 + PR #30 修复）。**验收方式**：用 `--mode=forged` 复检
+  ——期望用户侧只收到一句人话、run 记录为失败、投递记录可查。
+
+### C.5 guanlan #30 已合并（`ea85eff`）
+
+- F-30-5..10 六点在我的复核里全部落实，结论 **pass**（cloud-mcp-guanlan PR 评论 `6613454022`），
+  4 条 low 建议（UTC/本地日期混用、占位路径、"自包含"措辞、`Remove-Item` 守卫）未阻塞合并。
+- 消歧：§6 表末行"cloud-pi PR #30（AGT-038）未验"指的是 **cloud-pi 的** #30，与本行 guanlan #30 无关；
+  前者本轮已评审（结论 `needs_revision`：脱敏后门 F-30-1、Trace 判定矛盾 F-30-2），状态见 C.6。
+
+### C.6 cloud-pi PR #30 评审结论（`ed5ffe0`）
+
+- 我**独立复现**（自签令牌 + 真实 Worker + 真实模型）：runId `r-20261103T194511-3f8531` succeeded，
+  `whoami` 580 ms、`news_recent` 1155 ms 返回 2 条真实新闻；`tools/list` 恰好 2 个读工具；`test:mcp` 19/19；
+  expired → `mcp_credential_unavailable` 且**模型未被调用**；audience 不符客户端即拒；forged → 真实 401 + 零工具调用。
+- 结论 **needs_revision**：F-30-1（`Next cursor` base64url 包着 account/consumer UUID，绕过 `sanitize()` 进了 run 记录）
+  与 F-30-2（判失败时 run 记录仍 `succeeded`，管理 API 读回与 Trace 矛盾）为必修；另 3 条建议。
+- 因此 A-3 行**仍待补**：等 pi-dev 修完两条必修、PR 合并后再按"真实工具调用 / 令牌不进模型 / fail-closed"
+  三条给最终 L3 判定。
+
+### C.7 追加后的交叉核对（重算）
+
+- L3 行（1/2/4/6/8、第 5 项、第 3 项的通道部分）仍逐条对得上 G0–G11，**无失配**；
+- 新增 G15（工具维护）、G16（投递纪律）不对应任何 L3 声明，也不下调任何既有判定；
+- **结论：追加后依然没有"标 L3 但缺口表里对不上"的行**；也没有把任何 L2 行升成 L3。
