@@ -269,8 +269,16 @@ export async function createAgentRuntime(options = {}) {
               // Empty list is meaningful: no built-in read/bash/edit/write tools leak in.
               tools: exposedTools,
             });
-            await created.session.bindExtensions({});
-            return created.session;
+            try {
+              await created.session.bindExtensions({});
+              return created.session;
+            } catch (error) {
+              // A partially bound extension may already own subprocesses or
+              // transports. Failure before the session is returned must clean
+              // those up as well, not only the normal run/finally path.
+              await closeSession(created.session);
+              throw error;
+            }
           })();
 
           const setupResult = await Promise.race([
@@ -401,7 +409,12 @@ async function raceTimeout(promise, ms, value) {
  */
 async function closeSession(session) {
   try {
-    await session.extensionRunner?.emit?.({ type: "session_shutdown", reason: "dispose" });
+    // A broken extension must not prevent the underlying session from being
+    // disposed. The outer run also has a deadline; closeSession needs its own.
+    await raceTimeout(
+      session.extensionRunner?.emit?.({ type: "session_shutdown", reason: "dispose" }),
+      ABORT_SETTLE_MS,
+    );
   } catch {
     // Extension shutdown is best effort; disposal must still happen.
   }
