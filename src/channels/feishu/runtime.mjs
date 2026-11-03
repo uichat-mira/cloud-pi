@@ -54,6 +54,14 @@ export function createFeishuAgentRunner({
 
   let runtimePromise;
   let disposed = false;
+  // AGT-027's contract: one runtime instance must not run two turns at once.
+  // The channel keeps one runtime, so turns from different chats are serialized
+  // here. A turn whose signal is aborted while it waits never reaches the model.
+  let runLock = Promise.resolve();
+
+  function cancelledRecord() {
+    return { status: "cancelled", text: "", error: { code: "cancelled" }, durationMs: 0 };
+  }
 
   async function getRuntime() {
     if (disposed) throw new Error("Feishu agent runner is disposed");
@@ -76,8 +84,21 @@ export function createFeishuAgentRunner({
   return {
     /** @param {{text:string, signal?:AbortSignal}} input */
     async runTurn({ text, signal }) {
-      const runtime = await getRuntime();
-      return await runtime.run(text, { signal });
+      const previous = runLock;
+      let release;
+      runLock = new Promise((resolve) => {
+        release = resolve;
+      });
+      await previous.catch(() => {});
+      try {
+        // A queued turn canceled before its slot starts must not call the model.
+        if (signal?.aborted) return cancelledRecord();
+        const runtime = await getRuntime();
+        if (signal?.aborted) return cancelledRecord();
+        return await runtime.run(text, { signal });
+      } finally {
+        release();
+      }
     },
 
     async dispose() {

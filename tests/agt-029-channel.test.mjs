@@ -314,3 +314,41 @@ describe("AGT-029 T2: messages that must not reach the runtime", () => {
     assert.ok(outcomes.some((outcome) => outcome.reason === "channel_disposed"));
   });
 });
+
+describe("AGT-029 P1-2: stopAll releases dropped queued work", () => {
+  test("stopAll drains an active run plus queued work without leaking pending", { timeout: 5_000 }, async () => {
+    let started;
+    const startedPromise = new Promise((resolve) => {
+      started = resolve;
+    });
+    let calls = 0;
+    const { channel, replies, outcomes } = createHarness({
+      runTurn: async ({ signal }) => {
+        calls += 1;
+        started();
+        await new Promise((resolve) => {
+          if (signal.aborted) return resolve();
+          signal.addEventListener("abort", resolve, { once: true });
+        });
+        return { status: "cancelled", text: "", runId: "run-stopall" };
+      },
+    });
+
+    channel.handleEvent(textEvent({ eventId: "evt_active", messageId: "om_active", chatId: "oc_same", text: "active" }));
+    await startedPromise;
+    channel.handleEvent(textEvent({ eventId: "evt_queued", messageId: "om_queued", chatId: "oc_same", text: "queued" }));
+    assert.equal(channel.pendingCount, 2);
+
+    const startedAt = Date.now();
+    const drained = await channel.stopAll({ timeoutMs: 1_000 });
+
+    assert.equal(drained, true, "stopAll must drain instead of timing out");
+    assert.ok(Date.now() - startedAt < 1_000);
+    assert.equal(calls, 1, "the queued message must not run");
+    assert.equal(channel.pendingCount, 0);
+    assert.equal(channel.activeRunCount, 0);
+    assert.equal(replies.length, 0);
+    await channel.whenIdle();
+    assert.ok(outcomes.some((outcome) => outcome.action === "cancelled"));
+  });
+});

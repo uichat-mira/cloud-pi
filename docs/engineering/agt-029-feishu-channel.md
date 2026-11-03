@@ -63,6 +63,8 @@ src/channels/feishu/
 
 - `channel.mjs` 不 import 网络或 Pi SDK，可用假 `runTurn` / `reply` 做 T1/T2。
 - `runtime.mjs` 每次 `run()` 由 AGT-027 建立独立 Session；不跨消息保留历史。
+- 同一个 runtime 实例的 `run()` 在 runner 内**全局串行**（AGT-027 合同）；不同 chat 的
+  Channel 队列仍相互独立，等待中的 turn 被 `/stop` 后直接取消，不进入模型。
 - 会话 cwd 是私有临时目录，仓库 `AGENTS.md`、`notes/` 和其他本地文件不会进入模型上下文。
 - `allowedTools` / `exposedTools` / `customTools` 全为空：飞书消息无法触发任何本地或 MCP 工具。
 
@@ -98,6 +100,8 @@ src/channels/feishu/
 - 同一 chat 的运行串行队列；`/stop` 会递增 epoch，停止前已排队的消息不会再执行。
 - 被 /stop 中止的 run 不再发送第二条错误/结果消息；只有 `/stop` 自己回复一次。
 - 没有活动运行时的 `/stop` 回复“当前没有正在运行的任务”，不调用 Runtime。
+- `stopAll()` 会 abort 所有 active run，并对每个被丢弃的 queued task 对称释放 pending；
+  因此 shutdown 不依赖 timeout，`whenIdle()` 不会被已丢弃任务永久卡住。
 
 ## 6. 配置
 
@@ -139,8 +143,8 @@ FEISHU_APP_ID=cli_... FEISHU_APP_SECRET=... npm run feishu:live
 | 卡片 | 证据 |
 | --- | --- |
 | T1 配置 / 路由 / 事件 / 去重 | `tests/agt-029-config.test.mjs`、`events`、`policy`、`dedupe`：23 项 |
-| T2 Adapter → Runtime 调用边界、AbortSignal、错误回复、负例 | `tests/agt-029-channel.test.mjs`：15 项；`tests/agt-029-service.test.mjs`：2 项 |
-| T3 真实 `createAgentRuntime().run()` + Pi faux 管线 | `tests/agt-029-runtime.test.mjs`：5 项 |
+| T2 Adapter → Runtime 调用边界、AbortSignal、错误回复、负例 | `tests/agt-029-channel.test.mjs`：16 项；`tests/agt-029-service.test.mjs`：2 项 |
+| T3 真实 `createAgentRuntime().run()` + Pi faux 管线 | `tests/agt-029-runtime.test.mjs`：7 项 |
 | Live 私聊 / 授权群 @ / 群非 @ 忽略 | `npm run feishu:live`：真实事件 + 真实模型，证据见 Live 文档 |
 | 全仓回归 | `npm test`：365 项通过，0 失败（含 P0/AGT-027/AGT-028） |
 

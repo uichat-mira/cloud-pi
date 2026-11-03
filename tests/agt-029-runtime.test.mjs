@@ -211,3 +211,137 @@ describe("AGT-029 T3: the channel runner grants no tools", () => {
     assert.equal(disposed, true);
   });
 });
+
+describe("AGT-029 P1-1: one runtime is never called concurrently", () => {
+  const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function createChannel(runner, replies, outcomes, onRunTurn) {
+    return createFeishuChannel({
+      allowedChatIds: [],
+      botOpenId: "ou_bot_0001",
+      runTurn: async (input) => {
+        onRunTurn?.(input);
+        return await runner.runTurn(input);
+      },
+      reply: async (messageId, text) => {
+        replies.push({ messageId, text });
+        return { messageId: `om_reply_${replies.length}` };
+      },
+      onOutcome: (outcome) => outcomes.push(outcome),
+    });
+  }
+
+  test("two chats share one runtime but run() concurrency stays at one", { timeout: 8_000 }, async () => {
+    let releaseFirst;
+    const firstGate = new Promise((resolve) => {
+      releaseFirst = resolve;
+    });
+    const calls = [];
+    let active = 0;
+    let maxActive = 0;
+
+    const runner = createFeishuAgentRunner({
+      config: loadConfig(BASE_ENV),
+      createRuntime: async () => ({
+        async run(text) {
+          calls.push(text);
+          active += 1;
+          maxActive = Math.max(maxActive, active);
+          if (calls.length === 1) await firstGate;
+          active -= 1;
+          return { status: "succeeded", text: `echo:${text}`, runId: `run-${text}` };
+        },
+        dispose() {},
+      }),
+    });
+    const replies = [];
+    const outcomes = [];
+    const channel = createChannel(runner, replies, outcomes);
+
+    try {
+      channel.handleEvent(textEvent({ eventId: "evt_a", messageId: "om_a", chatId: "oc_chat_a", text: "a" }));
+      channel.handleEvent(textEvent({ eventId: "evt_b", messageId: "om_b", chatId: "oc_chat_b", text: "b" }));
+      await tick(30);
+
+      assert.equal(maxActive, 1, "the second chat must wait for the first run");
+      assert.deepEqual(calls, ["a"]);
+
+      releaseFirst();
+      await channel.whenIdle();
+
+      assert.equal(maxActive, 1);
+      assert.deepEqual(calls, ["a", "b"]);
+      assert.deepEqual(
+        replies.map((entry) => entry.text).sort(),
+        ["echo:a", "echo:b"],
+      );
+      assert.equal(outcomes.filter((outcome) => outcome.action === "replied").length, 2);
+    } finally {
+      releaseFirst();
+      await channel.dispose();
+      await runner.dispose();
+    }
+  });
+
+  test("a queued turn canceled while waiting never calls the model", { timeout: 8_000 }, async () => {
+    let releaseFirst;
+    const firstGate = new Promise((resolve) => {
+      releaseFirst = resolve;
+    });
+    let firstStarted;
+    const firstStartedPromise = new Promise((resolve) => {
+      firstStarted = resolve;
+    });
+    let calls = 0;
+    let secondSignal;
+
+    const runner = createFeishuAgentRunner({
+      config: loadConfig(BASE_ENV),
+      createRuntime: async () => ({
+        async run(text) {
+          calls += 1;
+          if (calls === 1) {
+            firstStarted();
+            await firstGate;
+          }
+          return { status: "succeeded", text: `answer:${text}`, runId: `run-${text}` };
+        },
+        dispose() {},
+      }),
+    });
+    const replies = [];
+    const outcomes = [];
+    const channel = createChannel(runner, replies, outcomes, (input) => {
+      if (input.chatId === "oc_second") secondSignal = input.signal;
+    });
+
+    try {
+      channel.handleEvent(textEvent({ eventId: "evt_first", messageId: "om_first", chatId: "oc_first", text: "first" }));
+      await firstStartedPromise;
+
+      channel.handleEvent(textEvent({ eventId: "evt_second", messageId: "om_second", chatId: "oc_second", text: "second" }));
+      await tick(20);
+      assert.ok(secondSignal, "the second turn must be waiting behind the first");
+      assert.equal(secondSignal.aborted, false);
+
+      channel.handleEvent(
+        textEvent({ eventId: "evt_stop_second", messageId: "om_stop_second", chatId: "oc_second", text: "/stop" }),
+      );
+      assert.equal(secondSignal.aborted, true);
+
+      releaseFirst();
+      await channel.whenIdle();
+
+      assert.equal(calls, 1, "the canceled queued turn must not reach the model");
+      assert.equal(secondSignal.aborted, true);
+      assert.equal(replies.filter((entry) => entry.text.startsWith("answer:")).length, 1);
+      assert.ok(
+        outcomes.some((outcome) => outcome.action === "cancelled" && outcome.chatId === "oc_second"),
+      );
+    } finally {
+      releaseFirst();
+      await channel.dispose();
+      await runner.dispose();
+    }
+  });
+});

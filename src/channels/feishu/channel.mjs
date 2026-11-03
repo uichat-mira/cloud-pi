@@ -167,6 +167,14 @@ export function createFeishuChannel({
     if (!queue.running) void drain(chatId, queue);
   }
 
+  /** Drop queued (not yet started) tasks and release their pending slots. */
+  function dropQueued(queue) {
+    while (queue.items.length > 0) {
+      queue.items.pop();
+      end();
+    }
+  }
+
   async function drain(chatId, queue) {
     queue.running = true;
     while (queue.items.length > 0) {
@@ -342,7 +350,7 @@ export function createFeishuChannel({
       active.controller.abort();
       epochs.set(chatId, (epochs.get(chatId) ?? 0) + 1);
     }
-    for (const queue of queues.values()) queue.items.length = 0;
+    for (const queue of queues.values()) dropQueued(queue);
     if (pending === 0) return true;
     return await Promise.race([
       whenIdle().then(() => true),
