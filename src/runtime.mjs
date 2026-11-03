@@ -24,8 +24,20 @@ import {
 import { classifyError, RuntimeError } from "./errors.mjs";
 import { CONFIG_KEYS, describeConfig, loadConfig, normalizeConfig, redactSecrets } from "./config.mjs";
 import { createModelRuntime } from "./provider.mjs";
+import { redactOpaqueHandles } from "./redaction.mjs";
 
 const RESULT_PREVIEW_CHARS = 2_000;
+/** Enough to see which parameters a tool was called with, without whole documents. */
+const INPUT_PREVIEW_CHARS = 400;
+
+/** JSON that never throws on circular or exotic values. */
+function safeJson(value) {
+  try {
+    return JSON.stringify(value ?? {});
+  } catch {
+    return "[unserializable]";
+  }
+}
 const IDLE_GRACE_MS = 10_000;
 const ABORT_SETTLE_MS = 2_000;
 
@@ -63,6 +75,9 @@ function createRunGuard({ capture, allowedTools, maxToolCalls, onEvent, secrets 
         name: event.toolName,
         status: "pending",
         requestedAt: new Date().toISOString(),
+        // Sanitized argument summary: enough to audit a call, never a secret and
+        // never a whole document (AGT-038 wants the call traceable in the run).
+        inputSummary: redactOpaqueHandles(redactSecrets(safeJson(event.input), secrets)).slice(0, INPUT_PREVIEW_CHARS),
       };
       capture.records.set(event.toolCallId, record);
       capture.order.push(record);
@@ -97,7 +112,10 @@ function createRunGuard({ capture, allowedTools, maxToolCalls, onEvent, secrets 
       record.status = event.isError ? "error" : "ok";
       record.error = Boolean(event.isError);
       if (typeof record.startedAt === "number") record.durationMs = Date.now() - record.startedAt;
-      record.resultPreview = redactSecrets(textOfContent(event.content), secrets).slice(0, RESULT_PREVIEW_CHARS);
+      record.resultPreview = redactOpaqueHandles(redactSecrets(textOfContent(event.content), secrets)).slice(
+        0,
+        RESULT_PREVIEW_CHARS,
+      );
       emit(onEvent, {
         type: "tool_result",
         tool: event.toolName,
@@ -494,12 +512,13 @@ function buildRunRecord({ runId, config, capture, session, promptError, timedOut
     });
   }
 
-  const text = redactSecrets(textOfContent(lastAssistant?.content ?? []), secrets);
+  const text = redactOpaqueHandles(redactSecrets(textOfContent(lastAssistant?.content ?? []), secrets));
   const toolCalls = capture.order.map((record) => ({
     name: record.name,
     toolCallId: record.id,
     status: record.status,
     ...(record.reason ? { reason: record.reason } : {}),
+    ...(record.inputSummary !== undefined ? { inputSummary: record.inputSummary } : {}),
     ...(typeof record.durationMs === "number" ? { durationMs: record.durationMs } : {}),
     ...(record.resultPreview !== undefined ? { resultPreview: record.resultPreview } : {}),
   }));

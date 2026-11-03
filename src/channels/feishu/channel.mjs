@@ -24,6 +24,7 @@ import { createDedupeStore } from "./dedupe.mjs";
 import { normalizeFeishuMessageEvent, readFeishuEventType } from "./events.mjs";
 import { decideFeishuRoute } from "./policy.mjs";
 import { maskId } from "./config.mjs";
+import { sanitizeModelReply } from "../../redaction.mjs";
 
 export const STOP_COMMANDS = Object.freeze(new Set(["/stop", "/cancel", "停止", "取消"]));
 
@@ -427,6 +428,13 @@ export function createFeishuChannel({
       replyText = `Mira 处理失败（${safeErrorCode(record)}），请稍后重试。`;
     }
 
+    // Pseudo tool syntax written as prose must never reach the user; the reply is
+    // replaced and the turn is recorded as failed so the trace matches the chat.
+    const { text: sanitizedReply, leaked } = sanitizeModelReply(replyText);
+    if (leaked) {
+      log({ level: "warn", event: "feishu_reply_pseudo_tool_text", action: "replaced" });
+      replyText = sanitizedReply;
+    }
     const sent = await safeReply(event.messageId, replyText);
 
     if (isResearch) {
@@ -444,6 +452,7 @@ export function createFeishuChannel({
         replyDelivered: sent.ok,
         ...baseOutcome(event),
       };
+      if (leaked) Object.assign(outcome, { action: "failed", reason: "pseudo_tool_text", status: "failed" });
       emit(outcome);
       return outcome;
     }
@@ -461,11 +470,12 @@ export function createFeishuChannel({
             total: Number.isFinite(record.usage.total) ? record.usage.total : undefined,
           }
         : undefined,
-      errorCode: status === "succeeded" ? undefined : safeErrorCode(record),
+      errorCode: leaked ? "pseudo_tool_text" : status === "succeeded" ? undefined : safeErrorCode(record),
       replyMessageId: sent.messageId,
       replyDelivered: sent.ok,
       ...baseOutcome(event),
     };
+    if (leaked) Object.assign(outcome, { action: "failed", reason: "pseudo_tool_text", status: "failed" });
     emit(outcome);
     return outcome;
   }

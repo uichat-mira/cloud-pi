@@ -40,7 +40,10 @@
     "two-phase:live": "node --env-file-if-exists=.env scripts/agt-036/two-phase-live.mjs",
     "two-phase:self-test": "node scripts/agt-036/two-phase-live.mjs --self-test",
     "collaboration:evidence": "node scripts/agt-035/live-collaboration-evidence.mjs",
-    "scheduler:poc": "node scripts/scheduler-poc-evidence.mjs"
+    "scheduler:poc": "node scripts/scheduler-poc-evidence.mjs",
+    "test:mcp": "node --test \"tests/agt-038-*.test.mjs\"",
+    "mcp:probe": "node scripts/agt-038/probe-mcp.mjs",
+    "mcp:live": "node --env-file-if-exists=.env scripts/agt-038/live-mcp.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.4.0",

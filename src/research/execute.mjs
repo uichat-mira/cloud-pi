@@ -685,6 +685,13 @@ async function runPreparedExecution(context) {
     }
   } catch (error) {
     runtimeError = classifyRuntimeError(error);
+    // A post-run rule (fail-closed MCP verdict) failed an otherwise finished run.
+    // Keep its record — with a failed terminal status — so the persisted run and
+    // the management API show a failure instead of a successful run with an error
+    // attached to it.
+    if (error?.runRecord && typeof error.runRecord === "object") {
+      runtimeResult = { ...error.runRecord, status: RUN_STATUS.FAILED };
+    }
   } finally {
     clearTimeout(deadlineTimer);
     externalSignal?.removeEventListener("abort", onExternalAbort);

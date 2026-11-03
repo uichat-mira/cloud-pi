@@ -19,6 +19,7 @@ import { createWecomDedupeStore } from "./dedupe.mjs";
 import { normalizeWecomMessageEvent } from "./events.mjs";
 import { decideWecomRoute } from "./policy.mjs";
 import { byteLength, splitForSend } from "./text.mjs";
+import { sanitizeModelReply } from "../../redaction.mjs";
 
 export const WECOM_STOP_COMMAND = "/stop";
 export const WECOM_RESEARCH_COMMAND = "/research";
@@ -487,9 +488,33 @@ export function createWecomChannel({
         kind === "research" && typeof record?.runId === "string" && record.runId.length > 0
           ? `${text}\n\nrunId: ${record.runId}`
           : text;
-      const sent = await deliver(event, answer);
+      // A model that could not use a tool sometimes writes the invocation syntax as
+      // prose. It must never reach the user: replace it with a human sentence and
+      // record the turn as failed, so the run trace matches what the user saw.
+      const { text: outbound, leaked } = sanitizeModelReply(answer);
+      if (leaked) {
+        log({ level: "warn", event: "wecom_reply_pseudo_tool_text", action: "replaced" });
+      }
+      const sent = await deliver(event, outbound);
       const ackInfo = event.messageId ? ackRecords.get(event.messageId) : undefined;
       if (event.messageId) ackRecords.delete(event.messageId);
+      if (leaked) {
+        return emit({
+          ...deliveryFields(sent),
+          action: "failed",
+          reason: "pseudo_tool_text",
+          status: "failed",
+          kind,
+          runId: typeof record?.runId === "string" ? record.runId : undefined,
+          durationMs: Date.now() - started,
+          // Two-phase correlation: the same `requestId` and the ack seen for this
+          // inbound message, so evidence can join ack and final.
+          requestId: requestIdOf(event),
+          ackMs: ackInfo?.ackMs,
+          ackDelivered: ackInfo?.ok,
+          ...baseOutcome(event),
+        });
+      }
       return emit({
         kind,
         status: typeof record?.status === "string" ? record.status : "failed",
