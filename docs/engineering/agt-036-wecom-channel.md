@@ -304,6 +304,25 @@ node scripts/agt-036/delivery-live.mjs --secrets <path> --env-file <path> --inbo
 `--self-test` 只替换模型 port 与 transport（scheduler / research 执行器 / run store / 投递全是真的），
 用于离线自检命令本身；它的 `mode` 字段是 `self-test`，**不作为真实链路证据**。
 
+#### 试运行记录（2026-11-04 03:20–03:40 +08，未成功，如实记录）
+
+| 项 | 值 |
+| --- | --- |
+| 命令 | `node scripts/agt-036/delivery-live.mjs --inbound-timeout-ms=1200000` |
+| 连接 | `wss://openws.work.weixin.qq.com` 直连，`Authentication successful`（真实 bot_id/secret 被平台接受） |
+| 入站 | **0 条**（20 分钟窗口内无任何真实入站；维护者当时已休息，无法配合发消息） |
+| 结果 | harness 以退出码 1 结束：`ok:false, error:"timed out waiting for an inbound WeCom message"`，**没有**创建调度、**没有**发送任何消息、**没有**写成功证据 |
+| 结论 | 投递代码路径已离线验证；真实企业微信投递仍**未验证**，见 §12 与 blocker |
+
+重跑只需一条真实入站（任一单聊消息即可）：
+
+```bash
+npm run delivery:live -- --inbound-timeout-ms=600000
+```
+
+成功时 stdout 与 `.work/agt-036-delivery/live-evidence.jsonl` 会各出现一行
+`agt036_delivery_live`，其中 `deliveryStatus:"sent"`、`acks:[0]`；失败时同一行带 `error`/`lastError`。
+
 ## 11. 脱敏修复：短 id 不再原样出现在投递视图
 
 `maskId()`（飞书）对长度不足 6+4 的 id 会原样返回；企业微信 `userid`（例如 8 个字符）正好落在这个
@@ -314,7 +333,9 @@ node scripts/agt-036/delivery-live.mjs --secrets <path> --env-file <path> --inbo
 
 | 项 | 状态 | 说明 |
 | --- | --- | --- |
+| **单聊主动投递（真实企业微信）** | **未验证（blocker）** | 代码路径 + 通道认证已就绪；2026-11-04 03:20–03:40 的 20 分钟窗口内无任何真实入站，harness 以退出码 1 诚实结束（未建调度、未发消息）。需维护者在窗口内给机器人发任意一条消息后重跑 `npm run delivery:live` |
 | 群聊主动投递 | 未验证 | 需要维护者提供一个测试群并把机器人拉进群；`wecom_chat` 分支离线已覆盖 |
 | 群内 `@` 前缀 | 未实现 | 属 t27（`@` 剥离与两段式 ack），本卡不重复实现 |
 | 未知会话持久化 | 未做 | 已知会话表仍是进程内存；重启后需重新入站或显式开 `WECOM_DELIVERY_ALLOW_UNKNOWN_SESSION` |
+| 验收判据对接 | 已就绪 | dev 的 `scripts/agt-03x/b-scheduled-research-delivery.mjs` 是**只读裁判**（读 Management API + 磁盘），本卡的 harness 是**生产者**；`--offline` 自检 7/7 通过。裁判的 B2 还要求研究链路真的调用 Guanlan MCP 工具，属 t9/t28 的真实 Guanlan 接线范围 |
 

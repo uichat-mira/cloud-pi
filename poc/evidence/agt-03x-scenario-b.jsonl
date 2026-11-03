@@ -523,3 +523,14 @@
 {"scenario":"B","at":"2026-11-03T19:03:31.258Z","check":"pre-P7","status":"blocker","detail":"missing env: AGTX_P7_SECRET_MATCH","mode":"real"}
 {"scenario":"B","at":"2026-11-03T19:03:31.258Z","check":"pre-P8","status":"blocker","detail":"missing env: CLOUD_AUTH_PUBLIC_JWKS_URL","mode":"real"}
 {"scenario":"B","at":"2026-11-03T19:03:31.258Z","event":"result","mode":"real","status":"blocker","counts":{"total":10,"sent":0,"failed":0,"pending":10},"note":"B verdict=blocker"}
+{"scenario":"B","at":"2026-11-03T19:29:14.185Z","event":"start","mode":"offline","detail":"head=84cf501649ec10571c024d2f70fad093653464d0"}
+{"scenario":"B","at":"2026-11-03T19:29:14.189Z","event":"self-test","status":"pass","detail":"happy path -> pass expect=pass actual=pass"}
+{"scenario":"B","at":"2026-11-03T19:29:14.190Z","event":"self-test","status":"pass","detail":"partial research shown as succeeded -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T19:29:14.190Z","event":"self-test","status":"pass","detail":"duplicate runId (double trigger) -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T19:29:14.190Z","event":"self-test","status":"pass","detail":"no Guanlan tool call -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T19:29:14.190Z","event":"self-test","status":"pass","detail":"delivery reader unavailable -> blocker expect=blocker actual=blocker"}
+{"scenario":"B","at":"2026-11-03T19:29:14.190Z","event":"self-test","status":"pass","detail":"API/disk mismatch -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T19:29:14.190Z","event":"self-test","status":"pass","detail":"unbounded retries -> fail expect=fail actual=fail"}
+{"scenario":"B","at":"2026-11-03T19:29:14.191Z","check":"self-test","status":"pass","detail":"7/7 bundled cases matched","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T19:29:14.191Z","check":"B1-B7","status":"blocker","detail":"offline self-test only - no live run was read back","mode":"offline"}
+{"scenario":"B","at":"2026-11-03T19:29:14.191Z","event":"result","mode":"offline","status":"blocker","counts":{"total":2,"sent":1,"failed":0,"pending":1},"note":"B verdict=blocker"}
