@@ -222,6 +222,17 @@
   用户看到的第一句话决定他是否信任这个机器人；把模型原文投出去等于把"内部失败"变成"对外事故"。
 - **状态：未强制**。归属 pi-dev（t27 两段式回复 + PR #30 修复）。缺口表 G16。
 
+### 5.6 体验维度不在本矩阵判定范围内
+
+- 本矩阵只判两件事：**功能是否成立**、**证据属于哪一层**（L1/L2/L3 + 环境限定）。语气、文案、回复长度、
+  交互节奏、错误话术是否"像人说的"——**一律不判**。
+- 产品体验标准另立：`docs/product/wecom-experience-rubric.md`（t30 / PR #34，**尚未合并**；
+  合并后才成为权威。合并前不得当作已生效标准，也不得拿来当验收依据）。
+- 两个方向都写死：① 矩阵里的 "✅" 永远不等于"用户会觉得好用"；
+  ② 体验评审也不能替代 L3 证据——文笔再好，没有真实平台证据就是没验。
+- 为什么需要这条：t12 的 A 场景会同时产出"功能通过"和"体验很差"（例如工具不可用时只回一句人话）。
+  两张表混用，"通过"就变成一句没有信息量的话。
+
 ## 6. 跨仓库判定汇总
 
 | 仓库 | 基线 | 门禁结果（本次复跑） | 判定 |
@@ -260,6 +271,7 @@
 | A-1 定时投递到企业微信 | t25 接线完成 + 真实 schedule 触发一次 | 结论 / 层（预计 L3 真实平台）/ 环境 / 证据落点（真实群消息或 `run.json` + delivery 记录）/ 复现命令 / 未验证边界 |
 | A-2 群内两段式回复（ack + 终稿） | t27 完成 + 群里长任务跑一次 | 同上 + ack 延迟、终稿延迟、`req_id` 失效后兜底路径 |
 | A-3 cloud-pi PR #30（AGT-038）评审 | PR #30 转 ready 或合并后 | 三条重点：真实工具调用、令牌不进模型、fail-closed；每条给 L3 证据或标缺口 |
+| A-4 t12 真实端到端验收重派 | **四个条件同时满足**才可派单：a) t25 投递接线已验证；b) t27 两段式已验证；c) 维护者在线；d) 令牌注入步骤写死（现签命令 + TTL + 轮换点） | 场景 A/B/C/D 各自：结论 / 层（预计 L3）/ 环境 / 证据落点 / 复现命令 / 未验证边界；外加 G16 复检（工具不可用时用户侧只收到一句人话、run 记录为失败）。**任一条件缺失即记 blocker，不得用 fixture 顶替** |
 
 ## 附录 B：本次复跑的命令与原始输出摘录
 
@@ -410,3 +422,35 @@ $ npm run check
 - L3 行（1/2/4/6/8、第 5 项、第 3 项的通道部分）仍逐条对得上 G0–G11，**无失配**；
 - 新增 G15（工具维护）、G16（投递纪律）不对应任何 L3 声明，也不下调任何既有判定；
 - **结论：追加后依然没有"标 L3 但缺口表里对不上"的行**；也没有把任何 L2 行升成 L3。
+
+### C.8 引用锚点复核（dev@776e6b9）
+
+方法：把矩阵里所有 `path:line` 引用抽出来，对三个仓库 `origin/dev` 的当前文件做"存在性 + 行数 + 被引区间首末行内容"检查
+（cloud-pi `776e6b9`、cloud-mcp-guanlan `ea85eff`、cloud-auth `481767f`），共 57 处引用。
+
+- **命中且内容一致**：其余全部，包括 `live-smoke-evidence.md`、`group-and-proactive-evidence.md`、
+  `agt-037-unified-runtime.md`、`agt-027-live-evidence.md`、`agt-036-wecom-channel.md`、
+  `agt-034-local-management-api.md`、`src/channels/wecom/policy.mjs:46-58`、
+  guanlan `gln-014-real-token-acceptance.md:40-50/62-65/80/82/155-166`、cloud-auth `gln-013-nonprod-runbook.md:16-18/65-87`。
+- **1 处行号漂移**：`docs/evidence/wecom-v1/README.md` 的 §8（证据卫生与更正记录）原引用 `:126-154`。
+  #33 让 §7 变长后，§8 现在从 **L136** 开始、文件共 164 行，正确引用应为 **`:136-164`**。
+  按附录 A 的 append-only 规则**不原地改 §3.9**，以本行解释为准。
+- **一个口径变化，别误读**：`d-failure-modes` 现在仍 **exit 3**，但原因已不同——D8 **pass**
+  （`scanned 63 evidence files, zero secret-shaped hits`），exit 3 来自 `pre-P1` 检查"缺 `WECOM_BOT_ID`/`WECOM_SECRET`"
+  （无凭证环境的必然结果）。**不要把 exit 3 读成"D8 还在失败"。**
+
+### C.9 复现命令逐条执行（不含需要真实入站/凭证的）
+
+| 命令 | 本次结果 | 说明 |
+| --- | --- | --- |
+| `npm run wecom:check` | exit 2，`wecom_config_error` | 与 B.2 一致，fail-closed |
+| `npm run api:smoke` | exit 0，18 requests | |
+| `node scripts/agt-037/entry-smoke.mjs` | exit 0，`ok:true`，runId `r-20261103T195336-06b1c1` | 含 `missingCredentialExitCode=2` |
+| `node scripts/agt-03x/d-failure-modes.mjs` | exit 3；D8 **pass**、`pre-P1` blocker | 见 C.8 口径说明 |
+| `node scripts/agt-03x/self-test.mjs --full` | **11/11 + 27/27，exit 0** | 会重写 `offline-selftest.txt`（生成物，已还原，不入 PR） |
+| `npm run test:wecom` / `test:app` / `test:api` / `test:targets` / `test:scheduler` / `test:p0` | 71 / 16 / 26 / 29 / 31 / 12 全 pass，exit 0 | `test:api` 为本轮**第 6 次连续通过**（G15 仍只是偶发） |
+| `npm test` | 642/642，80 suites，exit 0 | dev@776e6b9 |
+| `npm run agent`、`npm run wecom:wait-inbound` | **未执行** | 需真实模型 key / 真实凭证 + 真实入站；命令本身存在（已核 `package.json`） |
+| guanlan `npm run check`、cloud-auth `pnpm run check` | **本轮未重跑** | 两仓自 B.6 无改动；本机 guanlan 无 `node_modules`（G3/G9 同类限制） |
+
+> 判读提醒：命令"能跑通"只证明**工具链可用**，不证明产品验收；判定仍以 §0 / §4 为准。
