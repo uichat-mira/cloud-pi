@@ -17,6 +17,12 @@ export const WECOM_CONFIG_KEYS = Object.freeze({
   BOT_NAME: "WECOM_BOT_NAME",
   ALLOWED_USER_IDS: "WECOM_ALLOWED_USER_IDS",
   ALLOWED_CHAT_IDS: "WECOM_ALLOWED_CHAT_IDS",
+  /**
+   * Optional fixed sentence sent to a rejected sender. Empty by default so a
+   * rejection gives no signal at all; set it only when a deployment wants to tell
+   * a colleague why the bot stayed silent.
+   */
+  DENIED_REPLY: "WECOM_DENIED_REPLY",
   WS_URL: "WECOM_WS_URL",
   HEARTBEAT_INTERVAL_MS: "WECOM_HEARTBEAT_INTERVAL_MS",
   CONNECT_TIMEOUT_MS: "WECOM_CONNECT_TIMEOUT_MS",
@@ -157,6 +163,7 @@ export function loadWecomConfig(env = process.env) {
     botName,
     allowedUserIds: readIdList(env, WECOM_CONFIG_KEYS.ALLOWED_USER_IDS),
     allowedChatIds: readIdList(env, WECOM_CONFIG_KEYS.ALLOWED_CHAT_IDS),
+    deniedReply: readString(env, WECOM_CONFIG_KEYS.DENIED_REPLY),
     wsUrl,
     heartbeatIntervalMs: readInteger(env, WECOM_CONFIG_KEYS.HEARTBEAT_INTERVAL_MS, {
       min: 5_000,
@@ -206,6 +213,7 @@ export function describeWecomConfig(config) {
     wsUrl: config?.wsUrl,
     allowedUserCount: config?.allowedUserIds?.length ?? 0,
     allowedChatCount: config?.allowedChatIds?.length ?? 0,
+    deniedReplyConfigured: typeof config?.deniedReply === "string" && config.deniedReply.length > 0,
     replyMaxBytes: config?.replyMaxBytes,
     replyTimeoutMs: config?.replyTimeoutMs,
     ackEnabled: config?.ackEnabled ?? true,

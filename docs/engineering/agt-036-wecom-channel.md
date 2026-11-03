@@ -39,8 +39,9 @@
 | `WECOM_BOT_ID` | 是 | — | 智能机器人 BotID |
 | `WECOM_BOT_SECRET` | 是 | — | 智能机器人 Secret |
 | `WECOM_BOT_NAME` | 群聊必填 | — | 机器人显示名；群聊只接受"文本以 `@<该名>` 开头"的消息 |
-| `WECOM_ALLOWED_USER_IDS` | 否 | 空（不限制） | 单聊 sender `userid` 白名单，逗号分隔；**不是** Cloud Auth 授权 |
-| `WECOM_ALLOWED_CHAT_IDS` | 否 | 空（不限制） | 群聊 `chatid` 白名单，逗号分隔 |
+| `WECOM_ALLOWED_USER_IDS` | 启用外部工具时必填 | 空（不限制） | 单聊 sender `userid` 白名单，逗号分隔；**不是** Cloud Auth 授权（见 §2.1） |
+| `WECOM_ALLOWED_CHAT_IDS` | 启用外部工具时必填（与上一条二选一） | 空（不限制） | 群聊 `chatid` 白名单，逗号分隔 |
+| `WECOM_DENIED_REPLY` | 否 | 不回复 | 被白名单拒绝时的固定文案；默认不回复，避免白名单被探测 |
 | `WECOM_WS_URL` | 否 | 不设置 | **不设置时使用 SDK 自己的默认端点**；仅用于排查或私有网关 |
 | `WECOM_HEARTBEAT_INTERVAL_MS` | 否 | `30000` | 官方建议 30s |
 | `WECOM_CONNECT_TIMEOUT_MS` | 否 | `20000` | 未完成认证即判启动失败 |
@@ -52,6 +53,41 @@
 `WECOM_WS_URL` 故意不写死：**实测**真实订阅端点是 `wss://openws.work.weixin.qq.com`（直连，不走代理；
 `aibot_subscribe` 返回 `errcode:0 / Authentication successful`，实测 ws_connected 192ms、subscribed 380ms），
 与 SDK 源码默认值一致。实现仍不硬编码，缺省交给 SDK，需要覆盖时用该变量显式指定。
+
+## 2.1 单租户委托下的授权边界（t29）
+
+这一节回答一个问题：**谁能触发一次读取，以及那次读取消的是谁的身份。**
+
+**事实一：V1 的所有 Guanlan 读取都使用维护者身份。** 云端是"维护者委托的单一 consumer 令牌"
+（ADR-002；按账户的 X1–X4 是 Deferred）。机器人读到的每一条新闻，都是以维护者被授权的那个
+consumer 身份读出来的，不存在"张三问就按张三的身份读"这条路径——因为 V1 还没有可用的
+per-user 委托。
+
+**事实二：白名单只决定"谁可以触发"，不决定"能读什么"。** `WECOM_ALLOWED_USER_IDS` /
+`WECOM_ALLOWED_CHAT_IDS` 是本进程的**本地会话授权**：它只回答"这条消息能否启动一次 run"。
+它**不是** Cloud Auth 授权，不授予账户、consumer 或工具权限；工具返回什么，仍由工具端的身份与
+资源授权决定。两者的关系是"闸门"与"门里的东西"，不能互相替代。
+
+**由此得到的硬性约束（t29 起强制）：** 只要外部工具被启用（`GUANLAN_MCP_URL` /
+`GUANLAN_MCP_TOKEN` / `GUANLAN_MCP_TOKEN_FILE` 任一存在），WeCom 通道**必须**配置
+`WECOM_ALLOWED_USER_IDS` 和/或 `WECOM_ALLOWED_CHAT_IDS`；两者都空时**进程拒绝启动**
+（`wecom_config_error` → 退出码 2），错误信息会点名这两个变量。原因是这两种状态不能同时成立：
+"任何能给机器人发消息的人都能触发一次 run" + "那次 run 用维护者身份读外部数据" =
+任何一个被拉进测试群的第三方都能借维护者的身份拿到数据。
+
+没有启用外部工具时（纯对话部署）保持原行为：不配白名单即不限制，因为此时 run 只能说话，
+不触及任何外部身份。
+
+**前提是"超管创建的机器人只服务于受控会话"。** ADR-002 §5 的单租户委托能成立，依赖两个部署侧
+事实：一是机器人由**企业超级管理员**创建，`from.userid` 才是明文 `userid`（否则恒为 `open_userid`，
+即 ADR-002 的 X4），本通道的会话路由键才可信；二是这个机器人**只被拉进受控的会话集合**。
+本节的启动闸门不是这两个前提的替代品，而是把它们**变成可检查的**——一旦有人在没有白名单的情况下
+把外部工具打开，进程不会"善意地"默认放行，而是直接起不来。
+
+**被拒绝时发生什么：** 判定发生在 `decideWecomRoute()`，早于模型与工具：不建 run、不调模型、
+不调工具，日志记一条 `wecom_channel_outcome` 结论行（`reason: user_not_allowed` /
+`chat_not_allowed`，标识符经 `hashId()` 投影）。默认**不回**任何消息，避免把白名单当成可探测的
+接口；需要给同事一个解释时用 `WECOM_DENIED_REPLY` 配一句固定文案。
 
 ## 3. 启动
 
@@ -68,6 +104,9 @@ npm run wecom:live
 
 退出码：`0` 干净停止，`1` 运行期失败（含认证失败），`2` 配置错误。日志是 stdout 上的 JSON 行，`event` 字段固定，标识符全部经 `hashId()` 投影，
 不含消息正文、原始 `userid`/`chatid`、不含 secret。
+
+**启动闸门**：外部工具已启用（Guanlan MCP 环境变量存在）但会话白名单为空时，进程**启动即失败**
+（`wecom_config_error` → 退出码 2），见 §2.1。
 
 认证失败的处理：SDK 把"订阅被拒"报成 `error` 事件（`853000` / `invalid bot_id`），
 transport 据此立刻以 `auth_failed` 拒绝 `start()`，而不是干等连接超时。

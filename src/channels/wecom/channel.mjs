@@ -17,12 +17,15 @@
 import { hashId, WECOM_DEFAULT_ACK_TEXT, WECOM_MAX_CONTENT_BYTES, WECOM_PLATFORM_ERROR } from "./config.mjs";
 import { createWecomDedupeStore } from "./dedupe.mjs";
 import { normalizeWecomMessageEvent } from "./events.mjs";
-import { decideWecomRoute } from "./policy.mjs";
+import { decideWecomRoute, WECOM_IGNORE_REASON } from "./policy.mjs";
 import { byteLength, splitForSend } from "./text.mjs";
 import { sanitizeModelReply } from "../../redaction.mjs";
 
 export const WECOM_STOP_COMMAND = "/stop";
 export const WECOM_RESEARCH_COMMAND = "/research";
+
+/** Rejections a configured `deniedReply` may answer (authorization, not routing). */
+const DENIAL_REASONS = new Set([WECOM_IGNORE_REASON.USER_NOT_ALLOWED, WECOM_IGNORE_REASON.CHAT_NOT_ALLOWED]);
 
 export const WECOM_REPLIES = Object.freeze({
   stopped: "已停止当前任务。",
@@ -65,6 +68,9 @@ function safeErrorCode(record) {
  *   first phase (`{enabled: true, text: "已收到，正在处理…"}` by default). Only
  *   effective together with `push`
  * @param {{botName?: string, allowedUserIds?: readonly string[], allowedChatIds?: readonly string[]}} [options.policy]
+ * @param {string} [options.deniedReply] fixed sentence for a rejected sender
+ *   (`user_not_allowed` / `chat_not_allowed`); empty means silence, which is the
+ *   default so the allowlist cannot be probed
  * @param {{maxBytes?: number, maxSegments?: number}} [options.segment]
  * @param {object} [options.dedupe]
  * @param {Function} [options.log]
@@ -78,6 +84,7 @@ export function createWecomChannel({
   sessions,
   ack = {},
   policy = {},
+  deniedReply,
   segment = {},
   dedupe = createWecomDedupeStore(),
   log = () => {},
@@ -601,7 +608,27 @@ export function createWecomChannel({
       // A bare mention (`@Mira`) carries no question. Answering it is better than
       // swallowing the message: the user gets a hint in the same conversation.
       if (route.reason === "empty_text") sendHint(event, WECOM_REPLIES.emptyText);
-      return ignored(event, route.reason, { routing: route.kind, replied: route.reason === "empty_text" });
+      // A rejected sender gets no model run and no tool call. By default they get
+      // no reply either, so the allowlist cannot be probed; a deployment may set
+      // one fixed sentence instead.
+      const denial = DENIAL_REASONS.has(route.reason);
+      const denyText = typeof deniedReply === "string" ? deniedReply.trim() : "";
+      if (denial && denyText.length > 0) {
+        void safeReply(event.frame, denyText).then((sent) => {
+          log({
+            level: "info",
+            event: "wecom_denied_reply",
+            reason: route.reason,
+            senderUserId: event.senderUserId ? hashId(event.senderUserId) : undefined,
+            chatId: event.chatId ? hashId(event.chatId) : undefined,
+            delivered: sent.ok === true,
+          });
+        });
+      }
+      return ignored(event, route.reason, {
+        routing: route.kind,
+        replied: route.reason === "empty_text" || (denial && denyText.length > 0),
+      });
     }
 
     if (!event.dedupeKey) return ignored(event, "missing_dedupe_key");
