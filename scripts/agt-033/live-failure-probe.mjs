@@ -17,7 +17,6 @@
  *   node --env-file-if-exists=.env scripts/agt-033/live-failure-probe.mjs
  */
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +31,7 @@ const outIndex = args.indexOf("--out");
 const outPath =
   outIndex >= 0 ? args[outIndex + 1] : join(repoRoot, "poc", "evidence", "agt-033-live-delivery.jsonl");
 const UNREACHABLE_OPEN_ID = `ou_${"0".repeat(32)}`;
-const codeCommit = execSync("git rev-parse HEAD", { cwd: repoRoot }).toString().trim();
+const codeCommit = process.env.AGT_033_CODE_COMMIT ?? null;
 const stateRoot = join(repoRoot, ".work", "agt-033", `failure-probe-${Date.now()}`);
 
 function timestampRunId() {
