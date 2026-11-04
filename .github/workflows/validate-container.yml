@@ -1,0 +1,36 @@
+name: Validate Cloud Pi Container
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - deploy/**
+      - .github/workflows/release-image.yml
+      - .github/workflows/validate-container.yml
+  push:
+    branches: [dev]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - deploy/**
+      - .github/workflows/release-image.yml
+      - .github/workflows/validate-container.yml
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build no-secret production Linux image
+        run: |
+          docker build --pull --platform linux/amd64 --tag cloud-pi-ci:$GITHUB_SHA .
+          docker image inspect cloud-pi-ci:$GITHUB_SHA --format '{{.Architecture}} {{.Config.User}}'
+      - name: Verify an isolated image can run the config checker
+        run: |
+          docker run --rm --network none cloud-pi-ci:$GITHUB_SHA \
+            node src/entry/main.mjs --channels none --check

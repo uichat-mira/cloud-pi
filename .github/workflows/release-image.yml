@@ -1,0 +1,46 @@
+name: Cloud Pi Container Image
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cloud-pi-image-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: npm
+      - name: Verify code with offline tests
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Build Linux/amd64 production image
+        run: |
+          docker build --pull --platform linux/amd64 --tag "mira-cloud-pi:${GITHUB_SHA}" .
+          docker image inspect "mira-cloud-pi:${GITHUB_SHA}" --format '{{.Architecture}}'
+      - name: Package image for small server
+        run: |
+          mkdir -p dist
+          docker save "mira-cloud-pi:${GITHUB_SHA}" | gzip -1 > dist/mira-cloud-pi-linux-amd64.tar.gz
+          (cd dist && sha256sum mira-cloud-pi-linux-amd64.tar.gz > mira-cloud-pi-linux-amd64.tar.gz.sha256)
+      - name: Publish immutable-code prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="cloud-pi-${GITHUB_SHA:0:12}"
+          gh release create "$TAG" \
+            dist/mira-cloud-pi-linux-amd64.tar.gz \
+            dist/mira-cloud-pi-linux-amd64.tar.gz.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Cloud Pi image ${GITHUB_SHA:0:12}" \
+            --notes "CI-built Linux/amd64 image for the Mira organization host. No credentials bundled. Deployment and live smoke are separate." \
+            --prerelease
