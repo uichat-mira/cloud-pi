@@ -184,6 +184,7 @@ async function main() {
 
   let exitCode = 0;
   let summary;
+  let testScheduleId;
   try {
     const service = app.channels.wecom;
     if (!service) throw new Error("the wecom channel did not start; nothing to push to");
@@ -204,13 +205,18 @@ async function main() {
       id: session.chatId,
       label: options.targetType === "wecom_chat" ? "定时研究群" : "定时研究单聊",
     };
+    // Persist the test as a PAUSED one-off from its very first write. Even a
+    // forced kill cannot leave an armed daily schedule that sends later.
+    // Scheduler.runNow() explicitly accepts paused one-off schedules.
     const schedule = await app.scheduler.createSchedule({
-      kind: "recurring",
-      timezone: "Asia/Shanghai",
-      cron: "0 3 * * *",
+      kind: "once",
+      timezone: "UTC",
+      at: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString().slice(0, 19),
+      enabled: false,
       request: { topic: options.topic, timeRange: "24h" },
       deliveryTargets: [target],
     });
+    testScheduleId = schedule.scheduleId;
 
     // 3. Manual trigger of the same path a cron tick would take.
     const trigger = await app.scheduler.runNow(schedule.scheduleId);
@@ -234,6 +240,7 @@ async function main() {
       mode: options.mode,
       at: new Date().toISOString(),
       scheduleId: schedule.scheduleId,
+      scheduleMode: "paused_once",
       runId,
       targetType: target.type,
       destinationMasked: hashId(target.id),
@@ -258,7 +265,34 @@ async function main() {
     };
     exitCode = error?.code === "app_config_error" ? 2 : 1;
   } finally {
-    await app.stop().catch(() => {});
+    // Drain the run and delivery before removing ONLY this invocation's schedule.
+    // Never enumerate or delete other schedules in an existing workspace.
+    try {
+      await app.stop();
+    } catch (error) {
+      exitCode = 1;
+      summary = {
+        ...(summary ?? { event: "agt036_delivery_live", mode: options.mode }),
+        stopError: { code: String(error?.code ?? "stop_failed") },
+      };
+    }
+    if (testScheduleId) {
+      try {
+        const deleted = await app.scheduler.deleteSchedule(testScheduleId);
+        if (deleted?.deleted !== true) throw new Error("scheduler did not confirm deletion");
+        summary = { ...summary, scheduleId: testScheduleId, scheduleMode: "paused_once", cleanup: { scheduleDeleted: true } };
+      } catch (error) {
+        // It was born paused: even a failed cleanup cannot auto-send later.
+        // Still report nonzero so no one mistakes the probe for a clean run.
+        exitCode = 1;
+        summary = {
+          ...(summary ?? { event: "agt036_delivery_live", mode: options.mode }),
+          scheduleId: testScheduleId,
+          scheduleMode: "paused_once",
+          cleanup: { scheduleDeleted: false, code: String(error?.code ?? "cleanup_failed") },
+        };
+      }
+    }
   }
 
   await writeEvidence(options.evidence, summary);
