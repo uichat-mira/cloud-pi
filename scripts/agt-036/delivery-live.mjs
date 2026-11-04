@@ -172,7 +172,14 @@ async function main() {
   delete env.HTTP_PROXY;
 
   const selfTest = options.mode === "self-test" ? await selfTestDeps({ stateDir, runsDir }) : null;
-  if (selfTest) env.CLOUD_AGENT_STATE_DIR = stateDir;
+  if (selfTest) {
+    env.CLOUD_AGENT_STATE_DIR = stateDir;
+    // The unified entry validates channel credentials before injecting the
+    // fake channel. Synthetic values exist ONLY in offline self-test mode, so
+    // CI neither needs nor reads actual enterprise credentials.
+    env.WECOM_BOT_ID = "offline-self-test-bot";
+    env.WECOM_BOT_SECRET = "offline-self-test-not-a-credential";
+  }
 
   const app = createCloudAgentApp({ env, ...(selfTest ? { deps: selfTest.deps } : {}) });
 
