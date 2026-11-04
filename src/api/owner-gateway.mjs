@@ -6,14 +6,10 @@ const SESSION = /^Bearer mcs_v1\.[A-Za-z0-9._-]{12,1024}$/;
 const ID = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,128}$/;
 const MAX_BODY = 16_384;
 
-function localOrigin(input) {
-  const url = new URL(input);
-  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/" ||
-      url.search || url.hash || url.username || url.password) {
-    throw new Error("only exact 127.0.0.1 HTTP origins are permitted");
-  }
-  return url.origin;
-}
+// The Mira node runs these services on fixed loopback ports. No configurable
+// proxy destination is needed, which also removes an SSRF routing surface.
+const AUTH_ORIGIN = "http://127.0.0.1:8788";
+const AGENT_ORIGIN = "http://127.0.0.1:8787";
 
 export function loadOwnerGatewayConfig(env = process.env) {
   const ownerId = String(env.CLOUD_AGENT_OWNER_ACCOUNT_ID ?? "").trim();
@@ -24,32 +20,47 @@ export function loadOwnerGatewayConfig(env = process.env) {
   }
   const port = Number(env.CLOUD_AGENT_OWNER_GATEWAY_PORT ?? 8793);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("invalid owner port");
-  return {
-    ownerId, portalOrigin, port,
-    authOrigin: localOrigin(env.CLOUD_AGENT_AUTH_ORIGIN ?? "http://127.0.0.1:8788"),
-    agentOrigin: localOrigin(env.CLOUD_AGENT_API_ORIGIN ?? "http://127.0.0.1:8787"),
-  };
+  if ((env.CLOUD_AGENT_AUTH_ORIGIN && env.CLOUD_AGENT_AUTH_ORIGIN !== AUTH_ORIGIN) ||
+      (env.CLOUD_AGENT_API_ORIGIN && env.CLOUD_AGENT_API_ORIGIN !== AGENT_ORIGIN)) {
+    throw new Error("owner gateway peers must use fixed 127.0.0.1 service ports");
+  }
+  return { ownerId, portalOrigin, port, authOrigin: AUTH_ORIGIN, agentOrigin: AGENT_ORIGIN };
 }
 
-function routeAllowed(method, raw) {
-  if (/%2f|%5c|%2e/i.test(raw)) return false;
+// Emit an explicit canonical path, not raw req.url. Only known route shapes,
+// bounded identifiers and listed query keys can reach the loopback API.
+function authorizedPath(method, raw) {
+  if (/%2f|%5c|%2e|%25/i.test(raw)) return null;
   const u = new URL(raw, "http://127.0.0.1");
   const parts = u.pathname.split("/").filter(Boolean);
-  if (parts[0] !== "v1") return false;
-  if (["health", "status"].includes(parts[1])) return method === "GET" && parts.length === 2 && !u.search;
+  if (parts[0] !== "v1") return null;
+  if (["health", "status"].includes(parts[1]) && method === "GET" && parts.length === 2 && !u.search) {
+    return "/v1/" + parts[1];
+  }
   if (parts[1] === "schedules") {
-    if (parts.length === 2) return ["GET", "POST"].includes(method) && !u.search;
-    if (!ID.test(parts[2])) return false;
-    if (parts.length === 3) return ["GET", "PATCH", "DELETE"].includes(method) && !u.search;
-    return parts.length === 4 && method === "POST" &&
-      ["pause", "enable", "run-now", "cancel"].includes(parts[3]) && !u.search;
+    if (parts.length === 2 && ["GET", "POST"].includes(method) && !u.search) return "/v1/schedules";
+    if (!ID.test(parts[2])) return null;
+    const base = "/v1/schedules/" + parts[2];
+    if (parts.length === 3 && ["GET", "PATCH", "DELETE"].includes(method) && !u.search) return base;
+    if (parts.length === 4 && method === "POST" && ["pause", "enable", "run-now", "cancel"].includes(parts[3]) && !u.search) return base + "/" + parts[3];
+    return null;
   }
   if (parts[1] === "runs" && method === "GET") {
-    if (parts.length === 2) return [...u.searchParams.keys()].every(k => k === "limit" || k === "scheduleId");
-    return ID.test(parts[2]) && !u.search &&
-      (parts.length === 3 || (parts.length === 4 && ["report", "delivery"].includes(parts[3])));
+    if (parts.length === 2) {
+      const params = u.searchParams;
+      if ([...params.keys()].some(k => !["limit", "scheduleId"].includes(k))) return null;
+      if (params.has("limit") && !/^(?:[1-9]|[1-9][0-9]|100)$/.test(params.get("limit"))) return null;
+      if (params.has("scheduleId") && !ID.test(params.get("scheduleId"))) return null;
+      const qs = new URLSearchParams();
+      if (params.has("limit")) qs.set("limit", params.get("limit"));
+      if (params.has("scheduleId")) qs.set("scheduleId", params.get("scheduleId"));
+      return "/v1/runs" + (qs.size ? "?" + qs.toString() : "");
+    }
+    if (!ID.test(parts[2]) || u.search) return null;
+    if (parts.length === 3) return "/v1/runs/" + parts[2];
+    if (parts.length === 4 && ["report", "delivery"].includes(parts[3])) return "/v1/runs/" + parts[2] + "/" + parts[3];
   }
-  return false;
+  return null;
 }
 
 function respond(res, status, payload) {
@@ -70,7 +81,7 @@ function respond(res, status, payload) {
  * The caller cannot choose scheme, host, port or redirect destination.
  */
 async function requestLocalAgent({ config, path, method, body }) {
-  const port = Number(new URL(config.agentOrigin).port || 80);
+  const port = 8787;
   return await new Promise((resolve, reject) => {
     const req = httpRequest({
       hostname: "127.0.0.1",
@@ -135,8 +146,8 @@ export function createOwnerGateway({ config, fetchImpl = fetch, authorize, reque
   async function handle(req, res) {
     try {
       const method = req.method ?? "";
-      const path = req.url ?? "/";
-      if (!routeAllowed(method, path)) return respond(res, 404, { error: "not_found" });
+      const path = authorizedPath(method, req.url ?? "/");
+      if (path === null) return respond(res, 404, { error: "not_found" });
       const bearer = req.headers.authorization ?? "";
       if (!SESSION.test(bearer)) return respond(res, 401, { error: "authentication_required" });
       const auth = await verify(bearer);
