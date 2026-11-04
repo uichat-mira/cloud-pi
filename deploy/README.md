@@ -78,3 +78,35 @@ permissions. Regular IM chat does not inherit owner-private Guanlan access.
 - No API key, Cloud Session, token contents or full chat IDs in logs/PRs.
 - The Cloud Auth portal is a **later management facade**. Do not expose
   the loopback management API as a shortcut to get a dashboard working.
+
+## Owner-only Cloud Auth portal bridge
+
+A second *small HTTP gateway* container runs on host loopback 127.0.0.1:8793.
+It is **not** another Agent runtime. Every request verifies a live Cloud Auth
+Session at host 127.0.0.1:8788 and compares the returned account id to the
+explicit `CLOUD_AGENT_OWNER_ACCOUNT_ID`. Rejected or offline auth fails
+closed. It never forwards the Cloud Session bearer to Cloud Pi.
+
+Only this gateway may be exposed by Caddy at the existing Cloud Auth origin
+under `/agent-control/*`. A same-origin request from the Cloud Auth Portal
+must supply its own Cloud Session bearer header. Writes require an exact
+Origin match and the gateway forwards only enumerated Agent API routes.
+The internal unauthenticated port 8787 stays strictly loopback and must
+**never** be proxied directly.
+
+For the existing `cloud-auth.tomzlab.cn` Caddy site, place this handler
+**before** the SPA fallback (replace no other site handler):
+
+```caddy
+handle_path /agent-control/* {
+  header Cache-Control "no-store"
+  header X-Frame-Options "DENY"
+  header X-Content-Type-Options "nosniff"
+  reverse_proxy 127.0.0.1:8793
+}
+```
+
+Use `caddy validate --config /etc/caddy/Caddyfile` before reloading.
+401 when unauthenticated, 403 for another Cloud Account or wrong mutation
+Origin, and 503 when Cloud Auth/Agent is down are correct results; 200 alone
+is not proof of a whole research job.
