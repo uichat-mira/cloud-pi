@@ -33,7 +33,10 @@ async function runProbe(root, extra = []) {
     child.on("close", (code) => { clearTimeout(timer); done({ exitCode: code, stdout, stderr }); });
   });
 
-  const lines = (await readFile(evidence, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+  const contents = await readFile(evidence, "utf8").catch((error) => {
+    throw new Error(`probe did not write evidence (exit=${exitCode}): stdout=${stdout} stderr=${stderr}`, { cause: error });
+  });
+  const lines = contents.trim().split("\n").map((line) => JSON.parse(line));
   const report = lines.at(-1);
   const scheduleFiles = await readdir(join(stateDir, "scheduler", "schedules")).catch((error) => {
     if (error?.code === "ENOENT") return [];
