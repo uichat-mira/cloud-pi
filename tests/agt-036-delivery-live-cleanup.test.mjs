@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,9 @@ const SCRIPT = join(ROOT, "scripts", "agt-036", "delivery-live.mjs");
 async function runProbe(root, extra = []) {
   const stateDir = join(root, "probe-state");
   const evidence = join(root, "evidence.jsonl");
+  // Node 22 may consume --env-file as a runtime option before the script sees
+  // it. Keep the path real but empty so the test cannot load operator secrets.
+  await writeFile(join(root, "no-model.env"), "", "utf8");
   const args = [
     SCRIPT,
     "--self-test",
