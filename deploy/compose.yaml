@@ -31,3 +31,31 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # Protected owner API for Cloud Auth's SPA. This is a separate SMALL Node
+  # process, not a second agent or another connection to either IM provider.
+  owner-gateway:
+    image: ${CLOUD_PI_IMAGE:?Set CLOUD_PI_IMAGE to an immutable release-tagged image}
+    container_name: mira-cloud-pi-owner-gateway
+    network_mode: host
+    restart: unless-stopped
+    init: true
+    mem_limit: 96m
+    cpus: 0.25
+    pids_limit: 32
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=64
+    volumes:
+      - ${CLOUD_PI_SECRETS_FILE:?Set CLOUD_PI_SECRETS_FILE to a private real file}:/run/secrets/agent.env:ro
+    command: ["node", "--env-file=/run/secrets/agent.env", "src/api/owner-gateway.mjs"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8793/v1/status',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
