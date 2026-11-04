@@ -80,7 +80,7 @@ function respond(res, status, payload) {
  * numeric loopback IP. The requested route was enumerated by routeAllowed().
  * The caller cannot choose scheme, host, port or redirect destination.
  */
-async function requestLocalAgent({ config, path, method, body }) {
+async function requestLocalAgent({ path, method, body, timeoutMs }) {
   const port = 8787;
   return await new Promise((resolve, reject) => {
     const req = httpRequest({
@@ -90,7 +90,7 @@ async function requestLocalAgent({ config, path, method, body }) {
       method,
       headers: body?.length ? { "content-type": "application/json", "content-length": body.length } : {},
       agent: false,
-      timeout: 10_000,
+      timeout: timeoutMs,
     }, (res) => {
       const parts = [];
       let length = 0;
@@ -160,7 +160,11 @@ export function createOwnerGateway({ config, fetchImpl = fetch, authorize, reque
       if (body?.length && !/^application\/json(?:;|$)/i.test(req.headers["content-type"] ?? "")) {
         return respond(res, 415, { error: "json_required" });
       }
-      const result = await requestAgent({ config, path, method, body });
+      // The existing run-now API resolves only after research and delivery
+      // reach a terminal state. A 10s timeout reports a false failure while
+      // the costly run continues, inviting accidental duplicate triggers.
+      const timeoutMs = method === "POST" && path.endsWith("/run-now") ? 360_000 : 10_000;
+      const result = await requestAgent({ path, method, body, timeoutMs });
       if (result.data.length > 1_048_576) return respond(res, 502, { error: "response_too_large" });
       res.writeHead(result.status, {
         "content-type": "application/json; charset=utf-8",
