@@ -69,3 +69,19 @@ test("canonicalizer rejects encoded separators, external absolute URLs and inval
   assert.equal((await fetch(base + "/v1/runs?limit=10", { headers })).status, 200);
   assert.deepEqual(paths, ["/v1/runs?limit=10"]);
 });
+
+test("run-now waits for terminal research without a misleading short timeout", async (suite) => {
+  const calls = [];
+  const gw = createOwnerGateway({config, authorize: async () => 200, requestAgent: async (request) => {
+    calls.push(request);
+    return {status:200, data:Buffer.from(JSON.stringify({ok:true,data:{status:"completed"}}))};
+  }});
+  const base = await gw.start(0);
+  suite.after(() => gw.stop());
+  const auth = {authorization:bearer,origin:config.portalOrigin};
+  assert.equal((await fetch(base + "/v1/schedules/s-123/run-now", {method:"POST",headers:auth})).status, 200);
+  assert.equal(calls[0].path, "/v1/schedules/s-123/run-now");
+  assert.equal(calls[0].timeoutMs, 360000);
+  assert.equal((await fetch(base + "/v1/status", {headers:{authorization:bearer}})).status, 200);
+  assert.equal(calls[1].timeoutMs, 10000);
+});
