@@ -1,5 +1,5 @@
 /** Owner-only portal bridge. Unauthenticated AGT-034 stays on loopback. */
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import { fileURLToPath } from "node:url";
 
 const SESSION = /^Bearer mcs_v1\.[A-Za-z0-9._-]{12,1024}$/;
@@ -64,6 +64,45 @@ function respond(res, status, payload) {
   res.end(body);
 }
 
+/**
+ * A network boundary, not a generic HTTP proxy: this always connects to the
+ * numeric loopback IP. The requested route was enumerated by routeAllowed().
+ * The caller cannot choose scheme, host, port or redirect destination.
+ */
+async function requestLocalAgent({ config, path, method, body }) {
+  const port = Number(new URL(config.agentOrigin).port || 80);
+  return await new Promise((resolve, reject) => {
+    const req = httpRequest({
+      hostname: "127.0.0.1",
+      port,
+      path,
+      method,
+      headers: body?.length ? { "content-type": "application/json", "content-length": body.length } : {},
+      agent: false,
+      timeout: 10_000,
+    }, (res) => {
+      const parts = [];
+      let length = 0;
+      res.on("data", (chunk) => {
+        length += chunk.length;
+        if (length > 1_048_576) {
+          req.destroy(Object.assign(new Error("local API response exceeds limit"), { status: 502 }));
+          return;
+        }
+        parts.push(chunk);
+      });
+      res.on("end", () => resolve({
+        status: res.statusCode || 502,
+        data: Buffer.concat(parts),
+      }));
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.on("timeout", () => req.destroy(new Error("local API timeout")));
+    req.end(body?.length ? body : undefined);
+  });
+}
+
 async function collectBody(req) {
   if (Number(req.headers["content-length"]) > MAX_BODY) return null;
   let size = 0;
@@ -89,7 +128,7 @@ export async function verifyCloudOwner(bearer, config, fetchImpl = fetch) {
   } catch { return 503; }
 }
 
-export function createOwnerGateway({ config, fetchImpl = fetch, authorize } = {}) {
+export function createOwnerGateway({ config, fetchImpl = fetch, authorize, requestAgent = requestLocalAgent } = {}) {
   if (!config) throw new TypeError("config required");
   const verify = authorize ?? (bearer => verifyCloudOwner(bearer, config, fetchImpl));
   let server = null;
@@ -110,20 +149,14 @@ export function createOwnerGateway({ config, fetchImpl = fetch, authorize } = {}
       if (body?.length && !/^application\/json(?:;|$)/i.test(req.headers["content-type"] ?? "")) {
         return respond(res, 415, { error: "json_required" });
       }
-      const result = await fetchImpl(config.agentOrigin + path, {
-        method,
-        ...(body?.length ? { body, headers: { "content-type": "application/json" } } : {}),
-        redirect: "error", signal: AbortSignal.timeout(10_000),
-      });
-      if (Number(result.headers.get("content-length")) > 1_048_576) return respond(res, 502, { error: "response_too_large" });
-      const data = Buffer.from(await result.arrayBuffer());
-      if (data.length > 1_048_576) return respond(res, 502, { error: "response_too_large" });
+      const result = await requestAgent({ config, path, method, body });
+      if (result.data.length > 1_048_576) return respond(res, 502, { error: "response_too_large" });
       res.writeHead(result.status, {
         "content-type": "application/json; charset=utf-8",
-        "content-length": data.length, "cache-control": "no-store",
+        "content-length": result.data.length, "cache-control": "no-store",
         "x-content-type-options": "nosniff", "x-frame-options": "DENY",
       });
-      res.end(data);
+      res.end(result.data);
     } catch { respond(res, 503, { error: "gateway_unavailable" }); }
   }
   return {
