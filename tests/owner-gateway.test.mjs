@@ -54,3 +54,18 @@ test("non-owner cannot read private run history", async (t) => {
   assert.equal((await fetch(base + "/v1/runs", { headers: { authorization: bearer } })).status, 403);
   assert.equal(calls, 0);
 });
+
+test("canonicalizer rejects encoded separators, external absolute URLs and invalid query shape", async (t) => {
+  const paths = [];
+  const gw = createOwnerGateway({ config, authorize: async () => 200,
+    requestAgent: async ({path}) => { paths.push(path); return { status: 200, data: Buffer.from("{}") }; },
+  });
+  const base = await gw.start(0);
+  t.after(() => gw.stop());
+  const headers = { authorization: bearer };
+  for (const path of ["/v1/runs?limit=9999", "/v1/runs?userId=foreign", "/v1/schedules/%252e%252e", "/v1/runs/%2Fetc", "/v1/runs?limit=10&scheduleId=%2Fetc"]) {
+    assert.equal((await fetch(base + path, { headers })).status, 404, path);
+  }
+  assert.equal((await fetch(base + "/v1/runs?limit=10", { headers })).status, 200);
+  assert.deepEqual(paths, ["/v1/runs?limit=10"]);
+});
