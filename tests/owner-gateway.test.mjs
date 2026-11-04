@@ -23,9 +23,9 @@ test("real HTTP denies guest, enforces origin and never forwards bearer", async 
   const forwarded = [];
   const gw = createOwnerGateway({
     config, authorize: async () => 200,
-    fetchImpl: async (url, init) => {
-      forwarded.push({ url, method: init.method, auth: init.headers?.authorization });
-      return response({ ok: true, data: { state: "up" } });
+    requestAgent: async ({path,method,body}) => {
+      forwarded.push({ url: "http://127.0.0.1:8787" + path, method, auth: undefined });
+      return { status: 200, data: Buffer.from(JSON.stringify({ ok: true, data: { state: "up" } })) };
     },
   });
   const base = await gw.start(0);
@@ -48,7 +48,7 @@ test("real HTTP denies guest, enforces origin and never forwards bearer", async 
 });
 test("non-owner cannot read private run history", async (t) => {
   let calls = 0;
-  const gw = createOwnerGateway({ config, authorize: async () => 403, fetchImpl: async () => { calls++; return response({}); } });
+  const gw = createOwnerGateway({ config, authorize: async () => 403, requestAgent: async () => { calls++; return { status: 200, data: Buffer.from("{}") }; } });
   const base = await gw.start(0);
   t.after(() => gw.stop());
   assert.equal((await fetch(base + "/v1/runs", { headers: { authorization: bearer } })).status, 403);
