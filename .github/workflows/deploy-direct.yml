@@ -95,7 +95,8 @@ jobs:
             -o ServerAliveInterval=15
             -o ServerAliveCountMax=3)
           remote="$DEPLOY_USER@$DEPLOY_HOST"
-          # shellcheck disable=SC2016 -- this command is evaluated on the remote host.
+          # Remote command expands only after connecting to the server.
+          # shellcheck disable=SC2016
           sshpass -e ssh -p "$DEPLOY_PORT" "${opts[@]}" "$remote" '
             set -eu
             test "$(id -u)" = 0
