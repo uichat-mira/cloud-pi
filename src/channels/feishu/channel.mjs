@@ -9,7 +9,7 @@
  * cannot become a second Agent Runtime.
  *
  * Guarantees this module enforces:
- *  - routing is decided before any run (private / authorized group @ / ignore);
+ *  - routing is decided before any run (private / verified group @ / ignore);
  *  - a dedupe key is reserved before the async run starts, so redelivery and
  *    concurrent duplicates produce one run;
  *  - only an explicit `/research <topic>` command starts research; every other
@@ -170,7 +170,6 @@ export function buildResearchReply(record, { maxChars = MAX_RESEARCH_REPLY_CHARS
 
 /**
  * @param {object} options
- * @param {Iterable<string>|Set<string>} [options.allowedChatIds] trusted POC group allowlist
  * @param {string|Function} [options.botOpenId] verified bot open id, or a getter
  * @param {Function} options.runTurn async ({text, chatId, chatType, messageId, signal}) => run record
  * @param {Function} [options.runResearch] async ({topic, chatId, chatType, messageId, signal}) =>
@@ -182,7 +181,6 @@ export function buildResearchReply(record, { maxChars = MAX_RESEARCH_REPLY_CHARS
  * @param {Function} [options.log] structured diagnostic sink
  */
 export function createFeishuChannel({
-  allowedChatIds = [],
   botOpenId,
   runTurn,
   runResearch,
@@ -195,7 +193,6 @@ export function createFeishuChannel({
   if (typeof reply !== "function") throw new TypeError("createFeishuChannel requires reply()");
 
   const policy = {
-    allowedChatIds: allowedChatIds instanceof Set ? allowedChatIds : new Set(allowedChatIds),
     get botOpenId() {
       return typeof botOpenId === "function" ? botOpenId() : botOpenId;
     },

@@ -58,7 +58,6 @@ export async function startFeishuService({
     });
 
     channel = createFeishuChannel({
-      allowedChatIds: config.allowedChatIds,
       botOpenId: () => transport.getBotOpenId(),
       runTurn: agent.runTurn,
       runResearch: research.runResearch,

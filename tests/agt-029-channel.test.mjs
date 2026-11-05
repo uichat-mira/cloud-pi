@@ -12,11 +12,10 @@ import { botMention, textEvent } from "./helpers/feishu-events.mjs";
 
 const BOT_OPEN_ID = "ou_bot_0001";
 
-function createHarness({ runTurn, reply, allowedChatIds = ["oc_group"], botOpenId = BOT_OPEN_ID } = {}) {
+function createHarness({ runTurn, reply, botOpenId = BOT_OPEN_ID } = {}) {
   const outcomes = [];
   const replies = [];
   const channel = createFeishuChannel({
-    allowedChatIds,
     botOpenId,
     runTurn: runTurn ?? (async () => ({ status: "succeeded", text: "ok", runId: "run-default" })),
     reply:
@@ -69,8 +68,8 @@ describe("AGT-029 T2: private chat route", () => {
   });
 });
 
-describe("AGT-029 T2: group authorization and mentions", () => {
-  test("an authorized group with @bot runs", async () => {
+describe("AGT-029 T2: group chat and verified mentions", () => {
+  test("a group with @bot runs", async () => {
     const calls = [];
     const { channel, replies } = createHarness({
       runTurn: async (input) => {
@@ -85,7 +84,7 @@ describe("AGT-029 T2: group authorization and mentions", () => {
     assert.equal(replies.length, 1);
   });
 
-  test("an authorized group without @bot never calls the runtime", async () => {
+  test("a group without @bot never calls the runtime", async () => {
     let calls = 0;
     const { channel, replies, outcomes } = createHarness({
       runTurn: async () => {
@@ -100,20 +99,20 @@ describe("AGT-029 T2: group authorization and mentions", () => {
     assert.equal(outcomes.at(-1).reason, "group_without_mention");
   });
 
-  test("an unauthorized group never calls the runtime, even with @bot", async () => {
-    let calls = 0;
+  test("a previously unlisted group can @bot and receive a real adapter reply", async () => {
+    const calls = [];
     const { channel, replies, outcomes } = createHarness({
-      allowedChatIds: ["oc_allowed"],
-      runTurn: async () => {
-        calls += 1;
-        return { status: "succeeded", text: "should not run", runId: "run-no" };
+      runTurn: async (input) => {
+        calls.push(input);
+        return { status: "succeeded", text: "group answer", runId: "run-open" };
       },
     });
     channel.handleEvent(groupEvent({ chatId: "oc_other", text: "@_user_1 hi" }));
     await channel.whenIdle();
-    assert.equal(calls, 0);
-    assert.equal(replies.length, 0);
-    assert.equal(outcomes.at(-1).reason, "unauthorized_group");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].text, "hi");
+    assert.equal(replies.length, 1);
+    assert.equal(outcomes.find((entry) => entry.action === "accepted")?.reason, "group_mention");
   });
 });
 
@@ -279,11 +278,15 @@ describe("AGT-029 T2: stop / cancel", () => {
     assert.ok(outcomes.some((outcome) => outcome.reason === "stopped_before_start"));
   });
 
-  test("a stop command in an unauthorized group is ignored", async () => {
-    const { channel, replies } = createHarness({ allowedChatIds: ["oc_allowed"] });
-    channel.handleEvent(groupEvent({ chatId: "oc_other", text: "/stop" }));
+  test("a stop command in a group requires @bot", async () => {
+    const { channel, replies } = createHarness();
+    channel.handleEvent(groupEvent({ chatId: "oc_other", text: "/stop", mentions: [] }));
     await channel.whenIdle();
     assert.equal(replies.length, 0);
+    channel.handleEvent(groupEvent({ chatId: "oc_other", text: "@_user_1 /stop" }));
+    await channel.whenIdle();
+    assert.equal(replies.length, 1);
+    assert.equal(replies[0].text, CHANNEL_REPLIES.noActiveRun);
   });
 });
 
