@@ -1,0 +1,119 @@
+name: Deploy Cloud Pi (direct)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: "Full immutable Cloud Pi image commit SHA already released by CI"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-pi-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/prod'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: production
+    steps:
+      - name: Checkout production source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate production release candidate
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Full lower-case commit SHA required"; exit 1; }
+          git cat-file -e "$RELEASE_SHA^{commit}"
+          git merge-base --is-ancestor "$RELEASE_SHA" "$GITHUB_SHA" || {
+            echo "Image source commit must already be in the Cloud Pi prod branch"
+            exit 1
+          }
+          bash -n deploy/ci-release.sh
+          echo "Verified production source ancestry and deploy script"
+
+      - name: Download and verify CI-built image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p dist
+          TAG="cloud-pi-$(printf '%s' "$RELEASE_SHA" | cut -c1-12)"
+          gh release download "$TAG" --repo uichat-mira/cloud-pi --dir dist \
+            --pattern 'mira-cloud-pi-linux-amd64.tar.gz*'
+          (cd dist && sha256sum -c mira-cloud-pi-linux-amd64.tar.gz.sha256)
+          gzip -t dist/mira-cloud-pi-linux-amd64.tar.gz
+          git show "$RELEASE_SHA:deploy/compose.yaml" > dist/compose.yaml
+          cp deploy/ci-release.sh dist/ci-release.sh
+          printf '%s\n' "$RELEASE_SHA" > dist/version.txt
+          export CLOUD_PI_IMAGE="mira-cloud-pi:$RELEASE_SHA"
+          export CLOUD_PI_DATA_DIR=/opt/cloud-pi/data
+          export CLOUD_PI_SECRETS_FILE=/opt/cloud-pi/secrets/agent.env
+          docker compose -f dist/compose.yaml config --quiet
+
+      - name: Transfer and activate on Mira server with pinned SSH identity
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          SSHPASS: ${{ secrets.DEPLOY_PASSWORD }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          for key in DEPLOY_HOST DEPLOY_USER DEPLOY_PORT SSHPASS DEPLOY_KNOWN_HOSTS; do
+            if test -z "${!key}"; then
+              echo "Required GitHub Actions deployment secret unavailable: $key"
+              exit 1
+            fi
+          done
+          test "$DEPLOY_USER" = root || { echo "Expected authorized root deployment account"; exit 1; }
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq sshpass >/dev/null
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/cloud-pi-known-hosts"
+          chmod 600 "$RUNNER_TEMP/cloud-pi-known-hosts"
+          opts=(-o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$RUNNER_TEMP/cloud-pi-known-hosts"
+            -o GlobalKnownHostsFile=/dev/null
+            -o BatchMode=no
+            -o PreferredAuthentications=password
+            -o NumberOfPasswordPrompts=1
+            -o ConnectTimeout=15
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=3)
+          remote="$DEPLOY_USER@$DEPLOY_HOST"
+          # Remote command expands only after connecting to the server.
+          # shellcheck disable=SC2016
+          sshpass -e ssh -p "$DEPLOY_PORT" "${opts[@]}" "$remote" '
+            set -eu
+            test "$(id -u)" = 0
+            test -s /opt/cloud-pi/secrets/agent.env
+            test -d /opt/cloud-pi/data
+            install -d -m 0755 /opt/cloud-pi/dist /opt/cloud-pi/backups
+            if test -s /opt/cloud-pi/dist/version.txt; then
+              cp /opt/cloud-pi/dist/version.txt "/opt/cloud-pi/backups/version-$(date -u +%Y%m%dT%H%M%SZ).txt"
+            fi
+            if test -s /opt/cloud-pi/dist/compose.yaml; then
+              cp /opt/cloud-pi/dist/compose.yaml "/opt/cloud-pi/backups/compose-$(date -u +%Y%m%dT%H%M%SZ).yaml"
+            fi
+          '
+          sshpass -e scp -P "$DEPLOY_PORT" "${opts[@]}" \
+            dist/compose.yaml dist/version.txt dist/ci-release.sh \
+            dist/mira-cloud-pi-linux-amd64.tar.gz \
+            dist/mira-cloud-pi-linux-amd64.tar.gz.sha256 \
+            "$remote:/opt/cloud-pi/dist/"
+          sshpass -e ssh -p "$DEPLOY_PORT" "${opts[@]}" "$remote" \
+            'bash /opt/cloud-pi/dist/ci-release.sh'
