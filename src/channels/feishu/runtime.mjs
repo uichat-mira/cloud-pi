@@ -272,6 +272,15 @@ export function createFeishuResearchRunner({
       const normalizedTopic = typeof topic === "string" ? topic.trim() : "";
       if (normalizedTopic.length === 0) return researchFailure(ERROR_CODE.INVALID_REQUEST);
 
+      // IM chat is open to everyone, but Guanlan is an owner-delegated private
+      // service. The public /research entry has no trusted Cloud Account
+      // identity: never let it inherit a configured private MCP credential.
+      // Scheduled owner-controlled research uses a separate runner.
+      if (typeof runEnv.GUANLAN_MCP_URL === "string" && runEnv.GUANLAN_MCP_URL.trim()) {
+        log({ level: "warn", event: "feishu_research_private_tool_blocked" });
+        return researchFailure(ERROR_CODE.RUNTIME_UNAVAILABLE);
+      }
+
       // The executor always receives an AbortSignal, even when a caller (e.g. a
       // future non-Feishu entry) does not pass one.
       const runSignal = signal ?? new AbortController().signal;

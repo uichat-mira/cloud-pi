@@ -5,12 +5,10 @@
  * never persisted, logged or returned by `describeFeishuConfig()`; every
  * validation error names the offending variable, never its value.
  *
- * Group authorization is a local, trusted POC allowlist (`FEISHU_ALLOWED_CHAT_IDS`).
- * It is not Cloud Auth authorization and it grants no member any account,
- * Guanlan or tool privilege.
- *
- * Fail closed: an invalid or incomplete configuration stops the process before
- * it connects, and a group message from a chat that is not listed is ignored.
+ * The optional FEISHU_ALLOWED_CHAT_IDS is retained only for outbound
+ * destination discovery in existing collaboration scripts. It does not control
+ * inbound conversations or which groups may mention the bot.
+ * Invalid credentials continue to fail closed before connecting.
  */
 
 export const FEISHU_CONFIG_KEYS = Object.freeze({

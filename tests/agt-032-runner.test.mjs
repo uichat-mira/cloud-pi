@@ -116,6 +116,30 @@ describe("AGT-032 T2: startResearch call boundary", () => {
     assert.equal(calls.length, 0);
   });
 
+  test("public chat research cannot inherit Guanlan owner credentials", async () => {
+    const { startResearchFn, calls } = fakeResearch();
+    let portLoads = 0;
+    const runner = createFeishuResearchRunner({
+      ...baseOptions({
+        env: {
+          GUANLAN_MCP_URL: "https://private.example.invalid/mcp",
+          GUANLAN_MCP_TOKEN: "owner-secret-not-for-chat",
+        },
+        loadPort: async () => {
+          portLoads += 1;
+          return port();
+        },
+      }),
+      startResearchFn,
+      readRunFn: fakeReadRun().readRunFn,
+    });
+    const result = await runner.runResearch({ topic: "owner private news" });
+    assert.equal(result.status, "failed");
+    assert.equal(result.error.code, "runtime_unavailable");
+    assert.equal(calls.length, 0);
+    assert.equal(portLoads, 0);
+  });
+
   test("an empty topic never reaches startResearch", async () => {
     const { startResearchFn, calls } = fakeResearch();
     const runner = createFeishuResearchRunner({ ...baseOptions(), startResearchFn, readRunFn: fakeReadRun().readRunFn });

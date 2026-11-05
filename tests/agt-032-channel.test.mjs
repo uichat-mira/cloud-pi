@@ -30,11 +30,10 @@ function deferred() {
   return { promise, resolve };
 }
 
-function harness({ runTurn, runResearch, reply, allowedChatIds = ["oc_group"], botOpenId = BOT_OPEN_ID } = {}) {
+function harness({ runTurn, runResearch, reply, botOpenId = BOT_OPEN_ID } = {}) {
   const outcomes = [];
   const replies = [];
   const channel = createFeishuChannel({
-    allowedChatIds,
     botOpenId,
     runTurn:
       runTurn ??
@@ -283,8 +282,8 @@ describe("AGT-032 T1/T2: channel routing for /research", () => {
   });
 });
 
-describe("AGT-032 T1/T2: group authorization and sender rules", () => {
-  test("an authorized group with @bot can trigger research", async () => {
+describe("AGT-032 T1/T2: group mention and sender rules", () => {
+  test("any group with @bot can trigger public research", async () => {
     const topics = [];
     const { channel } = harness({
       runResearch: async ({ topic }) => {
@@ -297,12 +296,12 @@ describe("AGT-032 T1/T2: group authorization and sender rules", () => {
     assert.deepEqual(topics, ["AI 新闻"]);
   });
 
-  test("authorized group without @bot and unauthorized groups never start research", async () => {
+  test("an unlisted group requires @bot but is not blocked from public research", async () => {
     let calls = 0;
     const { channel, outcomes } = harness({
       runResearch: async () => {
         calls += 1;
-        return { status: "completed", runId: "r-no" };
+        return { status: "completed", runId: "r-open", report: REPORT_TEXT };
       },
     });
     channel.handleEvent(groupEvent({ text: "/research AI 新闻", mentions: [] }));
@@ -310,12 +309,10 @@ describe("AGT-032 T1/T2: group authorization and sender rules", () => {
     assert.equal(calls, 0);
     assert.equal(outcomes.at(-1).reason, "group_without_mention");
 
-    channel.handleEvent(
-      groupEvent({ chatId: "oc_other", text: "@_user_1 /research AI 新闻" }),
-    );
+    channel.handleEvent(groupEvent({ chatId: "oc_other", text: "@_user_1 /research AI 新闻" }));
     await channel.whenIdle();
-    assert.equal(calls, 0);
-    assert.equal(outcomes.at(-1).reason, "unauthorized_group");
+    assert.equal(calls, 1);
+    assert.ok(outcomes.some((entry) => entry.action === "accepted" && entry.reason === "group_mention"));
   });
 
   test("non-user senders and duplicate deliveries never start research", async () => {
