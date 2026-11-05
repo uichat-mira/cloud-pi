@@ -17,6 +17,36 @@ The loaded image tag is `mira-cloud-pi:<full-commit-sha>`.
 Compare the SHA and artifact checksum before loading. Avoid building on this
 small shared production server.
 
+## Direct GitHub Actions production deployment (no Infra dependency)
+
+Cloud Pi owns its deployment workflow: `.github/workflows/deploy-direct.yml`.
+The workflow is manually dispatched **on Cloud Pi's `prod` branch**, using
+a full immutable release commit SHA (for example, a reviewed `dev` image
+already built and published by `release-image.yml`). It requires that
+commit to be an ancestor of `prod`, enforcing promotion first through
+`dev → test → prod`.
+
+The job uses these **organization-level GitHub Actions secrets**, if the
+Cloud Pi repository has been granted access: `DEPLOY_HOST`,
+`DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_PASSWORD`, and
+`DEPLOY_KNOWN_HOSTS`. It checks the five names for nonempty values before
+contacting the server; no secret values are committed or logged. The remote
+SSH host key is pinned, never automatically accepted.
+
+The job verifies the release archive SHA-256, uploads only the image,
+the matching Compose file, its commit SHA, and Cloud Pi's own
+`deploy/ci-release.sh` script. Remote preparation preserves persistent
+state and previous configuration; the script loads the image before
+cutover, backs up state, restarts only the Cloud Pi Compose project, probes
+loopback Agent health plus the owner gateway's unauthenticated 401, and
+attempts to restore the last loaded image if post-release health fails.
+Cloud Pi does **not** need `mira-cloud-infra`, a local DC session or an
+external deployment variable to run this workflow.
+
+**Limit:** HTTP/container health does not establish real Feishu group @,
+WeCom delivery, private Guanlan delegation, or model behavior. Require a
+separate real IM @ acceptance after production deployment.
+
 ## First-time target preparation
 
 1. Provision a private configuration file from `deploy/agent.env.example`
